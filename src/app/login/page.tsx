@@ -73,6 +73,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="rounded-xl h-12"
+                suppressHydrationWarning={true}
               />
             </div>
             <div className="space-y-2">
@@ -93,9 +94,10 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="rounded-xl h-12"
+                suppressHydrationWarning={true}
               />
             </div>
-            <Button type="submit" className="w-full h-12 rounded-xl text-base" disabled={isLoading} suppressHydrationWarning={true}>
+            <Button type="submit" className="w-full h-12 rounded-xl text-base" disabled={isLoading}>
               {isLoading ? 'Logging in...' : 'Login'}
             </Button>
           </form>

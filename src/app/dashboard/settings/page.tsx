@@ -96,23 +96,23 @@ export default function SettingsPage() {
                                         <AvatarImage src={user.avatar} data-ai-hint="person portrait" />
                                         <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
                                     </Avatar>
-                                    <Button variant="outline" className="rounded-full" disabled suppressHydrationWarning={true}>Change Photo</Button>
+                                    <Button variant="outline" className="rounded-full" disabled>Change Photo</Button>
                                 </div>
                                 <div className="grid gap-6 md:grid-cols-2">
                                     <div className="space-y-2">
                                         <Label htmlFor="name">Full Name</Label>
-                                        <Input id="name" defaultValue={user.name} className="rounded-xl" />
+                                        <Input id="name" defaultValue={user.name} className="rounded-xl" suppressHydrationWarning={true} />
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="email">Email</Label>
-                                        <Input id="email" type="email" defaultValue={user.email} className="rounded-xl" readOnly />
+                                        <Input id="email" type="email" defaultValue={user.email} className="rounded-xl" readOnly suppressHydrationWarning={true} />
                                     </div>
                                 </div>
                                  <div className="space-y-2 max-w-sm">
                                     <Label htmlFor="password">New Password</Label>
-                                    <Input id="password" type="password" className="rounded-xl" placeholder="••••••••" />
+                                    <Input id="password" type="password" className="rounded-xl" placeholder="••••••••" suppressHydrationWarning={true} />
                                 </div>
-                                <Button className="rounded-full" size="lg" onClick={handleSaveChanges} suppressHydrationWarning={true}>Save Changes</Button>
+                                <Button className="rounded-full" size="lg" onClick={handleSaveChanges}>Save Changes</Button>
                             </CardContent>
                         </Card>
                     </TabsContent>
@@ -146,9 +146,10 @@ export default function SettingsPage() {
                                         className="rounded-2xl"
                                         rows={4}
                                         disabled={!isWelcomeEnabled}
+                                        suppressHydrationWarning={true}
                                     />
                                 </div>
-                                <Button className="rounded-full" size="lg" onClick={handleSaveAutomations} suppressHydrationWarning={true}>Save Automations</Button>
+                                <Button className="rounded-full" size="lg" onClick={handleSaveAutomations}>Save Automations</Button>
                             </CardContent>
                         </Card>
                     </TabsContent>
@@ -161,7 +162,7 @@ export default function SettingsPage() {
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
-                                 <Button className="mb-6 rounded-full" disabled suppressHydrationWarning={true}>Invite Member</Button>
+                                 <Button className="mb-6 rounded-full" disabled>Invite Member</Button>
                                 <div className="space-y-6">
                                      {teamMembers.map(member => (
                                         <div key={member.id} className="flex items-center justify-between">

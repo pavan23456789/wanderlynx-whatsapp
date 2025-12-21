@@ -79,19 +79,19 @@ function ContactDialog({ open, onOpenChange, onSave, contact }: { open: boolean,
                 <div className="grid gap-4 py-4">
                     <div className="space-y-2">
                         <Label htmlFor="name">Name</Label>
-                        <Input id="name" value={formData.name || ''} onChange={handleChange} className="rounded-xl" />
+                        <Input id="name" value={formData.name || ''} onChange={handleChange} className="rounded-xl" suppressHydrationWarning={true} />
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="email">Email</Label>
-                        <Input id="email" type="email" value={formData.email || ''} onChange={handleChange} className="rounded-xl" />
+                        <Input id="email" type="email" value={formData.email || ''} onChange={handleChange} className="rounded-xl" suppressHydrationWarning={true} />
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="phone">Phone</Label>
-                        <Input id="phone" value={formData.phone || ''} onChange={handleChange} className="rounded-xl" />
+                        <Input id="phone" value={formData.phone || ''} onChange={handleChange} className="rounded-xl" suppressHydrationWarning={true} />
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="trip">Trip</Label>
-                        <Input id="trip" value={formData.trip || ''} onChange={handleChange} className="rounded-xl" />
+                        <Input id="trip" value={formData.trip || ''} onChange={handleChange} className="rounded-xl" suppressHydrationWarning={true} />
                     </div>
                 </div>
                 <DialogFooter>
@@ -229,7 +229,7 @@ export default function ContactsPage() {
              <div className="flex items-center justify-between gap-4">
                 <div className="relative w-full max-w-sm">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input placeholder="Search contacts..." className="pl-10 rounded-full" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                    <Input placeholder="Search contacts..." className="pl-10 rounded-full" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} suppressHydrationWarning={true} />
                 </div>
                 <div className="flex items-center gap-2">
                     <Button variant="outline" size="sm" className="rounded-full" onClick={handleExport}>

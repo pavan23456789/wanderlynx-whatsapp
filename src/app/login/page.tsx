@@ -50,8 +50,8 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-secondary/50 p-4">
-      <Card className="w-full max-w-sm shadow-2xl rounded-3xl">
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-sm shadow-lg rounded-3xl">
         <CardHeader className="space-y-2 text-center p-8">
           <div className="flex justify-center mb-2">
             <TravonexLogo className="h-12 w-12 text-primary" />

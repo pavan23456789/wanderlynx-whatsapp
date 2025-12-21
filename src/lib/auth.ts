@@ -25,7 +25,18 @@ const mockUsers: User[] = [
     role: 'Internal Staff',
     avatar: 'https://picsum.photos/seed/9/40/40',
   },
+    {
+    id: '3',
+    name: 'Jane Appleseed',
+    email: 'jane.a@travonex.com',
+    role: 'Internal Staff',
+    avatar: 'https://picsum.photos/seed/10/40/40',
+  }
 ];
+
+export function getTeamMembers(): User[] {
+    return mockUsers.filter(u => u.role === 'Internal Staff');
+}
 
 export function login(email: string, password: string): Promise<User | null> {
   return new Promise((resolve) => {

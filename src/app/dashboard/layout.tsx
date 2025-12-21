@@ -84,7 +84,7 @@ export default function DashboardLayout({
         <SidebarHeader>
           <div className="flex items-center gap-2">
             <TravonexLogo className="size-8 text-primary" />
-            <span className="text-lg font-semibold">Travonex</span>
+            <span className="text-lg font-semibold">Wanderlynx</span>
           </div>
         </SidebarHeader>
         <SidebarContent>
@@ -116,7 +116,7 @@ export default function DashboardLayout({
                 {user.email}
               </p>
             </div>
-            <Button variant="ghost" size="icon" onClick={handleLogout} className="ml-auto rounded-full">
+            <Button variant="ghost" size="icon" onClick={handleLogout} className="ml-auto rounded-full" suppressHydrationWarning={true}>
               <LogOut />
             </Button>
           </div>

@@ -39,7 +39,8 @@ function CreateCampaignDialog({ open, onOpenChange, onCampaignCreated }: { open:
     const [name, setName] = React.useState('');
     const [template, setTemplate] = React.useState('');
     const [audience, setAudience] = React.useState('all');
-    const templates = getTemplates().filter(t => t.status === 'Approved');
+    // Only allow marketing templates for campaigns initiated from this UI
+    const templates = getTemplates().filter(t => t.status === 'Approved' && t.category === 'Marketing');
     const contacts = getContacts();
 
     const handleCreate = () => {
@@ -63,17 +64,18 @@ function CreateCampaignDialog({ open, onOpenChange, onCampaignCreated }: { open:
             date: new Date().toISOString().split('T')[0],
         };
 
-        // In a real app, this would trigger a backend process
-        // For now, we simulate it.
+        // Simulate scheduling, sending, and final state updates
+        onCampaignCreated(newCampaign); 
+
         setTimeout(() => {
-            const updatedCampaign = { ...newCampaign, status: 'Delivering', sent: audience === 'all' ? contacts.length : 0 };
+            const updatedCampaign = { ...newCampaign, status: 'Delivering' as const, sent: audience === 'all' ? contacts.length : 0 };
             onCampaignCreated(updatedCampaign);
-        }, 1000); // Simulate scheduling delay
+        }, 2000); 
         
         setTimeout(() => {
-             const finalCampaign = { ...newCampaign, status: 'Sent', sent: audience === 'all' ? contacts.length : 0, delivered: Math.floor((audience === 'all' ? contacts.length : 0) * 0.95), read: Math.floor((audience === 'all' ? contacts.length : 0) * 0.8) };
+             const finalCampaign = { ...newCampaign, status: 'Sent' as const, sent: audience === 'all' ? contacts.length : 0, delivered: Math.floor((audience === 'all' ? contacts.length : 0) * 0.95), read: Math.floor((audience === 'all' ? contacts.length : 0) * 0.8) };
              onCampaignCreated(finalCampaign);
-        }, 5000); // Simulate sending delay
+        }, 5000);
 
 
         toast({
@@ -105,10 +107,10 @@ function CreateCampaignDialog({ open, onOpenChange, onCampaignCreated }: { open:
                         <Label htmlFor="template" className="text-right">Template</Label>
                          <Select value={template} onValueChange={setTemplate}>
                             <SelectTrigger className="col-span-3 rounded-xl">
-                                <SelectValue placeholder="Select a template" />
+                                <SelectValue placeholder="Select a marketing template" />
                             </SelectTrigger>
                             <SelectContent>
-                                {templates.map(t => <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>)}
+                                {templates.length > 0 ? templates.map(t => <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>) : <SelectItem value="none" disabled>No approved marketing templates</SelectItem>}
                             </SelectContent>
                         </Select>
                     </div>
@@ -126,7 +128,7 @@ function CreateCampaignDialog({ open, onOpenChange, onCampaignCreated }: { open:
                     </div>
                 </div>
                 <DialogFooter>
-                    <Button onClick={handleCreate} className="rounded-full" size="lg">Schedule Campaign</Button>
+                    <Button onClick={handleCreate} className="rounded-full" size="lg" disabled={templates.length === 0} suppressHydrationWarning={true}>Schedule Campaign</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -153,16 +155,18 @@ export default function CampaignsPage() {
         setFilteredCampaigns(results);
     }, [searchTerm, campaigns]);
 
-    const handleCampaignCreated = (newCampaign: Campaign) => {
-        const existingIndex = campaigns.findIndex(c => c.id === newCampaign.id);
-        let updatedCampaigns;
-        if (existingIndex > -1) {
-            updatedCampaigns = campaigns.map(c => c.id === newCampaign.id ? newCampaign : c);
-        } else {
-            updatedCampaigns = [newCampaign, ...campaigns];
-        }
-        setCampaigns(updatedCampaigns);
-        saveCampaigns(updatedCampaigns);
+    const handleCampaignCreated = (campaign: Campaign) => {
+        setCampaigns(prevCampaigns => {
+            const existingIndex = prevCampaigns.findIndex(c => c.id === campaign.id);
+            let updatedCampaigns;
+            if (existingIndex > -1) {
+                updatedCampaigns = prevCampaigns.map(c => c.id === campaign.id ? campaign : c);
+            } else {
+                updatedCampaigns = [campaign, ...prevCampaigns];
+            }
+            saveCampaigns(updatedCampaigns);
+            return updatedCampaigns;
+        });
     }
 
     const deleteCampaign = (id: string) => {
@@ -182,7 +186,7 @@ export default function CampaignsPage() {
                     </p>
                 </div>
                 <div className="flex items-center gap-4">
-                     <Button size="lg" className="rounded-full" onClick={() => setCreateOpen(true)}>
+                     <Button size="lg" className="rounded-full" onClick={() => setCreateOpen(true)} suppressHydrationWarning={true}>
                         <PlusCircle className="h-5 w-5 mr-2" />
                         Create Campaign
                     </Button>
@@ -247,6 +251,7 @@ export default function CampaignsPage() {
                                             size="icon"
                                             variant="ghost"
                                             className="rounded-full h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            suppressHydrationWarning={true}
                                         >
                                             <MoreHorizontal className="h-5 w-5" />
                                             <span className="sr-only">Toggle menu</span>

@@ -56,9 +56,9 @@ export default function LoginPage() {
           <div className="flex justify-center mb-2">
             <TravonexLogo className="h-12 w-12 text-primary" />
           </div>
-          <CardTitle className="text-3xl font-bold">Welcome Back</CardTitle>
+          <CardTitle className="text-3xl font-bold">Wanderlynx Login</CardTitle>
           <CardDescription>
-            Enter your credentials to access your dashboard
+            Enter your credentials to access the Messaging Platform
           </CardDescription>
         </CardHeader>
         <CardContent className="p-8 pt-0">
@@ -95,7 +95,7 @@ export default function LoginPage() {
                 className="rounded-xl h-12"
               />
             </div>
-            <Button type="submit" className="w-full h-12 rounded-xl text-base" disabled={isLoading}>
+            <Button type="submit" className="w-full h-12 rounded-xl text-base" disabled={isLoading} suppressHydrationWarning={true}>
               {isLoading ? 'Logging in...' : 'Login'}
             </Button>
           </form>

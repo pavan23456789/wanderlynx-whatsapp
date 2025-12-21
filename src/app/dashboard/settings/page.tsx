@@ -22,33 +22,20 @@ import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
-import { getCurrentUser, User } from '@/lib/auth';
-
-const teamMembers = [
-    {
-        id: '2',
-        name: 'John Doe',
-        email: 'john.doe@travonex.com',
-        role: 'Internal Staff',
-        avatar: 'https://picsum.photos/seed/9/40/40',
-    },
-    {
-        id: '3',
-        name: 'Jane Appleseed',
-        email: 'jane.a@travonex.com',
-        role: 'Internal Staff',
-        avatar: 'https://picsum.photos/seed/10/40/40',
-    }
-];
+import { getCurrentUser, User, getTeamMembers } from '@/lib/auth';
 
 export default function SettingsPage() {
     const { toast } = useToast();
     const [user, setUser] = React.useState<User | null>(null);
-    const [welcomeMessage, setWelcomeMessage] = React.useState("Thanks for contacting Travonex! An agent will be with you shortly.");
+    const [teamMembers, setTeamMembers] = React.useState<User[]>([]);
+    const [welcomeMessage, setWelcomeMessage] = React.useState("Thanks for contacting Wanderlynx! An agent will be with you shortly.");
     const [isWelcomeEnabled, setWelcomeEnabled] = React.useState(true);
 
     React.useEffect(() => {
         setUser(getCurrentUser());
+        if (getCurrentUser()?.role === 'Super Admin') {
+            setTeamMembers(getTeamMembers());
+        }
     }, []);
 
     const handleSaveChanges = () => {
@@ -59,11 +46,25 @@ export default function SettingsPage() {
     };
 
     const handleSaveAutomations = () => {
+        // In a real app, this would save to a backend
+        localStorage.setItem('automations_welcome_enabled', JSON.stringify(isWelcomeEnabled));
+        localStorage.setItem('automations_welcome_message', welcomeMessage);
         toast({
             title: "Automations Saved",
             description: "Your automation settings have been updated.",
         });
     };
+    
+    React.useEffect(() => {
+        const savedEnabled = localStorage.getItem('automations_welcome_enabled');
+        const savedMessage = localStorage.getItem('automations_welcome_message');
+        if (savedEnabled !== null) {
+            setWelcomeEnabled(JSON.parse(savedEnabled));
+        }
+        if (savedMessage !== null) {
+            setWelcomeMessage(savedMessage);
+        }
+    }, []);
 
     if (!user) {
         return <div>Loading...</div>;
@@ -95,7 +96,7 @@ export default function SettingsPage() {
                                         <AvatarImage src={user.avatar} data-ai-hint="person portrait" />
                                         <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
                                     </Avatar>
-                                    <Button variant="outline" className="rounded-full" disabled>Change Photo</Button>
+                                    <Button variant="outline" className="rounded-full" disabled suppressHydrationWarning={true}>Change Photo</Button>
                                 </div>
                                 <div className="grid gap-6 md:grid-cols-2">
                                     <div className="space-y-2">
@@ -111,7 +112,7 @@ export default function SettingsPage() {
                                     <Label htmlFor="password">New Password</Label>
                                     <Input id="password" type="password" className="rounded-xl" placeholder="••••••••" />
                                 </div>
-                                <Button className="rounded-full" size="lg" onClick={handleSaveChanges}>Save Changes</Button>
+                                <Button className="rounded-full" size="lg" onClick={handleSaveChanges} suppressHydrationWarning={true}>Save Changes</Button>
                             </CardContent>
                         </Card>
                     </TabsContent>
@@ -147,7 +148,7 @@ export default function SettingsPage() {
                                         disabled={!isWelcomeEnabled}
                                     />
                                 </div>
-                                <Button className="rounded-full" size="lg" onClick={handleSaveAutomations}>Save Automations</Button>
+                                <Button className="rounded-full" size="lg" onClick={handleSaveAutomations} suppressHydrationWarning={true}>Save Automations</Button>
                             </CardContent>
                         </Card>
                     </TabsContent>
@@ -160,7 +161,7 @@ export default function SettingsPage() {
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
-                                 <Button className="mb-6 rounded-full" disabled>Invite Member</Button>
+                                 <Button className="mb-6 rounded-full" disabled suppressHydrationWarning={true}>Invite Member</Button>
                                 <div className="space-y-6">
                                      {teamMembers.map(member => (
                                         <div key={member.id} className="flex items-center justify-between">

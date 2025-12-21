@@ -3,7 +3,7 @@ import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 
 export const metadata: Metadata = {
-  title: 'Travonex WhatsApp Ops Dashboard',
+  title: 'Wanderlynx Messaging Platform',
   description: 'Manage your WhatsApp operations with ease.',
 };
 

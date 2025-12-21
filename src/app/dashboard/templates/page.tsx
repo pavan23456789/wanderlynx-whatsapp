@@ -14,12 +14,13 @@ import {
 import { Input } from "@/components/ui/input"
 import { Template } from "@/lib/data";
 import { useToast } from "@/hooks/use-toast";
+import { Skeleton } from '@/components/ui/skeleton';
 
 
 const statusConfig = {
-    Approved: { variant: "default", icon: CheckCircle, className: "bg-green-100 text-green-800" },
-    Pending: { variant: "secondary", icon: Clock, className: "bg-yellow-100 text-yellow-800" },
-    Rejected: { variant: "destructive", icon: XCircle, className: "bg-red-100 text-red-800" },
+    Approved: { variant: "default", icon: CheckCircle, className: "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300" },
+    Pending: { variant: "secondary", icon: Clock, className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300" },
+    Rejected: { variant: "destructive", icon: XCircle, className: "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300" },
 } as const;
 
 export default function TemplatesPage() {
@@ -78,8 +79,21 @@ export default function TemplatesPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                  {isLoading ? (
                     Array.from({ length: 3 }).map((_, i) => (
-                        <Card key={i}><CardHeader><CardTitle>Loading...</CardTitle></CardHeader><CardContent><p>...</p></CardContent></Card>
+                        <Card key={i} className="flex flex-col">
+                            <CardHeader>
+                                <Skeleton className="h-6 w-1/2" />
+                                <Skeleton className="h-4 w-1/4" />
+                            </CardHeader>
+                            <CardContent className="flex-1">
+                                <Skeleton className="h-4 w-full mb-2" />
+                                <Skeleton className="h-4 w-3/4" />
+                            </CardContent>
+                        </Card>
                     ))
+                 ) : filteredTemplates.length === 0 ? (
+                    <div className="col-span-full text-center text-muted-foreground py-10">
+                        No templates found.
+                    </div>
                  ) : filteredTemplates.map((template) => {
                      const config = statusConfig[template.status as keyof typeof statusConfig] || statusConfig.Pending;
                      const Icon = config.icon;

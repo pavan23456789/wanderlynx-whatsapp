@@ -30,7 +30,7 @@ import { Input } from "@/components/ui/input"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label";
-import { getContacts, saveContacts, Contact } from '@/lib/data';
+import { Contact } from '@/lib/data';
 import { useToast } from '@/hooks/use-toast';
 
 function ContactDialog({ open, onOpenChange, onSave, contact }: { open: boolean, onOpenChange: (open: boolean) => void, onSave: (contact: Contact) => void, contact: Contact | null }) {
@@ -60,7 +60,7 @@ function ContactDialog({ open, onOpenChange, onSave, contact }: { open: boolean,
             return;
         }
 
-        const newId = formData.id || Date.now().toString();
+        const newId = formData.id || formData.phone || Date.now().toString();
         const avatar = formData.avatar || `https://picsum.photos/seed/${newId}/40/40`;
 
         onSave({ ...formData, id: newId, avatar } as Contact);
@@ -79,19 +79,19 @@ function ContactDialog({ open, onOpenChange, onSave, contact }: { open: boolean,
                 <div className="grid gap-4 py-4">
                     <div className="space-y-2">
                         <Label htmlFor="name">Name</Label>
-                        <Input id="name" value={formData.name} onChange={handleChange} className="rounded-xl" />
+                        <Input id="name" value={formData.name || ''} onChange={handleChange} className="rounded-xl" />
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="email">Email</Label>
-                        <Input id="email" type="email" value={formData.email} onChange={handleChange} className="rounded-xl" />
+                        <Input id="email" type="email" value={formData.email || ''} onChange={handleChange} className="rounded-xl" />
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="phone">Phone</Label>
-                        <Input id="phone" value={formData.phone} onChange={handleChange} className="rounded-xl" />
+                        <Input id="phone" value={formData.phone || ''} onChange={handleChange} className="rounded-xl" />
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="trip">Trip</Label>
-                        <Input id="trip" value={formData.trip} onChange={handleChange} className="rounded-xl" />
+                        <Input id="trip" value={formData.trip || ''} onChange={handleChange} className="rounded-xl" />
                     </div>
                 </div>
                 <DialogFooter>
@@ -108,25 +108,10 @@ function UploadDialog({ open, onOpenChange, onUpload }: { open: boolean, onOpenC
     const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (file) {
-            // Mock processing of CSV/XLSX
-            // In a real app, use a library like 'papaparse' or 'xlsx'
             toast({
                 title: "File Uploaded",
                 description: `${file.name} is being processed. This is a mock action.`,
             });
-
-            // Simulate adding a new contact from a file
-            const newContact: Contact = {
-                id: `csv-${Date.now()}`,
-                name: "CSV User",
-                phone: `+${Math.floor(1000000000 + Math.random() * 9000000000)}`,
-                email: "csv.user@example.com",
-                trip: "From Upload",
-                tags: ["uploaded"],
-                avatar: `https://picsum.photos/seed/csv/40/40`
-            };
-            
-            onUpload([newContact]);
             onOpenChange(false);
         }
     };
@@ -154,52 +139,66 @@ export default function ContactsPage() {
     const [isContactDialogOpen, setContactDialogOpen] = React.useState(false);
     const [isUploadOpen, setUploadOpen] = React.useState(false);
     const [editingContact, setEditingContact] = React.useState<Contact | null>(null);
+    const { toast } = useToast();
 
+    const fetchContacts = React.useCallback(async () => {
+        try {
+            const response = await fetch('/api/contacts');
+            if (response.ok) {
+                const data = await response.json();
+                setContacts(data);
+                setFilteredContacts(data);
+            } else {
+                throw new Error('Failed to fetch contacts');
+            }
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Error', description: (error as Error).message });
+        }
+    }, [toast]);
+    
     React.useEffect(() => {
-        const data = getContacts();
-        setContacts(data);
-        setFilteredContacts(data);
-    }, []);
+        fetchContacts();
+    }, [fetchContacts]);
 
     React.useEffect(() => {
         const results = contacts.filter(contact =>
             contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            contact.phone.toLowerCase().includes(searchTerm.toLowerCase())
+            (contact.phone && contact.phone.toLowerCase().includes(searchTerm.toLowerCase()))
         );
         setFilteredContacts(results);
     }, [searchTerm, contacts]);
 
-    const handleSaveContact = (contact: Contact) => {
-        const updatedContacts = [...contacts];
-        const existingIndex = updatedContacts.findIndex(c => c.id === contact.id);
+    const handleSaveContact = async (contact: Contact) => {
+        try {
+            const isUpdate = contacts.some(c => c.id === contact.id);
+            const response = await fetch('/api/contacts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contact, isUpdate }),
+            });
 
-        if (existingIndex > -1) {
-            updatedContacts[existingIndex] = contact;
-        } else {
-            updatedContacts.unshift(contact);
+            if (response.ok) {
+                toast({ title: 'Success', description: `Contact ${isUpdate ? 'updated' : 'created'}.` });
+                fetchContacts();
+            } else {
+                const errorData = await response.json();
+                throw new Error(errorData.message || `Failed to ${isUpdate ? 'update' : 'create'} contact.`);
+            }
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Error', description: (error as Error).message });
         }
-        setContacts(updatedContacts);
-        saveContacts(updatedContacts);
     };
 
     const handleDeleteContact = (id: string) => {
-        const updatedContacts = contacts.filter(c => c.id !== id);
-        setContacts(updatedContacts);
-        saveContacts(updatedContacts);
+        // Implement backend deletion if needed
+        console.log("Delete contact:", id);
     };
     
     const handleUpload = (newContacts: Contact[]) => {
-        const currentContacts = getContacts();
-        const phones = new Set(currentContacts.map(c => c.phone));
-        const uniqueNewContacts = newContacts.filter(nc => !phones.has(nc.phone));
-        
-        const updated = [...uniqueNewContacts, ...currentContacts];
-        setContacts(updated);
-        saveContacts(updated);
+        // This is a mock implementation
     };
     
     const handleExport = () => {
-        // In a real app, this would be a CSV string from the data
         const csvContent = "data:text/csv;charset=utf-8,name,phone,email\n" + contacts.map(c => `${c.name},${c.phone},${c.email}`).join("\n");
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");

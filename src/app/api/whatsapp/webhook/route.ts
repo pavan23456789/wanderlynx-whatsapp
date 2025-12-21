@@ -4,6 +4,7 @@ import {
     updateConversationWithMessage, 
     updateMessageStatus 
 } from '@/lib/conversation-store';
+import { getContactByPhone, addContact } from '@/lib/contact-store';
 
 /**
  * Handles webhook verification for the WhatsApp channel.
@@ -77,6 +78,21 @@ async function processIncomingMessage(contact: { wa_id: string; profile: { name:
 
     console.log(`[Webhook] Incoming message from ${name} (${from}): "${text}"`);
     
+    // Check if contact exists, if not, create one
+    let existingContact = await getContactByPhone(from);
+    if (!existingContact) {
+        console.log(`[Webhook] New contact detected. Creating contact for ${name} (${from}).`);
+        await addContact({
+            id: from, // Use phone number as ID for simplicity
+            phone: from,
+            name: name,
+            email: '',
+            trip: 'Unknown',
+            tags: ['new-lead'],
+            avatar: `https://picsum.photos/seed/${from}/40/40`,
+        });
+    }
+
     await updateConversationWithMessage({
         contactId: from,
         contactName: name,

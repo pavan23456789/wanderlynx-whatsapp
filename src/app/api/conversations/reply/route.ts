@@ -5,7 +5,7 @@ import { isAfter, subHours } from 'date-fns';
 
 export async function POST(request: Request) {
     try {
-        const { contactId, text, isTemplate } = await request.json();
+        const { contactId, text, isTemplate, templateParams } = await request.json();
 
         if (!contactId || !text) {
             return NextResponse.json({ message: 'Missing contactId or text' }, { status: 400 });
@@ -27,8 +27,7 @@ export async function POST(request: Request) {
         
         let messageId;
         if (isTemplate) {
-             // For simplicity, we are not passing dynamic params here. A real app would need to.
-            const response = await sendWhatsAppTemplateMessage(contactId, text, []);
+            const response = await sendWhatsAppTemplateMessage(contactId, text, templateParams || []);
             // For templates, the API response doesn't directly give a message ID in the same way.
             // We'll use a placeholder or need to handle this based on the actual API response structure for templates.
             messageId = response.messages[0]?.id || `tpl-${Date.now()}`;

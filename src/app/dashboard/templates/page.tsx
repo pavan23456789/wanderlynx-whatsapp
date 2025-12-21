@@ -24,7 +24,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { getTemplates, saveTemplates, Template } from "@/lib/data";
+import { Template } from "@/lib/data";
 import { useToast } from "@/hooks/use-toast";
 
 
@@ -57,7 +57,7 @@ function TemplateDialog({ open, onOpenChange, onSave, template }: { open: boolea
         }
 
         const newId = formData.id || `TPL${Date.now()}`;
-        onSave({ ...formData, id: newId } as Template);
+        onSave({ ...formData, id: newId, status: formData.status || 'Pending' } as Template);
         onOpenChange(false);
     };
 
@@ -73,25 +73,24 @@ function TemplateDialog({ open, onOpenChange, onSave, template }: { open: boolea
                 <div className="grid gap-4 py-4">
                     <div className="space-y-2">
                         <Label htmlFor="name">Template Name</Label>
-                        <Input id="name" value={formData.name} onChange={(e) => setFormData(p => ({ ...p, name: e.target.value.toLowerCase().replace(/\s/g, '_') }))} className="rounded-xl" placeholder="e.g., welcome_message" />
+                        <Input id="name" value={formData.name || ''} onChange={(e) => setFormData(p => ({ ...p, name: e.target.value.toLowerCase().replace(/\s/g, '_') }))} className="rounded-xl" placeholder="e.g., welcome_message" />
                          <p className="text-xs text-muted-foreground">Must be lowercase and contain only letters, numbers, and underscores.</p>
                     </div>
                      <div className="space-y-2">
                         <Label htmlFor="category">Category</Label>
-                        <Select value={formData.category} onValueChange={(value) => setFormData(p => ({ ...p, category: value }))}>
+                        <Select value={formData.category} onValueChange={(value: any) => setFormData(p => ({ ...p, category: value }))}>
                             <SelectTrigger className="rounded-xl">
                                 <SelectValue placeholder="Select a category" />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="Marketing">Marketing</SelectItem>
-                                <SelectItem value="Transactional">Transactional</SelectItem>
                                 <SelectItem value="Utility">Utility</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="content">Message Body</Label>
-                        <Textarea id="content" value={formData.content} onChange={(e) => setFormData(p => ({ ...p, content: e.target.value }))} className="rounded-2xl" rows={5} placeholder="Hello {{1}}! Welcome to our service." />
+                        <Textarea id="content" value={formData.content || ''} onChange={(e) => setFormData(p => ({ ...p, content: e.target.value }))} className="rounded-2xl" rows={5} placeholder="Hello {{1}}! Welcome to our service." />
                         <p className="text-xs text-muted-foreground">Use `{{1}}`, `{{2}}` for variables.</p>
                     </div>
                 </div>
@@ -109,12 +108,25 @@ export default function TemplatesPage() {
     const [searchTerm, setSearchTerm] = React.useState("");
     const [isDialogOpen, setDialogOpen] = React.useState(false);
     const [editingTemplate, setEditingTemplate] = React.useState<Template | null>(null);
+    const { toast } = useToast();
+
+    const fetchTemplates = React.useCallback(async () => {
+        try {
+            const response = await fetch('/api/templates');
+            if (response.ok) {
+                const data = await response.json();
+                setTemplates(data);
+            } else {
+                throw new Error('Failed to fetch templates');
+            }
+        } catch (error) {
+             toast({ variant: 'destructive', title: 'Error', description: (error as Error).message });
+        }
+    }, [toast]);
 
     React.useEffect(() => {
-        const data = getTemplates();
-        setTemplates(data);
-        setFilteredTemplates(data);
-    }, []);
+        fetchTemplates();
+    }, [fetchTemplates]);
 
     React.useEffect(() => {
         const results = templates.filter(template =>
@@ -123,23 +135,28 @@ export default function TemplatesPage() {
         setFilteredTemplates(results);
     }, [searchTerm, templates]);
 
-    const handleSaveTemplate = (template: Template) => {
-        const updatedTemplates = [...templates];
-        const existingIndex = updatedTemplates.findIndex(t => t.id === template.id);
-
-        if (existingIndex > -1) {
-            updatedTemplates[existingIndex] = template;
-        } else {
-            updatedTemplates.unshift(template);
+    const handleSaveTemplate = async (template: Template) => {
+         try {
+            const response = await fetch('/api/templates', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(template),
+            });
+            if (response.ok) {
+                toast({ title: 'Success', description: 'Template saved.' });
+                fetchTemplates();
+            } else {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to save template');
+            }
+        } catch (error) {
+             toast({ variant: 'destructive', title: 'Error', description: (error as Error).message });
         }
-        setTemplates(updatedTemplates);
-        saveTemplates(updatedTemplates);
     };
 
     const handleDeleteTemplate = (id: string) => {
-        const updatedTemplates = templates.filter(t => t.id !== id);
-        setTemplates(updatedTemplates);
-        saveTemplates(updatedTemplates);
+        // Implement backend deletion if needed
+        console.log("Delete template:", id);
     };
 
     return (

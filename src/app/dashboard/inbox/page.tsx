@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Search, Send, Paperclip, Smile, Phone, Video, RefreshCw } from 'lucide-react';
+import { Search, Send, Paperclip, Smile, Phone, Video, RefreshCw, AlertTriangle } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -23,10 +23,86 @@ import {
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
-import { Conversation, Message, Template, getTemplates } from '@/lib/data';
+import { Conversation, Message, Template } from '@/lib/data';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow, isAfter, subHours } from 'date-fns';
+
+
+function TemplateReply({ selectedConv, templates, onReply, isSending }: { selectedConv: Conversation, templates: Template[], onReply: (text: string, params: string[]) => void, isSending: boolean }) {
+    const [selectedTemplate, setSelectedTemplate] = React.useState<Template | null>(null);
+    const [templateParams, setTemplateParams] = React.useState<string[]>([]);
+    const paramCount = React.useMemo(() => {
+        if (!selectedTemplate) return 0;
+        const matches = selectedTemplate.content.match(/\{\{\d+\}\}/g);
+        return matches ? new Set(matches).size : 0;
+    }, [selectedTemplate]);
+
+    React.useEffect(() => {
+        if (selectedTemplate) {
+            setTemplateParams(Array(paramCount).fill(''));
+        } else {
+            setTemplateParams([]);
+        }
+    }, [selectedTemplate, paramCount]);
+
+    const handleParamChange = (index: number, value: string) => {
+        const newParams = [...templateParams];
+        newParams[index] = value;
+        setTemplateParams(newParams);
+    };
+
+    const handleSendTemplate = () => {
+        if (!selectedTemplate || isSending) return;
+        onReply(selectedTemplate.name, templateParams);
+    };
+
+    return (
+        <div className="p-4 space-y-4">
+             <div className="flex items-center gap-2 rounded-2xl border border-yellow-500/50 bg-yellow-50 p-4 text-yellow-900 dark:bg-yellow-900/20 dark:text-yellow-200">
+                <AlertTriangle className="h-6 w-6" />
+                <div className="text-sm">
+                    <p className="font-bold">24-Hour Window Closed</p>
+                    <p>You can only reply with a pre-approved template message.</p>
+                </div>
+            </div>
+            <Select onValueChange={(name) => setSelectedTemplate(templates.find(t => t.name === name) || null)}>
+                <SelectTrigger className="flex-1 rounded-full text-base">
+                    <SelectValue placeholder="Select a template to reply..." />
+                </SelectTrigger>
+                <SelectContent>
+                    {templates.map(t => <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>)}
+                </SelectContent>
+            </Select>
+
+            {selectedTemplate && (
+                <div className="space-y-4 pt-2">
+                    <div className="rounded-2xl bg-secondary p-4">
+                        <p className="text-sm text-muted-foreground">Template Preview:</p>
+                        <p className="text-base">{selectedTemplate.content}</p>
+                    </div>
+                    {paramCount > 0 && Array.from({ length: paramCount }, (_, i) => (
+                         <div key={i} className="space-y-2">
+                            <Label htmlFor={`param-${i+1}`}>Parameter &#123;&#123;{i + 1}&#125;&#125;</Label>
+                            <Input 
+                                id={`param-${i+1}`} 
+                                placeholder={`Enter value for {{${i+1}}}`}
+                                value={templateParams[i] || ''}
+                                onChange={(e) => handleParamChange(i, e.target.value)}
+                                className="rounded-xl"
+                            />
+                        </div>
+                    ))}
+                </div>
+            )}
+            
+            <Button size="lg" className="w-full rounded-full" onClick={handleSendTemplate} disabled={!selectedTemplate || isSending}>
+                <Send className="h-5 w-5 mr-2" />
+                {isSending ? 'Sending...' : 'Send Template'}
+            </Button>
+        </div>
+    );
+}
 
 
 export default function InboxPage() {
@@ -35,14 +111,22 @@ export default function InboxPage() {
     const [selectedConv, setSelectedConv] = React.useState<Conversation | null>(null);
     const [isWindowClosed, setIsWindowClosed] = React.useState(false);
     const [messageText, setMessageText] = React.useState('');
-    const [templateName, setTemplateName] = React.useState('');
+    const [templates, setTemplates] = React.useState<Template[]>([]);
     const [searchTerm, setSearchTerm] = React.useState("");
     const [isLoading, setIsLoading] = React.useState(true);
     const [isSending, setIsSending] = React.useState(false);
     const scrollAreaRef = React.useRef<HTMLDivElement>(null);
     const { toast } = useToast();
 
-    const templates = getTemplates().filter(t => t.status === 'Approved');
+    const fetchTemplates = React.useCallback(async () => {
+        // In a real app, this would be an API call.
+        // For now, we simulate fetching approved templates.
+        const response = await fetch('/api/templates');
+        if (response.ok) {
+            const allTemplates = await response.json();
+            setTemplates(allTemplates.filter((t: Template) => t.status === 'Approved'));
+        }
+    }, []);
 
     const fetchConversations = React.useCallback(async () => {
         setIsLoading(true);
@@ -52,11 +136,10 @@ export default function InboxPage() {
             const data: Conversation[] = await response.json();
             setConversations(data);
             
-            // If there's a selected conversation, update it with fresh data
             if (selectedConv) {
                 const updatedSelected = data.find(c => c.id === selectedConv.id);
                 if(updatedSelected) setSelectedConv(updatedSelected);
-                else setSelectedConv(data[0] || null); // Or select the first one if the old one is gone
+                else setSelectedConv(data[0] || null);
             } else if (data.length > 0) {
                  setSelectedConv(data[0]);
             }
@@ -71,9 +154,11 @@ export default function InboxPage() {
 
     React.useEffect(() => {
         fetchConversations();
+        fetchTemplates();
         const interval = setInterval(fetchConversations, 15000); // Poll for new messages every 15 seconds
         return () => clearInterval(interval);
-    }, [fetchConversations]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [fetchTemplates]);
     
     React.useEffect(() => {
         const results = conversations.filter(conv =>
@@ -106,11 +191,11 @@ export default function InboxPage() {
         setSelectedConv({ ...conv, unread: 0 });
     };
 
-    const handleReply = async () => {
+    const handleReply = async (text: string, templateParams?: string[]) => {
         if (!selectedConv || isSending) return;
 
         const isTemplateReply = isWindowClosed;
-        const textToSend = isTemplateReply ? templateName : messageText;
+        const textToSend = text;
         if (!textToSend.trim()) return;
 
         setIsSending(true);
@@ -123,6 +208,7 @@ export default function InboxPage() {
                     contactId: selectedConv.id,
                     text: textToSend,
                     isTemplate: isTemplateReply,
+                    templateParams: templateParams
                 }),
             });
 
@@ -133,12 +219,10 @@ export default function InboxPage() {
 
             const newConversation: Conversation = await response.json();
             
-            // Update state with the new conversation data from backend
             setConversations(prev => prev.map(c => c.id === newConversation.id ? newConversation : c));
             setSelectedConv(newConversation);
             
             setMessageText('');
-            setTemplateName('');
 
         } catch (error) {
             toast({ variant: 'destructive', title: 'Send Failed', description: (error as Error).message });
@@ -222,10 +306,6 @@ export default function InboxPage() {
                                 <div className="ml-auto flex items-center gap-2">
                                     <Button variant="ghost" size="icon" className="rounded-full"><Phone className="h-5 w-5"/></Button>
                                     <Button variant="ghost" size="icon" className="rounded-full"><Video className="h-5 w-5"/></Button>
-                                    <Separator orientation="vertical" className="h-8 mx-2" />
-                                    <div className="flex items-center space-x-2 p-2 rounded-2xl bg-secondary">
-                                        <Label htmlFor="window-mode" className="text-sm">{isWindowClosed ? "24h Window: Closed" : "24h Window: Open"}</Label>
-                                    </div>
                                 </div>
                             </div>
                             <Separator />
@@ -248,21 +328,11 @@ export default function InboxPage() {
                                 </div>
                             </ScrollArea>
                             <Separator />
-                             <div className="p-4">
+                            
                                 {isWindowClosed ? (
-                                    <div className="flex items-center gap-4">
-                                        <Select value={templateName} onValueChange={setTemplateName}>
-                                            <SelectTrigger className="flex-1 rounded-full">
-                                                <SelectValue placeholder="24-hour window closed. Select a template to reply..." />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {templates.map(t => <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>)}
-                                            </SelectContent>
-                                        </Select>
-                                        <Button size="lg" className="rounded-full" onClick={handleReply} disabled={isSending}>Send Template</Button>
-                                    </div>
+                                    <TemplateReply selectedConv={selectedConv} templates={templates} onReply={handleReply} isSending={isSending}/>
                                 ) : (
-                                    <div className="relative">
+                                    <div className="p-4 relative">
                                         <Textarea
                                             placeholder="Type your message..."
                                             className="resize-none pr-40 rounded-2xl p-4"
@@ -272,7 +342,7 @@ export default function InboxPage() {
                                             onKeyDown={e => {
                                                 if (e.key === 'Enter' && !e.shiftKey) {
                                                     e.preventDefault();
-                                                    handleReply();
+                                                    handleReply(messageText);
                                                 }
                                             }}
                                         />
@@ -293,14 +363,14 @@ export default function InboxPage() {
                                                 </TooltipTrigger>
                                                 <TooltipContent>Add Emoji (Not Implemented)</TooltipContent>
                                             </Tooltip>
-                                            <Button size="lg" className="ml-2 rounded-full" onClick={handleReply} disabled={isSending}>
+                                            <Button size="lg" className="ml-2 rounded-full" onClick={() => handleReply(messageText)} disabled={isSending}>
                                                 <Send className="h-5 w-5 mr-2"/>
                                                 {isSending ? 'Sending...' : 'Send'}
                                             </Button>
                                         </div>
                                     </div>
                                 )}
-                            </div>
+                            
                         </div>
                     ) : (
                         <div className="flex h-full items-center justify-center p-4">

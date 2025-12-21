@@ -6,7 +6,7 @@ export async function GET() {
     const { data, error } = await supabase
       .from('templates')
       .select('*')
-      .eq('status', 'Approved')
+      .eq('status', 'APPROVED')
       .order('created_at', { ascending: false });
 
     if (error) {

@@ -1,35 +1,41 @@
 import { NextResponse } from 'next/server';
 import type { BookingConfirmedPayload } from '@/lib/types';
 import { sendWhatsAppTemplateMessage } from '@/lib/whatsapp';
-
-// Simple in-memory cache for idempotency. In a production environment,
-// this should be replaced with a persistent store like Redis or a database.
-const processedBookingIds = new Set<string>();
+import { hasProcessedBookingId, logMessageEvent } from '@/lib/logger';
 
 /**
  * API route handler for the 'booking_confirmed' event.
  * This endpoint strictly follows the V1 EVENT_CONTRACT.md.
  */
 export async function POST(request: Request) {
+  let bookingId: string | undefined;
+
   try {
     const body: BookingConfirmedPayload = await request.json();
     const { contact, trip } = body;
+    bookingId = trip?.bookingId;
 
     // --- 1. Validate Payload ---
-    if (!contact?.phone || !contact?.name || !trip?.bookingId || !trip.name || !trip.destination || !trip.startDate) {
+    if (!contact?.phone || !contact?.name || !bookingId || !trip.name || !trip.destination || !trip.startDate) {
       return NextResponse.json(
         { success: false, message: 'Validation Error: Missing required fields.' },
         { status: 400 }
       );
     }
     
-    const { bookingId } = trip;
-
-    // --- 2. Log Event Details ---
+    // --- 2. Log Event Reception ---
     console.log(`[Wanderlynx] Received: booking_confirmed event for bookingId: ${bookingId}`);
     
     // --- 3. Idempotency Check ---
-    if (processedBookingIds.has(bookingId)) {
+    if (await hasProcessedBookingId(bookingId)) {
+        await logMessageEvent({
+            idempotencyKey: bookingId,
+            type: 'booking',
+            status: 'SKIPPED',
+            event: 'booking_confirmed',
+            recipient: contact.phone,
+            details: { message: `Duplicate event for bookingId ${bookingId}. Skipping.` },
+        });
         console.log(`[Wanderlynx] Idempotency check: Duplicate event for bookingId ${bookingId}. Skipping.`);
         return NextResponse.json({
             success: true,
@@ -40,20 +46,34 @@ export async function POST(request: Request) {
     // --- 4. Send WhatsApp Message ---
     console.log(`[Wanderlynx]   - Intent: Send WhatsApp message to ${contact.phone}`);
     
-    // Define the template and its parameters
-    // IMPORTANT: The template name 'booking_confirmation_v1' must exist and be approved in your WhatsApp Business Manager.
     const templateName = 'booking_confirmation_v1';
     const templateParams = [contact.name, trip.name, trip.bookingId];
     
     try {
         await sendWhatsAppTemplateMessage(contact.phone, templateName, templateParams);
+        
+        await logMessageEvent({
+            idempotencyKey: bookingId,
+            type: 'booking',
+            status: 'SUCCESS',
+            event: 'booking_confirmed',
+            recipient: contact.phone,
+            details: { template: templateName, params: templateParams },
+        });
         console.log(`[Wanderlynx]   - SUCCESS: WhatsApp API invoked for bookingId ${bookingId}`);
-        // Add to cache only on successful API invocation
-        processedBookingIds.add(bookingId);
+
     } catch (apiError: any) {
+        await logMessageEvent({
+            idempotencyKey: bookingId,
+            type: 'booking',
+            status: 'FAILURE',
+            event: 'booking_confirmed',
+            recipient: contact.phone,
+            details: { template: templateName },
+            error: apiError.message,
+        });
         console.error(`[Wanderlynx]   - FAILURE: Could not send WhatsApp message for bookingId ${bookingId}. Reason: ${apiError.message}`);
-        // Do not re-throw. We acknowledge the event was received, but log the failure.
-        // A production system might add this to a retry queue.
+        // Do not re-throw. We acknowledge the event, but log the failure.
     }
 
 
@@ -61,8 +81,19 @@ export async function POST(request: Request) {
       success: true,
       message: 'Event "booking_confirmed" processed.',
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('[Wanderlynx] CRITICAL: Error processing "booking_confirmed" event:', error);
+    if (bookingId) {
+        await logMessageEvent({
+            idempotencyKey: bookingId,
+            type: 'booking',
+            status: 'FAILURE',
+            event: 'booking_confirmed',
+            recipient: 'N/A',
+            details: { message: "Critical error during processing." },
+            error: error.message,
+        });
+    }
     return NextResponse.json(
       { success: false, message: 'An internal server error occurred.' },
       { status: 500 }

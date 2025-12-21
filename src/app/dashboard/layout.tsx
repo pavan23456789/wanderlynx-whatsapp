@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   MessageSquare,
@@ -11,6 +11,7 @@ import {
   Send,
   Settings,
   LogOut,
+  ShieldCheck,
 } from 'lucide-react';
 import {
   SidebarProvider,
@@ -26,6 +27,16 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { TravonexLogo } from '@/components/icons';
 import { Button } from '@/components/ui/button';
+import { logout, getCurrentUser, User } from '@/lib/auth';
+
+const menuItems = [
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['Super Admin', 'Internal Staff'] },
+  { href: '/dashboard/inbox', label: 'Inbox', icon: MessageSquare, roles: ['Super Admin', 'Internal Staff'] },
+  { href: '/dashboard/contacts', label: 'Contacts', icon: Users, roles: ['Super Admin', 'Internal Staff'] },
+  { href: '/dashboard/templates', label: 'Templates', icon: ScrollText, roles: ['Super Admin'] },
+  { href: '/dashboard/campaigns', label: 'Campaigns', icon: Send, roles: ['Super Admin'] },
+  { href: '/dashboard/settings', label: 'Settings', icon: Settings, roles: ['Super Admin', 'Internal Staff'] },
+];
 
 export default function DashboardLayout({
   children,
@@ -33,15 +44,33 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [user, setUser] = React.useState<User | null>(null);
 
-  const menuItems = [
-    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/dashboard/inbox', label: 'Inbox', icon: MessageSquare },
-    { href: '/dashboard/contacts', label: 'Contacts', icon: Users },
-    { href: '/dashboard/templates', label: 'Templates', icon: ScrollText },
-    { href: '/dashboard/campaigns', label: 'Campaigns', icon: Send },
-    { href: '/dashboard/settings', label: 'Settings', icon: Settings },
-  ];
+  React.useEffect(() => {
+    const currentUser = getCurrentUser();
+    if (!currentUser) {
+      router.push('/login');
+    } else {
+      setUser(currentUser);
+    }
+  }, [router]);
+
+  const handleLogout = async () => {
+    await logout();
+    router.push('/login');
+  };
+  
+  const accessibleMenuItems = menuItems.filter(item => user && item.roles.includes(user.role));
+
+  if (!user) {
+    // You can render a loading spinner here
+    return (
+        <div className="flex h-screen w-full items-center justify-center">
+            <div className="text-2xl">Loading...</div>
+        </div>
+    );
+  }
 
   return (
     <SidebarProvider>
@@ -54,7 +83,7 @@ export default function DashboardLayout({
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
-            {menuItems.map((item) => (
+            {accessibleMenuItems.map((item) => (
               <SidebarMenuItem key={item.href}>
                 <Link href={item.href}>
                   <SidebarMenuButton
@@ -70,22 +99,20 @@ export default function DashboardLayout({
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter>
-          <div className="flex items-center gap-3 rounded-md p-2 hover:bg-sidebar-accent">
-            <Avatar className="h-9 w-9">
-              <AvatarImage src="https://picsum.photos/seed/8/40/40" alt="Admin" data-ai-hint="person portrait" />
-              <AvatarFallback>SA</AvatarFallback>
+          <div className="flex items-center gap-3 rounded-2xl p-3 hover:bg-secondary">
+            <Avatar className="h-10 w-10">
+              <AvatarImage src={user.avatar} alt={user.name} data-ai-hint="person portrait" />
+              <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
             </Avatar>
             <div className="overflow-hidden">
-              <p className="truncate font-medium">Super Admin</p>
+              <p className="truncate font-semibold">{user.name}</p>
               <p className="truncate text-sm text-muted-foreground">
-                admin@travonex.com
+                {user.email}
               </p>
             </div>
-            <Link href="/login" className="ml-auto">
-              <Button variant="ghost" size="icon">
-                <LogOut />
-              </Button>
-            </Link>
+            <Button variant="ghost" size="icon" onClick={handleLogout} className="ml-auto rounded-full">
+              <LogOut />
+            </Button>
           </div>
         </SidebarFooter>
       </Sidebar>

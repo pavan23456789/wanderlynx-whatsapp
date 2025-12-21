@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Search, Send, Paperclip, Smile, Phone, Video } from 'lucide-react';
+import { Search, Send, Paperclip, Smile, Phone, Video, RefreshCw } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -22,33 +22,58 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { getConversations, getTemplates, addMessageToConversation, Conversation, Message, Template } from '@/lib/data';
+import { Conversation, Message, Template, getTemplates } from '@/lib/data';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { formatDistanceToNow, isAfter, subHours } from 'date-fns';
+
 
 export default function InboxPage() {
     const [conversations, setConversations] = React.useState<Conversation[]>([]);
     const [filteredConversations, setFilteredConversations] = React.useState<Conversation[]>([]);
     const [selectedConv, setSelectedConv] = React.useState<Conversation | null>(null);
-    const [windowClosed, setWindowClosed] = React.useState(false);
+    const [isWindowClosed, setIsWindowClosed] = React.useState(false);
     const [messageText, setMessageText] = React.useState('');
-    const [template, setTemplate] = React.useState('');
+    const [templateName, setTemplateName] = React.useState('');
     const [searchTerm, setSearchTerm] = React.useState("");
+    const [isLoading, setIsLoading] = React.useState(true);
+    const [isSending, setIsSending] = React.useState(false);
     const scrollAreaRef = React.useRef<HTMLDivElement>(null);
     const { toast } = useToast();
 
     const templates = getTemplates().filter(t => t.status === 'Approved');
 
-    React.useEffect(() => {
-        const data = getConversations();
-        setConversations(data);
-        setFilteredConversations(data);
-        if (data.length > 0) {
-            setSelectedConv(data[0]);
+    const fetchConversations = React.useCallback(async () => {
+        setIsLoading(true);
+        try {
+            const response = await fetch('/api/conversations');
+            if (!response.ok) throw new Error('Failed to fetch conversations');
+            const data: Conversation[] = await response.json();
+            setConversations(data);
+            
+            // If there's a selected conversation, update it with fresh data
+            if (selectedConv) {
+                const updatedSelected = data.find(c => c.id === selectedConv.id);
+                if(updatedSelected) setSelectedConv(updatedSelected);
+                else setSelectedConv(data[0] || null); // Or select the first one if the old one is gone
+            } else if (data.length > 0) {
+                 setSelectedConv(data[0]);
+            }
+
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Error', description: (error as Error).message });
+        } finally {
+            setIsLoading(false);
         }
-    }, []);
+    }, [toast, selectedConv]);
+
+
+    React.useEffect(() => {
+        fetchConversations();
+        const interval = setInterval(fetchConversations, 15000); // Poll for new messages every 15 seconds
+        return () => clearInterval(interval);
+    }, [fetchConversations]);
     
     React.useEffect(() => {
         const results = conversations.filter(conv =>
@@ -63,56 +88,65 @@ export default function InboxPage() {
         }
     }, [selectedConv?.messages]);
 
+    React.useEffect(() => {
+        if (selectedConv?.lastMessageTimestamp) {
+            const lastMessageDate = new Date(selectedConv.lastMessageTimestamp);
+            const limit = subHours(new Date(), 24);
+            setIsWindowClosed(isAfter(limit, lastMessageDate));
+        } else {
+            setIsWindowClosed(true); // Default to closed if no timestamp
+        }
+    }, [selectedConv]);
+
     const handleSelectConversation = (conv: Conversation) => {
         const updatedConversations = conversations.map(c => 
             c.id === conv.id ? {...c, unread: 0} : c
         );
-        setConversations(updatedConversations);
+        setConversations(updatedConversations); // Optimistic UI update
         setSelectedConv({ ...conv, unread: 0 });
     };
 
-    const handleSendMessage = () => {
-        if (!selectedConv || !messageText.trim()) return;
+    const handleReply = async () => {
+        if (!selectedConv || isSending) return;
 
-        const newMessage: Message = { sender: 'me', text: messageText, time: '' };
-        const updatedConvos = addMessageToConversation(selectedConv.id, newMessage);
+        const isTemplateReply = isWindowClosed;
+        const textToSend = isTemplateReply ? templateName : messageText;
+        if (!textToSend.trim()) return;
 
-        setConversations(updatedConvos);
-        const updatedSelected = updatedConvos.find(c => c.id === selectedConv.id);
-        if (updatedSelected) {
-            setSelectedConv(updatedSelected);
+        setIsSending(true);
+
+        try {
+            const response = await fetch('/api/conversations/reply', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contactId: selectedConv.id,
+                    text: textToSend,
+                    isTemplate: isTemplateReply,
+                }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to send message');
+            }
+
+            const newConversation: Conversation = await response.json();
+            
+            // Update state with the new conversation data from backend
+            setConversations(prev => prev.map(c => c.id === newConversation.id ? newConversation : c));
+            setSelectedConv(newConversation);
+            
+            setMessageText('');
+            setTemplateName('');
+
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Send Failed', description: (error as Error).message });
+        } finally {
+            setIsSending(false);
         }
-        setMessageText('');
     };
     
-    const handleSendTemplate = () => {
-        if (!selectedConv || !template) {
-            toast({
-                variant: 'destructive',
-                title: 'No Template Selected',
-                description: 'Please select a template to send.',
-            });
-            return;
-        }
-
-        const selectedTemplate = templates.find(t => t.name === template);
-        if (!selectedTemplate) return;
-
-        // A real app would substitute variables here.
-        const messageText = selectedTemplate.content.replace(/\{\{\d\}\}/g, '[variable]');
-
-        const newMessage: Message = { sender: 'me', text: `TEMPLATE: ${messageText}`, time: '' };
-        const updatedConvos = addMessageToConversation(selectedConv.id, newMessage);
-        
-        setConversations(updatedConvos);
-        const updatedSelected = updatedConvos.find(c => c.id === selectedConv.id);
-        if (updatedSelected) {
-            setSelectedConv(updatedSelected);
-        }
-        setTemplate('');
-        toast({ title: "Template Sent", description: `"${selectedTemplate.name}" was sent.` });
-    }
-
     return (
         <TooltipProvider>
             <ResizablePanelGroup
@@ -121,11 +155,14 @@ export default function InboxPage() {
             >
                 <ResizablePanel defaultSize={25} minSize={20} maxSize={30}>
                     <div className="flex h-full flex-col bg-card rounded-2xl shadow-sm m-4 mr-0">
-                        <div className="p-4">
-                            <div className="relative">
+                        <div className="p-4 flex items-center gap-2">
+                            <div className="relative flex-1">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                                 <Input placeholder="Search conversations..." className="pl-10 rounded-full" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                             </div>
+                            <Button variant="ghost" size="icon" className="rounded-full" onClick={fetchConversations} disabled={isLoading}>
+                                <RefreshCw className={cn("h-5 w-5", isLoading && "animate-spin")} />
+                            </Button>
                         </div>
                         <ScrollArea className="flex-1">
                             <div className="flex flex-col gap-2 p-4 pt-0">
@@ -152,13 +189,13 @@ export default function InboxPage() {
                                                     selectedConv?.id === conv.id ? 'text-foreground' : 'text-muted-foreground'
                                                 )}
                                             >
-                                                {conv.time}
+                                                {formatDistanceToNow(new Date(conv.lastMessageTimestamp), { addSuffix: true })}
                                             </div>
                                         </div>
                                         <div className="line-clamp-2 text-sm text-muted-foreground">
                                             {conv.lastMessage}
                                         </div>
-                                        {conv.unread && conv.unread > 0 ? (
+                                        {conv.unread > 0 ? (
                                             <Badge className="ml-auto bg-primary text-primary-foreground">{conv.unread}</Badge>
                                         ) : null}
                                     </button>
@@ -179,28 +216,32 @@ export default function InboxPage() {
                                     </Avatar>
                                     <div>
                                         <div className="font-semibold text-base">{selectedConv.name}</div>
-                                        <div className="text-sm text-muted-foreground">Active 2m ago</div>
+                                        <div className="text-sm text-muted-foreground">{selectedConv.id}</div>
                                     </div>
                                 </div>
                                 <div className="ml-auto flex items-center gap-2">
                                     <Button variant="ghost" size="icon" className="rounded-full"><Phone className="h-5 w-5"/></Button>
                                     <Button variant="ghost" size="icon" className="rounded-full"><Video className="h-5 w-5"/></Button>
                                     <Separator orientation="vertical" className="h-8 mx-2" />
-                                    <div className="flex items-center space-x-2 p-2">
-                                        <Switch id="window-mode" checked={windowClosed} onCheckedChange={setWindowClosed} />
-                                        <Label htmlFor="window-mode" className="text-sm">24h Window Closed</Label>
+                                    <div className="flex items-center space-x-2 p-2 rounded-2xl bg-secondary">
+                                        <Label htmlFor="window-mode" className="text-sm">{isWindowClosed ? "24h Window: Closed" : "24h Window: Open"}</Label>
                                     </div>
                                 </div>
                             </div>
                             <Separator />
                             <ScrollArea className="flex-1 p-6" ref={scrollAreaRef}>
                                 <div className="space-y-6">
-                                    {selectedConv.messages.map((msg, index) => (
-                                        <div key={index} className={cn("flex items-end gap-3", msg.sender === 'me' ? 'justify-end' : 'justify-start')}>
+                                    {selectedConv.messages.map((msg) => (
+                                        <div key={msg.id} className={cn("flex items-end gap-3", msg.sender === 'me' ? 'justify-end' : 'justify-start')}>
                                             {msg.sender !== 'me' && <Avatar className="h-8 w-8"><AvatarImage src={selectedConv.avatar} /><AvatarFallback>{selectedConv.name.charAt(0)}</AvatarFallback></Avatar>}
                                             <div className={cn("max-w-md rounded-2xl p-4 text-base", msg.sender === 'me' ? 'bg-primary text-primary-foreground rounded-br-none' : 'bg-secondary rounded-bl-none')}>
                                                 <p>{msg.text}</p>
-                                                <p className={cn("text-xs mt-2", msg.sender === 'me' ? 'text-primary-foreground/70' : 'text-muted-foreground')}>{msg.time}</p>
+                                                 <div className={cn("flex items-center gap-2 text-xs mt-2", msg.sender === 'me' ? 'text-primary-foreground/70 justify-end' : 'text-muted-foreground')}>
+                                                    <span>{formatDistanceToNow(new Date(msg.time), { addSuffix: true })}</span>
+                                                    {msg.sender === 'me' && (
+                                                        <Badge variant="secondary" className="text-xs">{msg.status}</Badge>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     ))}
@@ -208,17 +249,17 @@ export default function InboxPage() {
                             </ScrollArea>
                             <Separator />
                              <div className="p-4">
-                                {windowClosed ? (
+                                {isWindowClosed ? (
                                     <div className="flex items-center gap-4">
-                                        <Select value={template} onValueChange={setTemplate}>
+                                        <Select value={templateName} onValueChange={setTemplateName}>
                                             <SelectTrigger className="flex-1 rounded-full">
-                                                <SelectValue placeholder="Select a template to reply..." />
+                                                <SelectValue placeholder="24-hour window closed. Select a template to reply..." />
                                             </SelectTrigger>
                                             <SelectContent>
                                                 {templates.map(t => <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>)}
                                             </SelectContent>
                                         </Select>
-                                        <Button size="lg" className="rounded-full" onClick={handleSendTemplate}>Send Template</Button>
+                                        <Button size="lg" className="rounded-full" onClick={handleReply} disabled={isSending}>Send Template</Button>
                                     </div>
                                 ) : (
                                     <div className="relative">
@@ -231,7 +272,7 @@ export default function InboxPage() {
                                             onKeyDown={e => {
                                                 if (e.key === 'Enter' && !e.shiftKey) {
                                                     e.preventDefault();
-                                                    handleSendMessage();
+                                                    handleReply();
                                                 }
                                             }}
                                         />
@@ -242,7 +283,7 @@ export default function InboxPage() {
                                                         <Paperclip className="h-5 w-5" />
                                                     </Button>
                                                 </TooltipTrigger>
-                                                <TooltipContent>Attach File</TooltipContent>
+                                                <TooltipContent>Attach File (Not Implemented)</TooltipContent>
                                             </Tooltip>
                                             <Tooltip>
                                                 <TooltipTrigger asChild>
@@ -250,11 +291,11 @@ export default function InboxPage() {
                                                         <Smile className="h-5 w-5" />
                                                     </Button>
                                                 </TooltipTrigger>
-                                                <TooltipContent>Add Emoji</TooltipContent>
+                                                <TooltipContent>Add Emoji (Not Implemented)</TooltipContent>
                                             </Tooltip>
-                                            <Button size="lg" className="ml-2 rounded-full" onClick={handleSendMessage}>
+                                            <Button size="lg" className="ml-2 rounded-full" onClick={handleReply} disabled={isSending}>
                                                 <Send className="h-5 w-5 mr-2"/>
-                                                Send
+                                                {isSending ? 'Sending...' : 'Send'}
                                             </Button>
                                         </div>
                                     </div>
@@ -264,8 +305,14 @@ export default function InboxPage() {
                     ) : (
                         <div className="flex h-full items-center justify-center p-4">
                             <div className="text-center">
-                                <p className="text-lg font-medium">No conversation selected</p>
-                                <p className="text-muted-foreground">Select a conversation to start chatting.</p>
+                                {isLoading ? (
+                                    <p className="text-lg font-medium text-muted-foreground">Loading conversations...</p>
+                                ) : (
+                                    <>
+                                        <p className="text-lg font-medium">No conversation selected</p>
+                                        <p className="text-muted-foreground">Select a conversation to start chatting.</p>
+                                    </>
+                                )}
                             </div>
                         </div>
                     )}

@@ -28,6 +28,7 @@ import { Campaign, Template } from "@/lib/data";
 import { useToast } from "@/hooks/use-toast";
 import { format } from 'date-fns';
 import { useRouter } from 'next/navigation';
+import { Progress } from "@/components/ui/progress";
 
 const statusConfig = {
     Completed: { variant: "default", icon: Send },
@@ -290,7 +291,7 @@ export default function CampaignsPage() {
                                         </div>
                                     </div>
                                     <div className="text-sm text-muted-foreground pt-2">
-                                        Created: {format(new Date(campaign.createdAt), "PP")}
+                                        Created: {campaign.createdAt ? format(new Date(campaign.createdAt), "PP") : '-'}
                                     </div>
                                 </CardContent>
                                 <div className="absolute top-4 right-4">

@@ -220,7 +220,9 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
                                     </Badge>
                                 </TableCell>
                                 <TableCell className="text-xs text-muted-foreground">{msg.error || '-'}</TableCell>
-                                <TableCell className="text-right text-xs text-muted-foreground">{format(new Date(msg.timestamp), "Pp")}</TableCell>
+                                <TableCell className="text-right text-xs text-muted-foreground">
+                                    {msg.timestamp ? format(new Date(msg.timestamp), "Pp") : '-'}
+                                </TableCell>
                             </TableRow>
                         ))}
                     </TableBody>

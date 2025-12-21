@@ -1,14 +1,28 @@
 import { NextResponse } from 'next/server';
-import { getTemplates } from '@/lib/template-store';
-import type { Template } from '@/lib/data';
+import { supabase } from '@/lib/supabase/server';
 
+export async function GET() {
+  try {
+    const { data, error } = await supabase
+      .from('templates')
+      .select('*')
+      .eq('status', 'Approved')
+      .order('created_at', { ascending: false });
 
-export async function GET(request: Request) {
-    try {
-        const templates = await getTemplates();
-        return NextResponse.json(templates);
-    } catch (error: any) {
-        console.error('[API/Templates] Failed to get templates:', error);
-        return NextResponse.json({ message: 'Failed to retrieve templates' }, { status: 500 });
+    if (error) {
+      console.error('[templates API] Supabase error:', error);
+      return NextResponse.json(
+        { message: 'Failed to retrieve templates' },
+        { status: 500 }
+      );
     }
+
+    return NextResponse.json(data ?? []);
+  } catch (err) {
+    console.error('[templates API] Server error:', err);
+    return NextResponse.json(
+      { message: 'Internal server error' },
+      { status: 500 }
+    );
+  }
 }

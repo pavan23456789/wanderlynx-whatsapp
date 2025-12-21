@@ -1,48 +1,25 @@
 import { supabase } from '@/lib/supabase/server'
 
-/* =========================
-   TYPES (minimal + safe)
-========================= */
-
-export type Conversation = {
-  id: string
-  phone: string
-  name: string | null
-  last_message: string | null
-  last_message_at: string | null
-}
-
-export type Message = {
-  id: string
-  conversation_id: string
-  body: string
-  direction: 'inbound' | 'outbound'
-  created_at: string
-  status?: string
-}
-
-/* =========================
-   GET ALL CONVERSATIONS
-========================= */
-
-export async function getConversations(): Promise<Conversation[]> {
+/**
+ * Get all conversations
+ */
+export async function getConversations() {
   const { data, error } = await supabase
     .from('conversations')
     .select('*')
     .order('last_message_at', { ascending: false })
 
   if (error) {
-    console.error('[conversation-store] getConversations failed:', error)
+    console.error('[getConversations]', error)
     return []
   }
 
   return data ?? []
 }
 
-/* =========================
-   GET CONVERSATION BY ID
-========================= */
-
+/**
+ * Get single conversation by ID
+ */
 export async function getConversationById(id: string) {
   const { data, error } = await supabase
     .from('conversations')
@@ -51,17 +28,16 @@ export async function getConversationById(id: string) {
     .single()
 
   if (error) {
-    console.error('[conversation-store] getConversationById failed:', error)
+    console.error('[getConversationById]', error)
     return null
   }
 
   return data
 }
 
-/* =========================
-   UPDATE CONVERSATION AFTER MESSAGE
-========================= */
-
+/**
+ * Update conversation last message
+ */
 export async function updateConversationWithMessage(
   conversationId: string,
   message: string
@@ -75,14 +51,13 @@ export async function updateConversationWithMessage(
     .eq('id', conversationId)
 
   if (error) {
-    console.error('[conversation-store] updateConversationWithMessage failed:', error)
+    console.error('[updateConversationWithMessage]', error)
   }
 }
 
-/* =========================
-   UPDATE MESSAGE STATUS
-========================= */
-
+/**
+ * Update message status (stub for now)
+ */
 export async function updateMessageStatus(
   messageId: string,
   status: string
@@ -93,6 +68,6 @@ export async function updateMessageStatus(
     .eq('id', messageId)
 
   if (error) {
-    console.error('[conversation-store] updateMessageStatus failed:', error)
+    console.error('[updateMessageStatus]', error)
   }
 }

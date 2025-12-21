@@ -7,10 +7,21 @@ import * as path from 'path';
 
 const LOG_FILE_PATH = path.join(process.cwd(), 'logs', 'events.json');
 
+export type LogEntry = {
+  timestamp: string;
+  idempotencyKey: string;
+  type: 'booking' | 'invoice';
+  status: 'SUCCESS' | 'FAILURE' | 'SKIPPED';
+  event: string;
+  recipient: string;
+  details: any;
+  error?: string;
+};
+
 type LogData = {
   processedBookingIds: string[];
   processedInvoiceIds: string[];
-  messageLog: Record<string, any>[];
+  messageLog: LogEntry[];
 };
 
 /**
@@ -72,17 +83,9 @@ export async function hasProcessedInvoiceId(invoiceId: string): Promise<boolean>
 /**
  * Logs a message event and marks the corresponding ID as processed.
  */
-export async function logMessageEvent(logEntry: {
-  idempotencyKey: string;
-  type: 'booking' | 'invoice';
-  status: 'SUCCESS' | 'FAILURE' | 'SKIPPED';
-  event: string;
-  recipient: string;
-  details: any;
-  error?: string;
-}) {
+export async function logMessageEvent(logEntry: Omit<LogEntry, 'timestamp'>) {
   const logs = await getLogData();
-  const newLog = {
+  const newLog: LogEntry = {
     timestamp: new Date().toISOString(),
     ...logEntry,
   };
@@ -103,4 +106,12 @@ export async function logMessageEvent(logEntry: {
   }
 
   await writeLogData(logs);
+}
+
+/**
+ * Retrieves the message logs.
+ */
+export async function getEventLogs(): Promise<LogEntry[]> {
+    const data = await getLogData();
+    return data.messageLog;
 }

@@ -12,6 +12,7 @@ import {
   Settings,
   LogOut,
   ShieldCheck,
+  History,
 } from 'lucide-react';
 import {
   SidebarProvider,
@@ -35,6 +36,7 @@ const menuItems = [
   { href: '/dashboard/contacts', label: 'Contacts', icon: Users, roles: ['Super Admin', 'Internal Staff'] },
   { href: '/dashboard/templates', label: 'Templates', icon: ScrollText, roles: ['Super Admin'] },
   { href: '/dashboard/campaigns', label: 'Campaigns', icon: Send, roles: ['Super Admin'] },
+  { href: '/dashboard/logs', label: 'Event Logs', icon: History, roles: ['Super Admin'] },
   { href: '/dashboard/settings', label: 'Settings', icon: Settings, roles: ['Super Admin', 'Internal Staff'] },
 ];
 

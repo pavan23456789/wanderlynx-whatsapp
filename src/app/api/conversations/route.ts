@@ -1,14 +1,16 @@
-import { NextResponse } from 'next/server';
-import { getConversations } from '@/lib/conversation-store';
+import { NextResponse } from 'next/server'
+import { supabase } from '@/lib/supabase/server'
 
-export async function GET(request: Request) {
-    try {
-        const conversations = await getConversations();
-        // Sort by most recent message
-        const sortedConversations = conversations.sort((a, b) => b.lastMessageTimestamp - a.lastMessageTimestamp);
-        return NextResponse.json(sortedConversations);
-    } catch (error: any) {
-        console.error('[API/Conversations] Failed to get conversations:', error);
-        return NextResponse.json({ message: 'Failed to retrieve conversations' }, { status: 500 });
-    }
+export async function GET() {
+  const { data, error } = await supabase
+    .from('conversations')
+    .select('*')
+    .order('last_message_at', { ascending: false })
+
+  if (error) {
+    console.error(error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  return NextResponse.json(data)
 }

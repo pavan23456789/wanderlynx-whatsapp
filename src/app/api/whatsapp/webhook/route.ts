@@ -16,13 +16,16 @@ export async function GET(request: Request) {
     const token = searchParams.get('hub.verify_token');
     const challenge = searchParams.get('hub.challenge');
 
-    const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
+    // The verify token must match the one set in the Meta Developer App dashboard.
+    const VERIFY_TOKEN = "travonex_verify";
 
     if (mode === 'subscribe' && token === VERIFY_TOKEN) {
         console.log('[Webhook] Verification successful');
+        // Respond with the challenge token from the request
         return new NextResponse(challenge, { status: 200 });
     } else {
-        console.warn('[Webhook] Verification failed');
+        console.warn('[Webhook] Verification failed: Invalid token or mode.');
+        // Respond with '403 Forbidden' if tokens do not match
         return new NextResponse('Forbidden', { status: 403 });
     }
 }

@@ -24,65 +24,94 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-
-const conversations = [
-    {
-        id: 1,
-        name: 'Olivia Martin',
-        avatar: 'https://picsum.photos/seed/1/40/40',
-        lastMessage: 'Can you confirm my trip details?',
-        time: '5m',
-        unread: 2,
-    },
-    {
-        id: 2,
-        name: 'Jackson Lee',
-        avatar: 'https://picsum.photos/seed/2/40/40',
-        lastMessage: 'Thanks for the update!',
-        time: '10m',
-    },
-    {
-        id: 3,
-        name: 'Isabella Nguyen',
-        avatar: 'https://picsum.photos/seed/3/40/40',
-        lastMessage: 'My flight was rescheduled.',
-        time: '1h',
-    },
-    {
-        id: 4,
-        name: 'William Kim',
-        avatar: 'https://picsum.photos/seed/4/40/40',
-        lastMessage: 'Perfect!',
-        time: '2h',
-    },
-    {
-        id: 5,
-        name: 'Sophia Gonzalez',
-        avatar: 'https://picsum.photos/seed/5/40/40',
-        lastMessage: 'I have a question about my booking.',
-        time: '1d',
-    },
-];
-
-const messages = {
-    1: [
-        { sender: 'other', text: 'Hey, I have a question about my upcoming trip to Paris.', time: '10:30 AM' },
-        { sender: 'me', text: 'Hello Olivia! I can certainly help with that. What is your question?', time: '10:31 AM' },
-        { sender: 'other', text: 'Can you confirm my trip details?', time: '10:32 AM' },
-    ],
-    2: [
-        { sender: 'me', text: 'Hi Jackson, just a reminder about your flight check-in tomorrow.', time: '9:00 AM' },
-        { sender: 'other', text: 'Thanks for the update!', time: '9:05 AM' },
-    ],
-    // other messages
-};
-
+import { getConversations, getTemplates, addMessageToConversation, Conversation, Message, Template } from '@/lib/data';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
 
 export default function InboxPage() {
-    const [selectedConv, setSelectedConv] = React.useState(conversations[0]);
+    const [conversations, setConversations] = React.useState<Conversation[]>([]);
+    const [filteredConversations, setFilteredConversations] = React.useState<Conversation[]>([]);
+    const [selectedConv, setSelectedConv] = React.useState<Conversation | null>(null);
     const [windowClosed, setWindowClosed] = React.useState(false);
+    const [messageText, setMessageText] = React.useState('');
+    const [template, setTemplate] = React.useState('');
+    const [searchTerm, setSearchTerm] = React.useState("");
+    const scrollAreaRef = React.useRef<HTMLDivElement>(null);
+    const { toast } = useToast();
 
-    const currentMessages = messages[selectedConv.id as keyof typeof messages] || [];
+    const templates = getTemplates().filter(t => t.status === 'Approved');
+
+    React.useEffect(() => {
+        const data = getConversations();
+        setConversations(data);
+        setFilteredConversations(data);
+        if (data.length > 0) {
+            setSelectedConv(data[0]);
+        }
+    }, []);
+    
+    React.useEffect(() => {
+        const results = conversations.filter(conv =>
+            conv.name.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+        setFilteredConversations(results);
+    }, [searchTerm, conversations]);
+
+    React.useEffect(() => {
+        if (scrollAreaRef.current) {
+            scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
+        }
+    }, [selectedConv?.messages]);
+
+    const handleSelectConversation = (conv: Conversation) => {
+        const updatedConversations = conversations.map(c => 
+            c.id === conv.id ? {...c, unread: 0} : c
+        );
+        setConversations(updatedConversations);
+        setSelectedConv({ ...conv, unread: 0 });
+    };
+
+    const handleSendMessage = () => {
+        if (!selectedConv || !messageText.trim()) return;
+
+        const newMessage: Message = { sender: 'me', text: messageText, time: '' };
+        const updatedConvos = addMessageToConversation(selectedConv.id, newMessage);
+
+        setConversations(updatedConvos);
+        const updatedSelected = updatedConvos.find(c => c.id === selectedConv.id);
+        if (updatedSelected) {
+            setSelectedConv(updatedSelected);
+        }
+        setMessageText('');
+    };
+    
+    const handleSendTemplate = () => {
+        if (!selectedConv || !template) {
+            toast({
+                variant: 'destructive',
+                title: 'No Template Selected',
+                description: 'Please select a template to send.',
+            });
+            return;
+        }
+
+        const selectedTemplate = templates.find(t => t.name === template);
+        if (!selectedTemplate) return;
+
+        // A real app would substitute variables here.
+        const messageText = selectedTemplate.content.replace(/\{\{\d\}\}/g, '[variable]');
+
+        const newMessage: Message = { sender: 'me', text: `TEMPLATE: ${messageText}`, time: '' };
+        const updatedConvos = addMessageToConversation(selectedConv.id, newMessage);
+        
+        setConversations(updatedConvos);
+        const updatedSelected = updatedConvos.find(c => c.id === selectedConv.id);
+        if (updatedSelected) {
+            setSelectedConv(updatedSelected);
+        }
+        setTemplate('');
+        toast({ title: "Template Sent", description: `"${selectedTemplate.name}" was sent.` });
+    }
 
     return (
         <TooltipProvider>
@@ -95,19 +124,19 @@ export default function InboxPage() {
                         <div className="p-4">
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                                <Input placeholder="Search conversations..." className="pl-10 rounded-full" />
+                                <Input placeholder="Search conversations..." className="pl-10 rounded-full" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                             </div>
                         </div>
                         <ScrollArea className="flex-1">
                             <div className="flex flex-col gap-2 p-4 pt-0">
-                                {conversations.map((conv) => (
+                                {filteredConversations.map((conv) => (
                                     <button
                                         key={conv.id}
                                         className={cn(
                                             'flex flex-col items-start gap-2 rounded-2xl p-4 text-left text-sm transition-all hover:bg-secondary',
-                                            selectedConv.id === conv.id && 'bg-secondary'
+                                            selectedConv?.id === conv.id && 'bg-secondary'
                                         )}
-                                        onClick={() => setSelectedConv(conv)}
+                                        onClick={() => handleSelectConversation(conv)}
                                     >
                                         <div className="flex w-full items-center justify-between">
                                             <div className="flex items-center gap-3">
@@ -120,7 +149,7 @@ export default function InboxPage() {
                                             <div
                                                 className={cn(
                                                     'text-xs',
-                                                    selectedConv.id === conv.id ? 'text-foreground' : 'text-muted-foreground'
+                                                    selectedConv?.id === conv.id ? 'text-foreground' : 'text-muted-foreground'
                                                 )}
                                             >
                                                 {conv.time}
@@ -129,9 +158,9 @@ export default function InboxPage() {
                                         <div className="line-clamp-2 text-sm text-muted-foreground">
                                             {conv.lastMessage}
                                         </div>
-                                        {conv.unread && (
+                                        {conv.unread && conv.unread > 0 ? (
                                             <Badge className="ml-auto bg-primary text-primary-foreground">{conv.unread}</Badge>
-                                        )}
+                                        ) : null}
                                     </button>
                                 ))}
                             </div>
@@ -164,9 +193,9 @@ export default function InboxPage() {
                                 </div>
                             </div>
                             <Separator />
-                            <ScrollArea className="flex-1 p-6">
+                            <ScrollArea className="flex-1 p-6" ref={scrollAreaRef}>
                                 <div className="space-y-6">
-                                    {currentMessages.map((msg, index) => (
+                                    {selectedConv.messages.map((msg, index) => (
                                         <div key={index} className={cn("flex items-end gap-3", msg.sender === 'me' ? 'justify-end' : 'justify-start')}>
                                             {msg.sender !== 'me' && <Avatar className="h-8 w-8"><AvatarImage src={selectedConv.avatar} /><AvatarFallback>{selectedConv.name.charAt(0)}</AvatarFallback></Avatar>}
                                             <div className={cn("max-w-md rounded-2xl p-4 text-base", msg.sender === 'me' ? 'bg-primary text-primary-foreground rounded-br-none' : 'bg-secondary rounded-bl-none')}>
@@ -181,8 +210,15 @@ export default function InboxPage() {
                              <div className="p-4">
                                 {windowClosed ? (
                                     <div className="flex items-center gap-4">
-                                        <Input disabled value="Select a template to reply..." className="rounded-full" />
-                                        <Button size="lg" className="rounded-full">Send Template</Button>
+                                        <Select value={template} onValueChange={setTemplate}>
+                                            <SelectTrigger className="flex-1 rounded-full">
+                                                <SelectValue placeholder="Select a template to reply..." />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {templates.map(t => <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                        <Button size="lg" className="rounded-full" onClick={handleSendTemplate}>Send Template</Button>
                                     </div>
                                 ) : (
                                     <div className="relative">
@@ -190,6 +226,14 @@ export default function InboxPage() {
                                             placeholder="Type your message..."
                                             className="resize-none pr-40 rounded-2xl p-4"
                                             rows={1}
+                                            value={messageText}
+                                            onChange={e => setMessageText(e.target.value)}
+                                            onKeyDown={e => {
+                                                if (e.key === 'Enter' && !e.shiftKey) {
+                                                    e.preventDefault();
+                                                    handleSendMessage();
+                                                }
+                                            }}
                                         />
                                         <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center">
                                             <Tooltip>
@@ -208,7 +252,7 @@ export default function InboxPage() {
                                                 </TooltipTrigger>
                                                 <TooltipContent>Add Emoji</TooltipContent>
                                             </Tooltip>
-                                            <Button size="lg" className="ml-2 rounded-full">
+                                            <Button size="lg" className="ml-2 rounded-full" onClick={handleSendMessage}>
                                                 <Send className="h-5 w-5 mr-2"/>
                                                 Send
                                             </Button>

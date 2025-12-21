@@ -1,3 +1,6 @@
+'use client';
+
+import * as React from 'react';
 import { PlusCircle, MoreHorizontal, Search, FileText, CheckCircle, Clock, XCircle } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -17,45 +20,128 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { getTemplates, saveTemplates, Template } from "@/lib/data";
+import { useToast } from "@/hooks/use-toast";
 
-const templates = [
-    {
-        id: "TPL001",
-        name: "welcome_message",
-        category: "Marketing",
-        content: "Hello {{1}}! Welcome to Travonex. How can we help you plan your next adventure?",
-        status: "Approved",
-    },
-    {
-        id: "TPL002",
-        name: "trip_confirmation",
-        category: "Transactional",
-        content: "Your trip to {{1}} is confirmed! Your booking ID is {{2}}.",
-        status: "Approved",
-    },
-    {
-        id: "TPL003",
-        name: "flight_reminder",
-        category: "Transactional",
-        content: "Reminder: Your flight {{1}} to {{2}} departs in 24 hours.",
-        status: "Pending",
-    },
-    {
-        id: "TPL004",
-        name: "new_promo",
-        category: "Marketing",
-        content: "Don't miss out on our new year sale! Get up to 30% off on all packages.",
-        status: "Rejected",
-    },
-];
 
 const statusConfig = {
     Approved: { variant: "default", icon: CheckCircle },
     Pending: { variant: "secondary", icon: Clock },
     Rejected: { variant: "destructive", icon: XCircle },
+} as const;
+
+function TemplateDialog({ open, onOpenChange, onSave, template }: { open: boolean, onOpenChange: (open: boolean) => void, onSave: (template: Template) => void, template: Template | null }) {
+    const { toast } = useToast();
+    const [formData, setFormData] = React.useState<Partial<Template>>({});
+
+    React.useEffect(() => {
+        if (template) {
+            setFormData(template);
+        } else {
+            setFormData({ name: '', category: 'Marketing', content: '', status: 'Pending' });
+        }
+    }, [template]);
+
+    const handleSave = () => {
+        if (!formData.name || !formData.content) {
+            toast({
+                variant: "destructive",
+                title: "Missing Information",
+                description: "Template name and content are required.",
+            });
+            return;
+        }
+
+        const newId = formData.id || `TPL${Date.now()}`;
+        onSave({ ...formData, id: newId } as Template);
+        onOpenChange(false);
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-xl">
+                <DialogHeader>
+                    <DialogTitle>{template ? 'Edit Template' : 'Create New Template'}</DialogTitle>
+                    <DialogDescription>
+                       Templates must be approved by Meta before they can be used in campaigns.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="name">Template Name</Label>
+                        <Input id="name" value={formData.name} onChange={(e) => setFormData(p => ({ ...p, name: e.target.value.toLowerCase().replace(/\s/g, '_') }))} className="rounded-xl" placeholder="e.g., welcome_message" />
+                         <p className="text-xs text-muted-foreground">Must be lowercase and contain only letters, numbers, and underscores.</p>
+                    </div>
+                     <div className="space-y-2">
+                        <Label htmlFor="category">Category</Label>
+                        <Select value={formData.category} onValueChange={(value) => setFormData(p => ({ ...p, category: value }))}>
+                            <SelectTrigger className="rounded-xl">
+                                <SelectValue placeholder="Select a category" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Marketing">Marketing</SelectItem>
+                                <SelectItem value="Transactional">Transactional</SelectItem>
+                                <SelectItem value="Utility">Utility</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="content">Message Body</Label>
+                        <Textarea id="content" value={formData.content} onChange={(e) => setFormData(p => ({ ...p, content: e.target.value }))} className="rounded-2xl" rows={5} placeholder="Hello {{1}}! Welcome to our service." />
+                        <p className="text-xs text-muted-foreground">Use `{{1}}`, `{{2}}` for variables.</p>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button onClick={handleSave} className="rounded-full" size="lg">{template ? 'Save Changes' : 'Submit for Approval'}</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
 }
 
 export default function TemplatesPage() {
+    const [templates, setTemplates] = React.useState<Template[]>([]);
+    const [filteredTemplates, setFilteredTemplates] = React.useState<Template[]>([]);
+    const [searchTerm, setSearchTerm] = React.useState("");
+    const [isDialogOpen, setDialogOpen] = React.useState(false);
+    const [editingTemplate, setEditingTemplate] = React.useState<Template | null>(null);
+
+    React.useEffect(() => {
+        const data = getTemplates();
+        setTemplates(data);
+        setFilteredTemplates(data);
+    }, []);
+
+    React.useEffect(() => {
+        const results = templates.filter(template =>
+            template.name.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+        setFilteredTemplates(results);
+    }, [searchTerm, templates]);
+
+    const handleSaveTemplate = (template: Template) => {
+        const updatedTemplates = [...templates];
+        const existingIndex = updatedTemplates.findIndex(t => t.id === template.id);
+
+        if (existingIndex > -1) {
+            updatedTemplates[existingIndex] = template;
+        } else {
+            updatedTemplates.unshift(template);
+        }
+        setTemplates(updatedTemplates);
+        saveTemplates(updatedTemplates);
+    };
+
+    const handleDeleteTemplate = (id: string) => {
+        const updatedTemplates = templates.filter(t => t.id !== id);
+        setTemplates(updatedTemplates);
+        saveTemplates(updatedTemplates);
+    };
+
     return (
         <main className="flex flex-1 flex-col gap-6 p-6 md:gap-8 md:p-10">
             <div className="flex items-center justify-between">
@@ -66,7 +152,7 @@ export default function TemplatesPage() {
                     </p>
                 </div>
                 <div className="flex items-center gap-4">
-                     <Button size="lg" className="rounded-full">
+                     <Button size="lg" className="rounded-full" onClick={() => { setEditingTemplate(null); setDialogOpen(true); }}>
                         <PlusCircle className="h-5 w-5 mr-2" />
                         Create Template
                     </Button>
@@ -75,16 +161,16 @@ export default function TemplatesPage() {
              <div className="flex items-center justify-between gap-4">
                 <div className="relative w-full max-w-sm">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input placeholder="Search templates..." className="pl-10 rounded-full" />
+                    <Input placeholder="Search templates..." className="pl-10 rounded-full" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                 </div>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                 {templates.map((template) => {
+                 {filteredTemplates.map((template) => {
                      const config = statusConfig[template.status as keyof typeof statusConfig] || statusConfig.Pending;
                      const Icon = config.icon;
                      return (
-                        <Card key={template.id} className="group flex flex-col">
+                        <Card key={template.id} className="group flex flex-col relative">
                              <CardHeader>
                                 <div className="flex items-start justify-between">
                                      <div className="flex items-center gap-4">
@@ -120,9 +206,9 @@ export default function TemplatesPage() {
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end" className="rounded-xl">
                                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                        <DropdownMenuItem>Edit</DropdownMenuItem>
-                                        <DropdownMenuItem>Duplicate</DropdownMenuItem>
-                                        <DropdownMenuItem className="text-destructive">
+                                        <DropdownMenuItem onClick={() => { setEditingTemplate(template); setDialogOpen(true); }}>Edit</DropdownMenuItem>
+                                        <DropdownMenuItem disabled>Duplicate</DropdownMenuItem>
+                                        <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteTemplate(template.id)}>
                                             Delete
                                         </DropdownMenuItem>
                                     </DropdownMenuContent>
@@ -132,6 +218,7 @@ export default function TemplatesPage() {
                      )
                 })}
             </div>
+            <TemplateDialog open={isDialogOpen} onOpenChange={setDialogOpen} onSave={handleSaveTemplate} template={editingTemplate} />
         </main>
     )
 }

@@ -46,6 +46,7 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = React.useState<User | null>(null);
+  const [isLoading, setIsLoading] = React.useState(true);
 
   React.useEffect(() => {
     const currentUser = getCurrentUser();
@@ -53,24 +54,29 @@ export default function DashboardLayout({
       router.push('/login');
     } else {
       setUser(currentUser);
+      setIsLoading(false);
     }
   }, [router]);
 
-  const handleLogout = async () => {
-    await logout();
+  const handleLogout = () => {
+    logout();
     router.push('/login');
   };
   
-  const accessibleMenuItems = menuItems.filter(item => user && item.roles.includes(user.role));
-
-  if (!user) {
-    // You can render a loading spinner here
+  if (isLoading) {
     return (
         <div className="flex h-screen w-full items-center justify-center">
             <div className="text-2xl">Loading...</div>
         </div>
     );
   }
+
+  if (!user) {
+    return null; // or a redirect component
+  }
+
+  const accessibleMenuItems = menuItems.filter(item => user && item.roles.includes(user.role));
+
 
   return (
     <SidebarProvider>

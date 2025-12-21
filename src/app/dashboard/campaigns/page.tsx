@@ -1,4 +1,7 @@
+'use client';
+
 import { PlusCircle, MoreHorizontal, Search, Send, Clock, CheckCircle, XCircle } from "lucide-react"
+import * as React from 'react';
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -17,58 +20,158 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Label } from "@/components/ui/label";
+import { getCampaigns, getTemplates, getContacts, Campaign, Template, Contact, saveCampaigns } from "@/lib/data";
+import { useToast } from "@/hooks/use-toast";
 
-const campaigns = [
-    {
-        id: "CAMP001",
-        name: "New Year Promo",
-        template: "new_promo",
-        status: "Sent",
-        sent: 1000,
-        delivered: 950,
-        read: 800,
-        date: "2023-12-28",
-    },
-    {
-        id: "CAMP002",
-        name: "Summer Sale Kickoff",
-        template: "summer_sale",
-        status: "Delivering",
-        sent: 500,
-        delivered: 250,
-        read: 100,
-        date: "2024-06-15",
-    },
-    {
-        id: "CAMP003",
-        name: "Paris Trip Reminders",
-        template: "trip_confirmation",
-        status: "Scheduled",
-        sent: 0,
-        delivered: 0,
-        read: 0,
-        date: "2024-07-01",
-    },
-    {
-        id: "CAMP004",
-        name: "Customer Feedback Request",
-        template: "feedback_request",
-        status: "Failed",
-        sent: 200,
-        delivered: 0,
-        read: 0,
-        date: "2024-05-20",
-    },
-];
 
 const statusConfig = {
     Sent: { variant: "default", icon: CheckCircle },
     Delivering: { variant: "secondary", icon: Send },
     Scheduled: { variant: "outline", icon: Clock },
     Failed: { variant: "destructive", icon: XCircle },
+} as const;
+
+function CreateCampaignDialog({ open, onOpenChange, onCampaignCreated }: { open: boolean, onOpenChange: (open: boolean) => void, onCampaignCreated: (campaign: Campaign) => void }) {
+    const { toast } = useToast();
+    const [name, setName] = React.useState('');
+    const [template, setTemplate] = React.useState('');
+    const [audience, setAudience] = React.useState('all');
+    const templates = getTemplates().filter(t => t.status === 'Approved');
+    const contacts = getContacts();
+
+    const handleCreate = () => {
+        if (!name || !template) {
+            toast({
+                variant: "destructive",
+                title: "Missing Information",
+                description: "Please provide a campaign name and select a template.",
+            });
+            return;
+        }
+
+        const newCampaign: Campaign = {
+            id: `CAMP${Date.now()}`,
+            name,
+            template,
+            status: "Scheduled",
+            sent: 0,
+            delivered: 0,
+            read: 0,
+            date: new Date().toISOString().split('T')[0],
+        };
+
+        // In a real app, this would trigger a backend process
+        // For now, we simulate it.
+        setTimeout(() => {
+            const updatedCampaign = { ...newCampaign, status: 'Delivering', sent: audience === 'all' ? contacts.length : 0 };
+            onCampaignCreated(updatedCampaign);
+        }, 1000); // Simulate scheduling delay
+        
+        setTimeout(() => {
+             const finalCampaign = { ...newCampaign, status: 'Sent', sent: audience === 'all' ? contacts.length : 0, delivered: Math.floor((audience === 'all' ? contacts.length : 0) * 0.95), read: Math.floor((audience === 'all' ? contacts.length : 0) * 0.8) };
+             onCampaignCreated(finalCampaign);
+        }, 5000); // Simulate sending delay
+
+
+        toast({
+            title: "Campaign Scheduled",
+            description: `Campaign "${name}" has been scheduled to send.`,
+        });
+
+        onOpenChange(false);
+        setName('');
+        setTemplate('');
+        setAudience('all');
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                    <DialogTitle>Create New Campaign</DialogTitle>
+                    <DialogDescription>
+                        Set up a new broadcast message for your contacts.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="name" className="text-right">Name</Label>
+                        <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3 rounded-xl" placeholder="e.g., Summer Sale" />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="template" className="text-right">Template</Label>
+                         <Select value={template} onValueChange={setTemplate}>
+                            <SelectTrigger className="col-span-3 rounded-xl">
+                                <SelectValue placeholder="Select a template" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {templates.map(t => <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="audience" className="text-right">Audience</Label>
+                        <Select value={audience} onValueChange={setAudience}>
+                            <SelectTrigger className="col-span-3 rounded-xl">
+                                <SelectValue placeholder="Select audience" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Contacts</SelectItem>
+                                <SelectItem value="uploaded" disabled>Uploaded List (coming soon)</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button onClick={handleCreate} className="rounded-full" size="lg">Schedule Campaign</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
 }
 
 export default function CampaignsPage() {
+    const [campaigns, setCampaigns] = React.useState<Campaign[]>([]);
+    const [filteredCampaigns, setFilteredCampaigns] = React.useState<Campaign[]>([]);
+    const [searchTerm, setSearchTerm] = React.useState("");
+    const [isCreateOpen, setCreateOpen] = React.useState(false);
+
+    React.useEffect(() => {
+        const data = getCampaigns();
+        setCampaigns(data);
+        setFilteredCampaigns(data);
+    }, []);
+
+     React.useEffect(() => {
+        const results = campaigns.filter(campaign =>
+            campaign.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            campaign.template.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+        setFilteredCampaigns(results);
+    }, [searchTerm, campaigns]);
+
+    const handleCampaignCreated = (newCampaign: Campaign) => {
+        const existingIndex = campaigns.findIndex(c => c.id === newCampaign.id);
+        let updatedCampaigns;
+        if (existingIndex > -1) {
+            updatedCampaigns = campaigns.map(c => c.id === newCampaign.id ? newCampaign : c);
+        } else {
+            updatedCampaigns = [newCampaign, ...campaigns];
+        }
+        setCampaigns(updatedCampaigns);
+        saveCampaigns(updatedCampaigns);
+    }
+
+    const deleteCampaign = (id: string) => {
+        const updated = campaigns.filter(c => c.id !== id);
+        setCampaigns(updated);
+        saveCampaigns(updated);
+    }
+
+
     return (
         <main className="flex flex-1 flex-col gap-6 p-6 md:gap-8 md:p-10">
              <div className="flex items-center justify-between">
@@ -79,7 +182,7 @@ export default function CampaignsPage() {
                     </p>
                 </div>
                 <div className="flex items-center gap-4">
-                     <Button size="lg" className="rounded-full">
+                     <Button size="lg" className="rounded-full" onClick={() => setCreateOpen(true)}>
                         <PlusCircle className="h-5 w-5 mr-2" />
                         Create Campaign
                     </Button>
@@ -88,16 +191,16 @@ export default function CampaignsPage() {
              <div className="flex items-center justify-between gap-4">
                 <div className="relative w-full max-w-sm">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input placeholder="Search campaigns..." className="pl-10 rounded-full" />
+                    <Input placeholder="Search campaigns..." className="pl-10 rounded-full" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                 </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {campaigns.map((campaign) => {
+                {filteredCampaigns.map((campaign) => {
                     const config = statusConfig[campaign.status as keyof typeof statusConfig] || statusConfig.Scheduled;
                     const Icon = config.icon;
                     return (
-                        <Card key={campaign.id} className="group">
+                        <Card key={campaign.id} className="group relative">
                              <CardHeader className="flex flex-row items-start justify-between">
                                 <div>
                                     <CardTitle className="text-xl mb-1">{campaign.name}</CardTitle>
@@ -133,7 +236,7 @@ export default function CampaignsPage() {
                                     </div>
                                 </div>
                                  <div className="text-sm text-muted-foreground pt-2">
-                                    Date: {campaign.date}
+                                    Date: {new Date(campaign.date).toLocaleDateString()}
                                  </div>
                             </CardContent>
                              <div className="absolute top-4 right-4">
@@ -151,10 +254,10 @@ export default function CampaignsPage() {
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end" className="rounded-xl">
                                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                        <DropdownMenuItem>View Details</DropdownMenuItem>
-                                        <DropdownMenuItem>Pause</DropdownMenuItem>
-                                        <DropdownMenuItem>Duplicate</DropdownMenuItem>
-                                        <DropdownMenuItem className="text-destructive">
+                                        <DropdownMenuItem disabled>View Details</DropdownMenuItem>
+                                        <DropdownMenuItem disabled>Pause</DropdownMenuItem>
+                                        <DropdownMenuItem disabled>Duplicate</DropdownMenuItem>
+                                        <DropdownMenuItem className="text-destructive" onClick={() => deleteCampaign(campaign.id)}>
                                             Archive
                                         </DropdownMenuItem>
                                     </DropdownMenuContent>
@@ -164,6 +267,7 @@ export default function CampaignsPage() {
                     )
                 })}
             </div>
+            <CreateCampaignDialog open={isCreateOpen} onOpenChange={setCreateOpen} onCampaignCreated={handleCampaignCreated} />
         </main>
     )
 }

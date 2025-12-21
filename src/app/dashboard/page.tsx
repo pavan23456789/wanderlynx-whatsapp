@@ -1,5 +1,6 @@
 'use client';
 
+import * as React from 'react';
 import {
     Card,
     CardContent,
@@ -23,6 +24,7 @@ import {
     Send,
     ScrollText,
 } from "lucide-react"
+import { getContacts, getCampaigns, getTemplates, getConversations, Conversation } from '@/lib/data';
 
 const chartdata = [
     { name: "Mon", messages: 186 },
@@ -34,38 +36,20 @@ const chartdata = [
     { name: "Sun", messages: 345 },
 ]
 
-const recentConversations = [
-    {
-        name: "Olivia Martin",
-        email: "olivia.martin@email.com",
-        avatar: "https://picsum.photos/seed/1/40/40",
-        lastMessage: "Can you confirm my trip details?",
-        time: "5m ago",
-    },
-    {
-        name: "Jackson Lee",
-        email: "jackson.lee@email.com",
-        avatar: "https://picsum.photos/seed/2/40/40",
-        lastMessage: "Thanks for the update!",
-        time: "10m ago",
-    },
-    {
-        name: "Isabella Nguyen",
-        email: "isabella.nguyen@email.com",
-        avatar: "https://picsum.photos/seed/3/40/40",
-        lastMessage: "My flight was rescheduled.",
-        time: "1h ago",
-    },
-    {
-        name: "William Kim",
-        email: "will@email.com",
-        avatar: "https://picsum.photos/seed/4/40/40",
-        lastMessage: "Perfect!",
-        time: "2h ago",
-    },
-]
-
 export default function DashboardPage() {
+    const [totalContacts, setTotalContacts] = React.useState(0);
+    const [activeCampaigns, setActiveCampaigns] = React.useState(0);
+    const [totalTemplates, setTotalTemplates] = React.useState(0);
+    const [recentConversations, setRecentConversations] = React.useState<Conversation[]>([]);
+    
+    React.useEffect(() => {
+        setTotalContacts(getContacts().length);
+        setActiveCampaigns(getCampaigns().filter(c => c.status === 'Delivering' || c.status === 'Scheduled').length);
+        setTotalTemplates(getTemplates().length);
+        setRecentConversations(getConversations().slice(0, 4));
+    }, []);
+
+
     return (
         <main className="flex flex-1 flex-col gap-6 p-6 md:gap-8 md:p-10">
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
@@ -75,8 +59,8 @@ export default function DashboardPage() {
                         <Users className="h-5 w-5 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-3xl font-bold">1,254</div>
-                        <p className="text-sm text-muted-foreground">+20.1% from last month</p>
+                        <div className="text-3xl font-bold">{totalContacts}</div>
+                        <p className="text-sm text-muted-foreground">Total contacts in the system</p>
                     </CardContent>
                 </Card>
                 <Card>
@@ -85,8 +69,8 @@ export default function DashboardPage() {
                         <MessageSquare className="h-5 w-5 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-3xl font-bold">+2350</div>
-                        <p className="text-sm text-muted-foreground">+180.1% from last month</p>
+                        <div className="text-3xl font-bold">2,350</div>
+                        <p className="text-sm text-muted-foreground">(Mock Data)</p>
                     </CardContent>
                 </Card>
                 <Card>
@@ -95,8 +79,8 @@ export default function DashboardPage() {
                         <Send className="h-5 w-5 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-3xl font-bold">5</div>
-                        <p className="text-sm text-muted-foreground">+2 since last week</p>
+                        <div className="text-3xl font-bold">{activeCampaigns}</div>
+                        <p className="text-sm text-muted-foreground">Currently running or scheduled</p>
                     </CardContent>
                 </Card>
                 <Card>
@@ -105,8 +89,8 @@ export default function DashboardPage() {
                         <ScrollText className="h-5 w-5 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-3xl font-bold">28</div>
-                        <p className="text-sm text-muted-foreground">+5 approved this month</p>
+                        <div className="text-3xl font-bold">{totalTemplates}</div>
+                        <p className="text-sm text-muted-foreground">Total message templates</p>
                     </CardContent>
                 </Card>
             </div>
@@ -153,7 +137,7 @@ export default function DashboardPage() {
                     <CardHeader>
                         <CardTitle>Recent Conversations</CardTitle>
                         <CardDescription>
-                            You have 12 unread messages.
+                            Your most recent chats.
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="grid gap-6">
@@ -165,7 +149,7 @@ export default function DashboardPage() {
                                 </Avatar>
                                 <div className="grid gap-1">
                                     <p className="text-base font-medium leading-none">{convo.name}</p>
-                                    <p className="text-sm text-muted-foreground">{convo.lastMessage}</p>
+                                    <p className="text-sm text-muted-foreground truncate">{convo.lastMessage}</p>
                                 </div>
                                 <div className="ml-auto font-medium text-sm text-muted-foreground">{convo.time}</div>
                             </div>

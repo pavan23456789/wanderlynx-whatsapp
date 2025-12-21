@@ -3,6 +3,7 @@
 import { PlusCircle, MoreHorizontal, Search, Send, FileText, Users, Loader } from "lucide-react"
 import * as React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -27,7 +28,6 @@ import { Label } from "@/components/ui/label";
 import { Campaign, Template } from "@/lib/data";
 import { useToast } from "@/hooks/use-toast";
 import { format } from 'date-fns';
-import { useRouter } from 'next/navigation';
 import { Progress } from "@/components/ui/progress";
 
 const statusConfig = {
@@ -37,7 +37,7 @@ const statusConfig = {
     Failed: { variant: "destructive", icon: Send },
 } as const;
 
-function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, onOpenChange: (open: boolean) => void }) {
+function CreateCampaignDialog({ open, onOpenChange, onCampaignCreated }: { open: boolean, onOpenChange: (open: boolean) => void, onCampaignCreated: () => void }) {
     const router = useRouter();
     const { toast } = useToast();
     const [isLoading, setIsLoading] = React.useState(false);
@@ -49,13 +49,14 @@ function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, onOpenCha
     
     const variablePlaceholders = React.useMemo(() => {
         if (!selectedTemplate) return [];
+        // Matches {{1}}, {{2}}, etc.
         const regex = /\{\{(\d+)\}\}/g;
         const matches = new Set<string>();
         let match;
         while((match = regex.exec(selectedTemplate.content)) !== null) {
             matches.add(match[1]);
         }
-        return Array.from(matches).sort();
+        return Array.from(matches).sort((a,b) => parseInt(a) - parseInt(b));
     }, [selectedTemplate]);
 
     React.useEffect(() => {
@@ -64,9 +65,9 @@ function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, onOpenCha
                 const response = await fetch('/api/templates');
                 if(response.ok) {
                     const allTemplates: Template[] = await response.json();
-                    // Only allow marketing templates for campaigns initiated from this UI
-                    const marketingTemplates = allTemplates.filter(t => t.status === 'Approved' && t.category === 'Marketing');
-                    setTemplates(marketingTemplates);
+                    // Only allow marketing or approved utility templates for campaigns initiated from this UI
+                    const eligibleTemplates = allTemplates.filter(t => t.status === 'Approved');
+                    setTemplates(eligibleTemplates);
                 }
             };
             fetchTemplates();
@@ -117,6 +118,7 @@ function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, onOpenCha
             });
             
             onOpenChange(false);
+            onCampaignCreated(); // This will trigger a re-fetch in the parent
             router.push(`/dashboard/campaigns/${newCampaign.id}`);
 
         } catch (error: any) {
@@ -148,10 +150,10 @@ function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, onOpenCha
                         <Label htmlFor="template">Message Template</Label>
                         <Select onValueChange={(val) => setSelectedTemplate(templates.find(t => t.name === val) || null)}>
                             <SelectTrigger className="rounded-xl">
-                                <SelectValue placeholder="Select an approved marketing template" />
+                                <SelectValue placeholder="Select an approved template" />
                             </SelectTrigger>
                             <SelectContent>
-                                {templates.length > 0 ? templates.map(t => <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>) : <SelectItem value="none" disabled>No approved marketing templates</SelectItem>}
+                                {templates.length > 0 ? templates.map(t => <SelectItem key={t.id} value={t.name}>{t.name} ({t.category})</SelectItem>) : <SelectItem value="none" disabled>No approved templates found</SelectItem>}
                             </SelectContent>
                         </Select>
                     </div>
@@ -323,7 +325,7 @@ export default function CampaignsPage() {
                     )
                 })}
             </div>
-            <CreateCampaignDialog open={isCreateOpen} onOpenChange={setCreateOpen} />
+            <CreateCampaignDialog open={isCreateOpen} onOpenChange={setCreateOpen} onCampaignCreated={fetchCampaigns} />
         </main>
     )
 }

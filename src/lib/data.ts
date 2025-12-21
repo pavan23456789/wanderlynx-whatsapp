@@ -57,7 +57,7 @@ export type Campaign = {
     sent: number;
     failed: number;
     statusMessage: string;
-createdAt: string;
+    createdAt: string;
     messages: CampaignMessage[];
 };
 

@@ -1,5 +1,5 @@
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import *fs from 'fs/promises';
+import *path from 'path';
 import type { Campaign } from './data';
 
 const CAMPAIGNS_FILE_PATH = path.join(process.cwd(), 'logs', 'campaigns.json');
@@ -26,7 +26,7 @@ async function getStore(): Promise<CampaignStore> {
 
 async function writeStore(store: CampaignStore): Promise<void> {
     try {
-        await fs.writeFile(CAMPAIGNS_FILE_PATH, JSON.stringify(store, null, 2));
+        await fs.writeFile(CAMPAIGONS_FILE_PATH, JSON.stringify(store, null, 2));
     } catch (error) {
         console.error('[CampaignStore] Failed to write to campaigns file:', error);
     }

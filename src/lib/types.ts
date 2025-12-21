@@ -59,3 +59,27 @@ export type TripReminderPayload = {
     destination: string;
   };
 };
+
+
+/**
+ * Payload for sending a WhatsApp template message via Meta Cloud API.
+ */
+export type WhatsAppMessagePayload = {
+  messaging_product: 'whatsapp';
+  to: string;
+  type: 'template';
+  template: {
+    name: string;
+    language: {
+      code: string;
+    };
+    components: {
+      type: 'body' | 'header' | 'button';
+      parameters: {
+        type: 'text' | 'currency' | 'date_time' | 'image' | 'document';
+        text?: string;
+        // Add other parameter types as needed
+      }[];
+    }[];
+  };
+};

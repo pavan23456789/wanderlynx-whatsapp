@@ -2,10 +2,12 @@ import type { WhatsAppMessagePayload } from './types';
 
 /**
  * Sends a WhatsApp template message using the Meta Cloud API.
+ * This function now includes robust error handling.
  * @param to The recipient's phone number in E.164 format.
  * @param templateName The name of the message template.
  * @param templateParams The parameters to substitute into the template.
  * @returns The response from the WhatsApp API.
+ * @throws An error if the API request fails, containing the reason.
  */
 export async function sendWhatsAppTemplateMessage(
   to: string,
@@ -41,28 +43,22 @@ export async function sendWhatsAppTemplateMessage(
     },
   };
 
-  try {
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
-      },
-      body: JSON.stringify(payload),
-    });
+  const response = await fetch(apiUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
+    },
+    body: JSON.stringify(payload),
+  });
 
-    const responseData = await response.json();
-
-    if (!response.ok) {
-      console.error('[Wanderlynx] WhatsApp API Error:', responseData);
-      throw new Error(`WhatsApp API request failed with status ${response.status}`);
-    }
-
-    console.log('[Wanderlynx] WhatsApp message sent successfully:', responseData);
-    return responseData;
-
-  } catch (error) {
-    console.error('[Wanderlynx] Error sending WhatsApp message:', error);
-    throw error;
+  if (!response.ok) {
+    const errorData = await response.json();
+    const errorMessage = errorData.error?.message || `HTTP status ${response.status}`;
+    // Throw a detailed error to be caught by the calling API route
+    throw new Error(`WhatsApp API request failed: ${errorMessage}`);
   }
+
+  const responseData = await response.json();
+  return responseData;
 }

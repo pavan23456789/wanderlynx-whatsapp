@@ -1,7 +1,8 @@
 'use client';
 
-import { PlusCircle, MoreHorizontal, Search, Send, Clock, CheckCircle, XCircle } from "lucide-react"
+import { PlusCircle, MoreHorizontal, Search, Send, FileText, Users, Loader } from "lucide-react"
 import * as React from 'react';
+import Link from 'next/link';
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -23,28 +24,65 @@ import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label";
-import { getCampaigns, getTemplates, getContacts, Campaign, Template, Contact, saveCampaigns } from "@/lib/data";
+import { Campaign, Template } from "@/lib/data";
 import { useToast } from "@/hooks/use-toast";
-
+import { format } from 'date-fns';
+import { useRouter } from 'next/navigation';
 
 const statusConfig = {
-    Sent: { variant: "default", icon: CheckCircle },
-    Delivering: { variant: "secondary", icon: Send },
-    Scheduled: { variant: "outline", icon: Clock },
-    Failed: { variant: "destructive", icon: XCircle },
+    Completed: { variant: "default", icon: Send },
+    Sending: { variant: "secondary", icon: Loader },
+    Draft: { variant: "outline", icon: FileText },
+    Failed: { variant: "destructive", icon: Send },
 } as const;
 
-function CreateCampaignDialog({ open, onOpenChange, onCampaignCreated }: { open: boolean, onOpenChange: (open: boolean) => void, onCampaignCreated: (campaign: Campaign) => void }) {
+function CreateCampaignDialog({ open, onOpenChange }: { open: boolean, onOpenChange: (open: boolean) => void }) {
+    const router = useRouter();
     const { toast } = useToast();
-    const [name, setName] = React.useState('');
-    const [template, setTemplate] = React.useState('');
-    const [audience, setAudience] = React.useState('all');
-    // Only allow marketing templates for campaigns initiated from this UI
-    const templates = getTemplates().filter(t => t.status === 'Approved' && t.category === 'Marketing');
-    const contacts = getContacts();
+    const [isLoading, setIsLoading] = React.useState(false);
 
-    const handleCreate = () => {
-        if (!name || !template) {
+    const [name, setName] = React.useState('');
+    const [templates, setTemplates] = React.useState<Template[]>([]);
+    const [selectedTemplate, setSelectedTemplate] = React.useState<Template | null>(null);
+    const [variables, setVariables] = React.useState<Record<string, string>>({});
+    
+    const variablePlaceholders = React.useMemo(() => {
+        if (!selectedTemplate) return [];
+        const regex = /\{\{(\d+)\}\}/g;
+        const matches = new Set<string>();
+        let match;
+        while((match = regex.exec(selectedTemplate.content)) !== null) {
+            matches.add(match[1]);
+        }
+        return Array.from(matches).sort();
+    }, [selectedTemplate]);
+
+    React.useEffect(() => {
+        if (open) {
+            const fetchTemplates = async () => {
+                const response = await fetch('/api/templates');
+                if(response.ok) {
+                    const allTemplates: Template[] = await response.json();
+                    // Only allow marketing templates for campaigns initiated from this UI
+                    const marketingTemplates = allTemplates.filter(t => t.status === 'Approved' && t.category === 'Marketing');
+                    setTemplates(marketingTemplates);
+                }
+            };
+            fetchTemplates();
+        } else {
+            // Reset form on close
+            setName('');
+            setSelectedTemplate(null);
+            setVariables({});
+        }
+    }, [open]);
+
+    const handleVariableChange = (key: string, value: string) => {
+        setVariables(prev => ({ ...prev, [key]: value }));
+    };
+
+    const handleCreate = async () => {
+        if (!name || !selectedTemplate) {
             toast({
                 variant: "destructive",
                 title: "Missing Information",
@@ -53,82 +91,104 @@ function CreateCampaignDialog({ open, onOpenChange, onCampaignCreated }: { open:
             return;
         }
 
-        const newCampaign: Campaign = {
-            id: `CAMP${Date.now()}`,
-            name,
-            template,
-            status: "Scheduled",
-            sent: 0,
-            delivered: 0,
-            read: 0,
-            date: new Date().toISOString().split('T')[0],
-        };
+        setIsLoading(true);
+        try {
+            const response = await fetch('/api/campaigns', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name,
+                    templateName: selectedTemplate.name,
+                    templateContent: selectedTemplate.content,
+                    variables
+                })
+            });
 
-        // Simulate scheduling, sending, and final state updates
-        onCampaignCreated(newCampaign); 
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to create campaign');
+            }
 
-        setTimeout(() => {
-            const updatedCampaign = { ...newCampaign, status: 'Delivering' as const, sent: audience === 'all' ? contacts.length : 0 };
-            onCampaignCreated(updatedCampaign);
-        }, 2000); 
-        
-        setTimeout(() => {
-             const finalCampaign = { ...newCampaign, status: 'Sent' as const, sent: audience === 'all' ? contacts.length : 0, delivered: Math.floor((audience === 'all' ? contacts.length : 0) * 0.95), read: Math.floor((audience === 'all' ? contacts.length : 0) * 0.8) };
-             onCampaignCreated(finalCampaign);
-        }, 5000);
+            const newCampaign: Campaign = await response.json();
+            toast({
+                title: "Campaign Created",
+                description: `Campaign "${name}" has started sending.`,
+            });
+            
+            onOpenChange(false);
+            router.push(`/dashboard/campaigns/${newCampaign.id}`);
 
-
-        toast({
-            title: "Campaign Scheduled",
-            description: `Campaign "${name}" has been scheduled to send.`,
-        });
-
-        onOpenChange(false);
-        setName('');
-        setTemplate('');
-        setAudience('all');
+        } catch (error: any) {
+            toast({
+                variant: 'destructive',
+                title: 'Error',
+                description: error.message
+            });
+        } finally {
+            setIsLoading(false);
+        }
     }
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-xl">
                 <DialogHeader>
                     <DialogTitle>Create New Campaign</DialogTitle>
                     <DialogDescription>
-                        Set up a new broadcast message for your contacts.
+                        Set up a new broadcast message for all your contacts.
                     </DialogDescription>
                 </DialogHeader>
-                <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="name" className="text-right">Name</Label>
-                        <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3 rounded-xl" placeholder="e.g., Summer Sale" />
+                <div className="grid gap-6 py-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="name">Campaign Name</Label>
+                        <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="rounded-xl" placeholder="e.g., Summer Sale Announcement" />
                     </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="template" className="text-right">Template</Label>
-                         <Select value={template} onValueChange={setTemplate}>
-                            <SelectTrigger className="col-span-3 rounded-xl">
-                                <SelectValue placeholder="Select a marketing template" />
+                    <div className="space-y-2">
+                        <Label htmlFor="template">Message Template</Label>
+                        <Select onValueChange={(val) => setSelectedTemplate(templates.find(t => t.name === val) || null)}>
+                            <SelectTrigger className="rounded-xl">
+                                <SelectValue placeholder="Select an approved marketing template" />
                             </SelectTrigger>
                             <SelectContent>
                                 {templates.length > 0 ? templates.map(t => <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>) : <SelectItem value="none" disabled>No approved marketing templates</SelectItem>}
                             </SelectContent>
                         </Select>
                     </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="audience" className="text-right">Audience</Label>
-                        <Select value={audience} onValueChange={setAudience}>
-                            <SelectTrigger className="col-span-3 rounded-xl">
-                                <SelectValue placeholder="Select audience" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Contacts</SelectItem>
-                                <SelectItem value="uploaded" disabled>Uploaded List (coming soon)</SelectItem>
-                            </SelectContent>
-                        </Select>
+                    {selectedTemplate && (
+                         <div className="space-y-4 p-4 bg-secondary/50 rounded-2xl">
+                             <div className="space-y-2">
+                                <Label className="text-muted-foreground">Template Preview</Label>
+                                <p className="text-sm p-3 bg-background rounded-xl whitespace-pre-wrap">{selectedTemplate.content}</p>
+                            </div>
+                            {variablePlaceholders.length > 0 && (
+                                <div className="space-y-4">
+                                     <Label className="text-muted-foreground">Template Variables</Label>
+                                     {variablePlaceholders.map(key => (
+                                         <div key={key} className="space-y-2">
+                                             <Label htmlFor={`var-${key}`} className="font-mono text-sm">{`{{${key}}}`}</Label>
+                                             <Input 
+                                                id={`var-${key}`} 
+                                                value={variables[key] || ''} 
+                                                onChange={e => handleVariableChange(key, e.target.value)}
+                                                className="rounded-xl"
+                                                placeholder={`Enter value for variable ${key}`}
+                                             />
+                                         </div>
+                                     ))}
+                                </div>
+                            )}
+                         </div>
+                    )}
+                    <div className="p-4 border-l-4 border-yellow-500 bg-yellow-50 text-yellow-900 rounded-r-lg">
+                        <p className="font-bold">Audience: All Contacts</p>
+                        <p className="text-sm">This campaign will be sent to every contact in your system.</p>
                     </div>
                 </div>
                 <DialogFooter>
-                    <Button onClick={handleCreate} className="rounded-full" size="lg" disabled={templates.length === 0} suppressHydrationWarning={true}>Schedule Campaign</Button>
+                    <Button onClick={handleCreate} className="rounded-full" size="lg" disabled={!selectedTemplate || templates.length === 0 || isLoading}>
+                        {isLoading ? <Loader className="h-5 w-5 mr-2 animate-spin" /> : <Send className="h-5 w-5 mr-2" />}
+                        {isLoading ? 'Creating...' : 'Create and Send Campaign'}
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -140,42 +200,33 @@ export default function CampaignsPage() {
     const [filteredCampaigns, setFilteredCampaigns] = React.useState<Campaign[]>([]);
     const [searchTerm, setSearchTerm] = React.useState("");
     const [isCreateOpen, setCreateOpen] = React.useState(false);
+    const { toast } = useToast();
 
+    const fetchCampaigns = React.useCallback(async () => {
+        try {
+            const response = await fetch('/api/campaigns');
+             if (!response.ok) throw new Error('Failed to fetch campaigns');
+            const data = await response.json();
+            setCampaigns(data);
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Error', description: error.message });
+        }
+    }, [toast]);
+    
     React.useEffect(() => {
-        const data = getCampaigns();
-        setCampaigns(data);
-        setFilteredCampaigns(data);
-    }, []);
+        fetchCampaigns();
+        const interval = setInterval(fetchCampaigns, 10000); // Poll for status updates
+        return () => clearInterval(interval);
+    }, [fetchCampaigns]);
 
      React.useEffect(() => {
         const results = campaigns.filter(campaign =>
             campaign.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            campaign.template.toLowerCase().includes(searchTerm.toLowerCase())
+            campaign.templateName.toLowerCase().includes(searchTerm.toLowerCase())
         );
         setFilteredCampaigns(results);
     }, [searchTerm, campaigns]);
-
-    const handleCampaignCreated = (campaign: Campaign) => {
-        setCampaigns(prevCampaigns => {
-            const existingIndex = prevCampaigns.findIndex(c => c.id === campaign.id);
-            let updatedCampaigns;
-            if (existingIndex > -1) {
-                updatedCampaigns = prevCampaigns.map(c => c.id === campaign.id ? campaign : c);
-            } else {
-                updatedCampaigns = [campaign, ...prevCampaigns];
-            }
-            saveCampaigns(updatedCampaigns);
-            return updatedCampaigns;
-        });
-    }
-
-    const deleteCampaign = (id: string) => {
-        const updated = campaigns.filter(c => c.id !== id);
-        setCampaigns(updated);
-        saveCampaigns(updated);
-    }
-
-
+    
     return (
         <main className="flex flex-1 flex-col gap-6 p-6 md:gap-8 md:p-10">
              <div className="flex items-center justify-between">
@@ -201,78 +252,77 @@ export default function CampaignsPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredCampaigns.map((campaign) => {
-                    const config = statusConfig[campaign.status as keyof typeof statusConfig] || statusConfig.Scheduled;
+                    const config = statusConfig[campaign.status as keyof typeof statusConfig] || statusConfig.Draft;
                     const Icon = config.icon;
                     return (
-                        <Card key={campaign.id} className="group relative">
-                             <CardHeader className="flex flex-row items-start justify-between">
-                                <div>
-                                    <CardTitle className="text-xl mb-1">{campaign.name}</CardTitle>
-                                    <CardDescription>{campaign.template}</CardDescription>
-                                </div>
-                                 <Badge variant={config.variant as any} className="flex items-center gap-2">
-                                    <Icon className="h-4 w-4" />
-                                    <span>{campaign.status}</span>
-                                </Badge>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                               <div className="space-y-2">
-                                    <div className="flex justify-between text-sm text-muted-foreground">
-                                        <span>Read</span>
-                                        <span>{Math.round((campaign.read / campaign.sent) * 100) || 0}%</span>
-                                    </div>
-                                    <div className="w-full bg-secondary rounded-full h-2.5">
-                                        <div className="bg-primary h-2.5 rounded-full" style={{ width: `${(campaign.read / campaign.sent) * 100 || 0}%` }}></div>
-                                    </div>
-                               </div>
-                                <div className="grid grid-cols-3 gap-4 text-center">
+                        <Link href={`/dashboard/campaigns/${campaign.id}`} key={campaign.id} className="group relative">
+                            <Card className="h-full transition-all group-hover:shadow-lg">
+                                <CardHeader className="flex flex-row items-start justify-between">
                                     <div>
-                                        <p className="text-2xl font-bold">{campaign.sent}</p>
-                                        <p className="text-sm text-muted-foreground">Sent</p>
+                                        <CardTitle className="text-xl mb-1">{campaign.name}</CardTitle>
+                                        <CardDescription>{campaign.templateName}</CardDescription>
                                     </div>
-                                     <div>
-                                        <p className="text-2xl font-bold">{campaign.delivered}</p>
-                                        <p className="text-sm text-muted-foreground">Delivered</p>
-                                    </div>
-                                     <div>
-                                        <p className="text-2xl font-bold">{campaign.read}</p>
-                                        <p className="text-sm text-muted-foreground">Read</p>
-                                    </div>
+                                    <Badge variant={config.variant as any} className="flex items-center gap-2">
+                                        <Icon className={`h-4 w-4 ${campaign.status === 'Sending' ? 'animate-spin' : ''}`} />
+                                        <span>{campaign.status}</span>
+                                    </Badge>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                <div className="space-y-2">
+                                        <div className="flex justify-between text-sm text-muted-foreground">
+                                            <span>Progress</span>
+                                            <span>{Math.round(((campaign.sent + campaign.failed) / campaign.audienceCount) * 100) || 0}%</span>
+                                        </div>
+                                        <Progress value={((campaign.sent + campaign.failed) / campaign.audienceCount) * 100 || 0} />
                                 </div>
-                                 <div className="text-sm text-muted-foreground pt-2">
-                                    Date: {new Date(campaign.date).toLocaleDateString()}
-                                 </div>
-                            </CardContent>
-                             <div className="absolute top-4 right-4">
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button
-                                            aria-haspopup="true"
-                                            size="icon"
-                                            variant="ghost"
-                                            className="rounded-full h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                                            suppressHydrationWarning={true}
-                                        >
-                                            <MoreHorizontal className="h-5 w-5" />
-                                            <span className="sr-only">Toggle menu</span>
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="rounded-xl">
-                                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                        <DropdownMenuItem disabled>View Details</DropdownMenuItem>
-                                        <DropdownMenuItem disabled>Pause</DropdownMenuItem>
-                                        <DropdownMenuItem disabled>Duplicate</DropdownMenuItem>
-                                        <DropdownMenuItem className="text-destructive" onClick={() => deleteCampaign(campaign.id)}>
-                                            Archive
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            </div>
-                        </Card>
+                                    <div className="grid grid-cols-3 gap-4 text-center pt-2">
+                                        <div>
+                                            <p className="text-2xl font-bold">{campaign.sent}</p>
+                                            <p className="text-sm text-muted-foreground">Sent</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-2xl font-bold">{campaign.failed}</p>
+                                            <p className="text-sm text-muted-foreground">Failed</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-2xl font-bold">{campaign.audienceCount}</p>
+                                            <p className="text-sm text-muted-foreground">Audience</p>
+                                        </div>
+                                    </div>
+                                    <div className="text-sm text-muted-foreground pt-2">
+                                        Created: {format(new Date(campaign.createdAt), "PP")}
+                                    </div>
+                                </CardContent>
+                                <div className="absolute top-4 right-4">
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button
+                                                aria-haspopup="true"
+                                                size="icon"
+                                                variant="ghost"
+                                                className="rounded-full h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                onClick={(e) => e.preventDefault()}
+                                            >
+                                                <MoreHorizontal className="h-5 w-5" />
+                                                <span className="sr-only">Toggle menu</span>
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="rounded-xl">
+                                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                            <DropdownMenuItem onSelect={e => e.preventDefault()} disabled>Pause</DropdownMenuItem>
+                                            <DropdownMenuItem onSelect={e => e.preventDefault()} disabled>Duplicate</DropdownMenuItem>
+                                            <DropdownMenuItem className="text-destructive" onSelect={e => e.preventDefault()} disabled>
+                                                Archive
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
+                            </Card>
+                        </Link>
                     )
                 })}
             </div>
-            <CreateCampaignDialog open={isCreateOpen} onOpenChange={setCreateOpen} onCampaignCreated={handleCampaignCreated} />
+            <CreateCampaignDialog open={isCreateOpen} onOpenChange={setCreateOpen} />
         </main>
     )
 }

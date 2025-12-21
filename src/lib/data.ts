@@ -39,16 +39,28 @@ export type Template = {
     status: 'Approved' | 'Pending' | 'Rejected';
 };
 
+export type CampaignMessage = {
+    contactId: string;
+    status: 'Sent' | 'Failed' | 'Pending';
+    timestamp: string;
+    error?: string;
+};
+
 export type Campaign = {
     id: string;
-    name:string;
-    template: string;
-    status: 'Sent' | 'Delivering' | 'Scheduled' | 'Failed';
+    name: string;
+    templateName: string;
+    templateContent: string;
+    variables: Record<string, unknown>;
+    status: 'Draft' | 'Sending' | 'Completed' | 'Failed';
+    audienceCount: number;
     sent: number;
-    delivered: number;
-read: number;
-    date: string;
+    failed: number;
+    statusMessage: string;
+createdAt: string;
+    messages: CampaignMessage[];
 };
+
 
 // NOTE: Most data is now being managed by file-based stores on the backend.
 // These localStorage functions are being phased out or used as initial placeholders.
@@ -95,15 +107,14 @@ export const saveTemplates = (templates: Template[]) => {
     console.warn("saveTemplates is deprecated. Use API endpoint /api/templates.");
 };
 
-// CAMPAIGNS (Still using localStorage for mock UI)
-const initialCampaigns: Campaign[] = [
-    { id: "CAMP001", name: "New Year Promo", template: "new_year_promo", status: "Sent", sent: 1000, delivered: 950, read: 800, date: "2023-12-28" },
-    { id: "CAMP002", name: "Summer Sale Kickoff", template: "summer_promo", status: "Delivering", sent: 500, delivered: 250, read: 100, date: "2024-06-15" },
-    { id: "CAMP003", name: "Paris Trip Reminders", template: "trip_confirmation", status: "Scheduled", sent: 0, delivered: 0, read: 0, date: "2024-07-01" },
-    { id: "CAMP004", name: "Customer Feedback Request", template: "feedback_request", status: "Failed", sent: 200, delivered: 0, read: 0, date: "2024-05-20" },
-];
-export const getCampaigns = (): Campaign[] => getFromStorage('campaigns', initialCampaigns);
-export const saveCampaigns = (campaigns: Campaign[]) => saveToStorage('campaigns', campaigns);
+// CAMPAIGNS (Now managed by campaign-store.ts on the backend)
+export const getCampaigns = (): Campaign[] => {
+    console.warn("getCampaigns is deprecated. Use API endpoint /api/campaigns.");
+    return [];
+};
+export const saveCampaigns = (campaigns: Campaign[]) => {
+     console.warn("saveCampaigns is deprecated. Use API endpoint /api/campaigns.");
+};
 
 // CONVERSATIONS (Now managed by conversation-store.ts on the backend)
 export const getConversations = (): Conversation[] => {

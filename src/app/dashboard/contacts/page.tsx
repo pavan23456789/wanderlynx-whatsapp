@@ -265,31 +265,29 @@ export default function ContactsPage() {
                                 ))}
                             </div>
                         </CardContent>
-                        <CardHeader className="p-0">
-                             <div className="absolute top-4 right-4">
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button
-                                            aria-haspopup="true"
-                                            size="icon"
-                                            variant="ghost"
-                                            className="rounded-full h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                                        >
-                                            <MoreHorizontal className="h-5 w-5" />
-                                            <span className="sr-only">Toggle menu</span>
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="rounded-xl">
-                                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                        <DropdownMenuItem onClick={() => { setEditingContact(contact); setContactDialogOpen(true); }}>Edit</DropdownMenuItem>
-                                        <DropdownMenuItem disabled>View conversation</DropdownMenuItem>
-                                        <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteContact(contact.id)}>
-                                            Delete
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            </div>
-                        </CardHeader>
+                        <div className="absolute top-4 right-4">
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button
+                                        aria-haspopup="true"
+                                        size="icon"
+                                        variant="ghost"
+                                        className="rounded-full h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    >
+                                        <MoreHorizontal className="h-5 w-5" />
+                                        <span className="sr-only">Toggle menu</span>
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="rounded-xl">
+                                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                    <DropdownMenuItem onClick={() => { setEditingContact(contact); setContactDialogOpen(true); }}>Edit</DropdownMenuItem>
+                                    <DropdownMenuItem disabled>View conversation</DropdownMenuItem>
+                                    <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteContact(contact.id)}>
+                                        Delete
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
                     </Card>
                 ))}
             </div>

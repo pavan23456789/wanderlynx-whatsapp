@@ -1,14 +1,9 @@
 'use client';
 
 import * as React from 'react';
-import {
-  Search,
-  Send,
-  RefreshCw,
-  AlertTriangle,
-} from 'lucide-react';
+import { Search, Send, RefreshCw, AlertTriangle } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
 
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -17,15 +12,10 @@ import {
   ResizablePanelGroup,
 } from '@/components/ui/resizable';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  TooltipProvider,
-} from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { formatDistanceToNow } from 'date-fns';
 
 /* =========================
    TYPES
@@ -45,7 +35,7 @@ type Conversation = {
   avatar: string;
   unread: number;
   lastMessage: string;
-  lastMessageTimestamp: string;
+  lastMessageTimestamp: string | null;
   messages: Message[];
 };
 
@@ -156,12 +146,12 @@ export default function InboxPage() {
 
       const normalized: Conversation[] = raw.map((c: any) => ({
         id: c.id,
-        name: c.name || c.phone,
-        phone: c.phone,
+        name: c.name || c.phone || 'Unknown',
+        phone: c.phone ?? '',
         avatar: '',
         unread: 0,
-        lastMessage: c.last_message,
-        lastMessageTimestamp: c.last_message_at,
+        lastMessage: c.last_message ?? '',
+        lastMessageTimestamp: c.last_message_at ?? null,
         messages: [],
       }));
 
@@ -170,7 +160,11 @@ export default function InboxPage() {
         prev ? normalized.find(c => c.id === prev.id) || normalized[0] : normalized[0]
       );
     } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Error', description: e.message });
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: e.message,
+      });
     } finally {
       setLoading(false);
     }
@@ -200,7 +194,7 @@ export default function InboxPage() {
   );
 
   /* =========================
-     SEND MESSAGE
+     SEND TEMPLATE
   ========================= */
 
   const sendTemplate = async (template: string, params: string[]) => {
@@ -221,7 +215,11 @@ export default function InboxPage() {
       if (!res.ok) throw new Error('Send failed');
       fetchConversations();
     } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Send failed', description: e.message });
+      toast({
+        variant: 'destructive',
+        title: 'Send failed',
+        description: e.message,
+      });
     } finally {
       setSending(false);
     }
@@ -258,11 +256,15 @@ export default function InboxPage() {
                   )}
                 >
                   <div className="font-semibold">{c.name}</div>
+
                   <div className="text-sm text-muted-foreground">
-                    {c.lastMessage}
+                    {c.lastMessage || '—'}
                   </div>
-                  <div className="text-xs">
-                    {formatDistanceToNow(new Date(c.lastMessageTimestamp), { addSuffix: true })}
+
+                  <div className="text-xs text-muted-foreground">
+                    {c.lastMessageTimestamp
+                      ? formatDistanceToNow(new Date(c.lastMessageTimestamp), { addSuffix: true })
+                      : 'No messages yet'}
                   </div>
                 </button>
               ))}

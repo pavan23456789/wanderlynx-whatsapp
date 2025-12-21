@@ -49,7 +49,7 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
   const { toast } = useToast();
 
   const fetchCampaign = React.useCallback(async () => {
-    // Don't set loading to true on refetch
+    // Don't set loading to true on refetch to avoid flicker
     // setIsLoading(true); 
     try {
       const response = await fetch(`/api/campaigns/${params.id}`);
@@ -74,7 +74,8 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
     fetchCampaign();
     // Poll for updates if the campaign is active
     const interval = setInterval(() => {
-        // Check campaign status without relying on the state variable which might be stale in the closure
+        // Use a function form of setCampaign to get the latest state
+        // This avoids stale closure issues with `campaign` state variable.
         setCampaign(currentCampaign => {
             if(currentCampaign && (currentCampaign.status === 'Sending' || currentCampaign.status === 'Draft')) {
                 fetchCampaign();
@@ -111,7 +112,7 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
         <h1 className="flex-1 shrink-0 whitespace-nowrap text-3xl font-bold tracking-tight">
           {campaign.name}
         </h1>
-        <Badge variant={config.variant as any} className="ml-auto sm:ml-0 flex items-center">
+        <Badge variant={config.variant as any} className={`ml-auto sm:ml-0 flex items-center ${config.className || ''}`}>
           <Icon className={`h-4 w-4 mr-2 ${config.className || ''}`} />
           {campaign.status}
         </Badge>
@@ -221,7 +222,7 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
                              <TableRow key={msg.contactId}>
                                 <TableCell>{msg.contactId}</TableCell>
                                 <TableCell>
-                                     <Badge variant={msg.status === 'Failed' ? 'destructive' : msg.status === 'Sent' ? 'default' : 'secondary'}>
+                                     <Badge variant={msg.status === 'Failed' ? 'destructive' : 'secondary'}>
                                         {msg.status}
                                     </Badge>
                                 </TableCell>

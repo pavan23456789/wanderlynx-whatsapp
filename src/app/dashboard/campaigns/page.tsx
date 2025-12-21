@@ -31,8 +31,8 @@ import { format } from 'date-fns';
 import { Progress } from "@/components/ui/progress";
 
 const statusConfig = {
-    Completed: { variant: "default", icon: Send },
-    Sending: { variant: "secondary", icon: Loader },
+    Completed: { variant: "default", icon: Send, className: 'bg-blue-100 text-blue-800' },
+    Sending: { variant: "secondary", icon: Loader, className: 'animate-spin' },
     Draft: { variant: "outline", icon: FileText },
     Failed: { variant: "destructive", icon: Send },
 } as const;
@@ -243,7 +243,7 @@ export default function CampaignsPage() {
                     </p>
                 </div>
                 <div className="flex items-center gap-4">
-                     <Button size="lg" className="rounded-full" onClick={() => setCreateOpen(true)} suppressHydrationWarning={true}>
+                     <Button size="lg" className="rounded-full" onClick={() => setCreateOpen(true)}>
                         <PlusCircle className="h-5 w-5 mr-2" />
                         Create Campaign
                     </Button>
@@ -272,7 +272,7 @@ export default function CampaignsPage() {
                                             <CardTitle className="text-xl mb-1">{campaign.name}</CardTitle>
                                             <CardDescription>{campaign.templateName}</CardDescription>
                                         </div>
-                                        <Badge variant={config.variant as any} className="flex items-center gap-2">
+                                        <Badge variant={config.variant as any} className={`flex items-center gap-2 ${config.className || ''}`}>
                                             <Icon className={`h-4 w-4 ${campaign.status === 'Sending' ? 'animate-spin' : ''}`} />
                                             <span>{campaign.status}</span>
                                         </Badge>

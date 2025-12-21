@@ -1,9 +1,10 @@
 'use client';
 
 import * as React from 'react';
-import { Search, FileText, CheckCircle, Clock, XCircle } from "lucide-react"
+import { Search, FileText, CheckCircle, Clock, XCircle, PlusCircle } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import {
     Card,
     CardContent,
@@ -67,6 +68,12 @@ export default function TemplatesPage() {
                     <p className="text-muted-foreground">
                         A read-only view of templates synced from WhatsApp Business Manager.
                     </p>
+                </div>
+                 <div className="flex items-center gap-4">
+                     <Button size="lg" className="rounded-full" disabled>
+                        <PlusCircle className="h-5 w-5 mr-2" />
+                        Create Template
+                    </Button>
                 </div>
             </div>
              <div className="flex items-center justify-between gap-4">

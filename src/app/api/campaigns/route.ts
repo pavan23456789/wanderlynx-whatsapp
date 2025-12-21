@@ -72,19 +72,14 @@ async function processCampaign(campaignId: string) {
             let messageBody = campaign.templateContent;
             
             const params: string[] = [];
-            // Handle numbered placeholders like {{1}}, {{2}}
-            const variablePlaceholders = messageBody.match(/\{\{(\d+)\}\}/g)?.map(p => p.replace(/\{|\}/g, '')) || [];
             
-            // This is a simple implementation assuming variables are passed for these placeholders.
-            // A more robust solution might map named variables to placeholder numbers.
-            // For now, we'll assume the `variables` object contains numbered keys if needed.
+            // This logic assumes variables are provided for numbered placeholders like {{1}}, {{2}}
             if(campaign.variables) {
-                 // Sort keys numerically to ensure order
+                 // Sort keys numerically to ensure order for params array
                 const sortedVarKeys = Object.keys(campaign.variables).sort((a, b) => parseInt(a) - parseInt(b));
                 for(const key of sortedVarKeys) {
                     const value = campaign.variables[key] as string;
                     params.push(value);
-                    // This replacement is for logging/display, actual params are sent separately
                     messageBody = messageBody.replace(`{{${key}}}`, value);
                 }
             }

@@ -30,4 +30,6 @@ The integration is based on a simple but powerful **event-driven (webhook) archi
 -   **Backend**: Next.js API Routes
 -   **Messaging**: Meta WhatsApp Cloud API
 
-For detailed setup and operational instructions, please see the [**Operations Guide**](./docs/OPERATIONS_GUIDE.md).
+For detailed setup instructions, please see the guides below:
+- [**WhatsApp API Setup Guide**](./docs/WHATSAPP_SETUP_GUIDE.md) (Start here if you are new)
+- [**Operations Guide**](./docs/OPERATIONS_GUIDE.md) (For testing and daily operations)

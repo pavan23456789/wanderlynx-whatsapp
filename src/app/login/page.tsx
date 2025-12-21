@@ -97,7 +97,7 @@ export default function LoginPage() {
                 suppressHydrationWarning={true}
               />
             </div>
-            <Button type="submit" className="w-full h-12 rounded-xl text-base" disabled={isLoading}>
+            <Button type="submit" className="w-full h-12 rounded-xl text-base" disabled={isLoading} suppressHydrationWarning={true}>
               {isLoading ? 'Logging in...' : 'Login'}
             </Button>
           </form>

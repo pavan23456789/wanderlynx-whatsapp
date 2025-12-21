@@ -1,6 +1,6 @@
 'use client';
 
-import { PlusCircle, MoreHorizontal, Search, Send, FileText, Users, Loader } from "lucide-react"
+import { PlusCircle, MoreHorizontal, Search, Send, FileText, Loader } from "lucide-react"
 import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -203,6 +203,7 @@ export default function CampaignsPage() {
     const [filteredCampaigns, setFilteredCampaigns] = React.useState<Campaign[]>([]);
     const [searchTerm, setSearchTerm] = React.useState("");
     const [isCreateOpen, setCreateOpen] = React.useState(false);
+    const [isLoading, setIsLoading] = React.useState(true);
     const { toast } = useToast();
 
     const fetchCampaigns = React.useCallback(async () => {
@@ -213,6 +214,8 @@ export default function CampaignsPage() {
             setCampaigns(data);
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Error', description: error.message });
+        } finally {
+            setIsLoading(false);
         }
     }, [toast]);
     
@@ -252,79 +255,85 @@ export default function CampaignsPage() {
                     <Input placeholder="Search campaigns..." className="pl-10 rounded-full" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                 </div>
             </div>
+            
+            {isLoading ? (
+                <div className="flex justify-center items-center h-64"><Loader className="h-8 w-8 animate-spin" /></div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {filteredCampaigns.map((campaign) => {
+                        const config = statusConfig[campaign.status as keyof typeof statusConfig] || statusConfig.Draft;
+                        const Icon = config.icon;
+                        const progress = campaign.audienceCount > 0 ? ((campaign.sent + campaign.failed) / campaign.audienceCount) * 100 : 0;
+                        return (
+                            <Link href={`/dashboard/campaigns/${campaign.id}`} key={campaign.id} className="group relative">
+                                <Card className="h-full transition-all group-hover:shadow-lg">
+                                    <CardHeader className="flex flex-row items-start justify-between">
+                                        <div>
+                                            <CardTitle className="text-xl mb-1">{campaign.name}</CardTitle>
+                                            <CardDescription>{campaign.templateName}</CardDescription>
+                                        </div>
+                                        <Badge variant={config.variant as any} className="flex items-center gap-2">
+                                            <Icon className={`h-4 w-4 ${campaign.status === 'Sending' ? 'animate-spin' : ''}`} />
+                                            <span>{campaign.status}</span>
+                                        </Badge>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4">
+                                    <div className="space-y-2">
+                                            <div className="flex justify-between text-sm text-muted-foreground">
+                                                <span>Progress</span>
+                                                <span>{Math.round(progress)}%</span>
+                                            </div>
+                                            <Progress value={progress} />
+                                    </div>
+                                        <div className="grid grid-cols-3 gap-4 text-center pt-2">
+                                            <div>
+                                                <p className="text-2xl font-bold">{campaign.sent}</p>
+                                                <p className="text-sm text-muted-foreground">Sent</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-2xl font-bold">{campaign.failed}</p>
+                                                <p className="text-sm text-muted-foreground">Failed</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-2xl font-bold">{campaign.audienceCount}</p>
+                                                <p className="text-sm text-muted-foreground">Audience</p>
+                                            </div>
+                                        </div>
+                                        <div className="text-sm text-muted-foreground pt-2">
+                                            Created: {campaign.createdAt ? format(new Date(campaign.createdAt), "PP") : '-'}
+                                        </div>
+                                    </CardContent>
+                                    <div className="absolute top-4 right-4">
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button
+                                                    aria-haspopup="true"
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    className="rounded-full h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    onClick={(e) => e.preventDefault()}
+                                                >
+                                                    <MoreHorizontal className="h-5 w-5" />
+                                                    <span className="sr-only">Toggle menu</span>
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" className="rounded-xl">
+                                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                                <DropdownMenuItem onSelect={e => e.preventDefault()} disabled>Pause</DropdownMenuItem>
+                                                <DropdownMenuItem onSelect={e => e.preventDefault()} disabled>Duplicate</DropdownMenuItem>
+                                                <DropdownMenuItem className="text-destructive" onSelect={e => e.preventDefault()} disabled>
+                                                    Archive
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
+                                </Card>
+                            </Link>
+                        )
+                    })}
+                </div>
+            )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredCampaigns.map((campaign) => {
-                    const config = statusConfig[campaign.status as keyof typeof statusConfig] || statusConfig.Draft;
-                    const Icon = config.icon;
-                    return (
-                        <Link href={`/dashboard/campaigns/${campaign.id}`} key={campaign.id} className="group relative">
-                            <Card className="h-full transition-all group-hover:shadow-lg">
-                                <CardHeader className="flex flex-row items-start justify-between">
-                                    <div>
-                                        <CardTitle className="text-xl mb-1">{campaign.name}</CardTitle>
-                                        <CardDescription>{campaign.templateName}</CardDescription>
-                                    </div>
-                                    <Badge variant={config.variant as any} className="flex items-center gap-2">
-                                        <Icon className={`h-4 w-4 ${campaign.status === 'Sending' ? 'animate-spin' : ''}`} />
-                                        <span>{campaign.status}</span>
-                                    </Badge>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                <div className="space-y-2">
-                                        <div className="flex justify-between text-sm text-muted-foreground">
-                                            <span>Progress</span>
-                                            <span>{Math.round(((campaign.sent + campaign.failed) / campaign.audienceCount) * 100) || 0}%</span>
-                                        </div>
-                                        <Progress value={((campaign.sent + campaign.failed) / campaign.audienceCount) * 100 || 0} />
-                                </div>
-                                    <div className="grid grid-cols-3 gap-4 text-center pt-2">
-                                        <div>
-                                            <p className="text-2xl font-bold">{campaign.sent}</p>
-                                            <p className="text-sm text-muted-foreground">Sent</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-2xl font-bold">{campaign.failed}</p>
-                                            <p className="text-sm text-muted-foreground">Failed</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-2xl font-bold">{campaign.audienceCount}</p>
-                                            <p className="text-sm text-muted-foreground">Audience</p>
-                                        </div>
-                                    </div>
-                                    <div className="text-sm text-muted-foreground pt-2">
-                                        Created: {campaign.createdAt ? format(new Date(campaign.createdAt), "PP") : '-'}
-                                    </div>
-                                </CardContent>
-                                <div className="absolute top-4 right-4">
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button
-                                                aria-haspopup="true"
-                                                size="icon"
-                                                variant="ghost"
-                                                className="rounded-full h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                onClick={(e) => e.preventDefault()}
-                                            >
-                                                <MoreHorizontal className="h-5 w-5" />
-                                                <span className="sr-only">Toggle menu</span>
-                                            </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end" className="rounded-xl">
-                                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                            <DropdownMenuItem onSelect={e => e.preventDefault()} disabled>Pause</DropdownMenuItem>
-                                            <DropdownMenuItem onSelect={e => e.preventDefault()} disabled>Duplicate</DropdownMenuItem>
-                                            <DropdownMenuItem className="text-destructive" onSelect={e => e.preventDefault()} disabled>
-                                                Archive
-                                            </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                </div>
-                            </Card>
-                        </Link>
-                    )
-                })}
-            </div>
             <CreateCampaignDialog open={isCreateOpen} onOpenChange={setCreateOpen} onCampaignCreated={fetchCampaigns} />
         </main>
     )

@@ -35,13 +35,13 @@ import type { Campaign, CampaignMessage } from '@/lib/data';
 import { format } from 'date-fns';
 
 const statusConfig = {
-  Sent: { variant: 'default', icon: CheckCircle, className: 'bg-green-100 text-green-800' },
   Sending: { variant: 'secondary', icon: Loader, className: 'animate-spin' },
   Pending: { variant: 'outline', icon: Clock },
-  Failed: { variant: 'destructive', icon: XCircle, className: 'bg-red-100 text-red-800' },
   Completed: { variant: 'default', icon: CheckCircle, className: 'bg-blue-100 text-blue-800' },
   Draft: { variant: 'secondary', icon: FileText },
+  Failed: { variant: 'destructive', icon: XCircle, className: 'bg-red-100 text-red-800' },
 } as const;
+
 
 export default function CampaignDetailPage({ params }: { params: { id: string } }) {
   const [campaign, setCampaign] = React.useState<Campaign | null>(null);
@@ -49,6 +49,8 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
   const { toast } = useToast();
 
   const fetchCampaign = React.useCallback(async () => {
+    // Don't set loading to true on refetch
+    // setIsLoading(true); 
     try {
       const response = await fetch(`/api/campaigns/${params.id}`);
       if (!response.ok) {
@@ -72,20 +74,24 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
     fetchCampaign();
     // Poll for updates if the campaign is active
     const interval = setInterval(() => {
-        if(campaign && (campaign.status === 'Sending' || campaign.status === 'Draft')) {
-            fetchCampaign();
-        }
+        // Check campaign status without relying on the state variable which might be stale in the closure
+        setCampaign(currentCampaign => {
+            if(currentCampaign && (currentCampaign.status === 'Sending' || currentCampaign.status === 'Draft')) {
+                fetchCampaign();
+            }
+            return currentCampaign;
+        });
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [fetchCampaign, campaign]);
+  }, [fetchCampaign]);
 
   if (isLoading) {
     return <div className="flex justify-center items-center h-full"><Loader className="h-8 w-8 animate-spin" /></div>;
   }
 
   if (!campaign) {
-    return <div className="text-center">Campaign not found.</div>;
+    return <div className="text-center p-10">Campaign not found.</div>;
   }
 
   const config = statusConfig[campaign.status as keyof typeof statusConfig] || statusConfig.Draft;
@@ -105,7 +111,7 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
         <h1 className="flex-1 shrink-0 whitespace-nowrap text-3xl font-bold tracking-tight">
           {campaign.name}
         </h1>
-        <Badge variant={config.variant as any} className="ml-auto sm:ml-0">
+        <Badge variant={config.variant as any} className="ml-auto sm:ml-0 flex items-center">
           <Icon className={`h-4 w-4 mr-2 ${config.className || ''}`} />
           {campaign.status}
         </Badge>
@@ -119,7 +125,7 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{campaign.status}</div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground truncate">
               {campaign.statusMessage}
             </p>
           </CardContent>
@@ -211,7 +217,7 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {campaign.messages && campaign.messages.map((msg: CampaignMessage) => (
+                        {campaign.messages && campaign.messages.length > 0 ? campaign.messages.map((msg: CampaignMessage) => (
                              <TableRow key={msg.contactId}>
                                 <TableCell>{msg.contactId}</TableCell>
                                 <TableCell>
@@ -224,7 +230,11 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
                                     {msg.timestamp ? format(new Date(msg.timestamp), "Pp") : '-'}
                                 </TableCell>
                             </TableRow>
-                        ))}
+                        )) : (
+                            <TableRow>
+                                <TableCell colSpan={4} className="text-center text-muted-foreground">No messages logged for this campaign yet.</TableCell>
+                            </TableRow>
+                        )}
                     </TableBody>
                 </Table>
             </CardContent>

@@ -1,5 +1,5 @@
-import *fs from 'fs/promises';
-import *path from 'path';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 import type { Campaign } from './data';
 
 const CAMPAIGNS_FILE_PATH = path.join(process.cwd(), 'logs', 'campaigns.json');
@@ -26,7 +26,7 @@ async function getStore(): Promise<CampaignStore> {
 
 async function writeStore(store: CampaignStore): Promise<void> {
     try {
-        await fs.writeFile(CAMPAIGONS_FILE_PATH, JSON.stringify(store, null, 2));
+        await fs.writeFile(CAMPAIGNS_FILE_PATH, JSON.stringify(store, null, 2));
     } catch (error) {
         console.error('[CampaignStore] Failed to write to campaigns file:', error);
     }
@@ -96,20 +96,19 @@ export async function updateCampaignStatus(
         campaign.statusMessage = options.message;
     }
 
-    if(options.incrementSent) {
+    if(options.incrementSent && options.contactId) {
         campaign.sent += 1;
-        if(options.contactId) {
-            campaign.messages.push({ contactId: options.contactId, status: 'Sent', timestamp: new Date().toISOString() });
-        }
+        campaign.messages.push({ contactId: options.contactId, status: 'Sent', timestamp: new Date().toISOString() });
     }
     
-    if(options.incrementFailed) {
+    if(options.incrementFailed && options.contactId) {
         campaign.failed += 1;
-        if(options.contactId) {
-             campaign.messages.push({ contactId: options.contactId, status: 'Failed', timestamp: new Date().toISOString(), error: options.error });
-        }
+        campaign.messages.push({ contactId: options.contactId, status: 'Failed', timestamp: new Date().toISOString(), error: options.error });
     }
     
+    // Ensure messages are sorted by timestamp for detail view
+    campaign.messages.sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
     store.campaigns[campaignIndex] = campaign;
     await writeStore(store);
     return campaign;

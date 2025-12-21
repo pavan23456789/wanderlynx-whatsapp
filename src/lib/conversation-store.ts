@@ -1,11 +1,30 @@
-// src/lib/conversation-store.ts
-
 import { supabase } from '@/lib/supabase/server'
-import type { Conversation } from './data'
 
-/**
- * Get all conversations (Inbox list)
- */
+/* =========================
+   TYPES (minimal + safe)
+========================= */
+
+export type Conversation = {
+  id: string
+  phone: string
+  name: string | null
+  last_message: string | null
+  last_message_at: string | null
+}
+
+export type Message = {
+  id: string
+  conversation_id: string
+  body: string
+  direction: 'inbound' | 'outbound'
+  created_at: string
+  status?: string
+}
+
+/* =========================
+   GET ALL CONVERSATIONS
+========================= */
+
 export async function getConversations(): Promise<Conversation[]> {
   const { data, error } = await supabase
     .from('conversations')
@@ -20,10 +39,11 @@ export async function getConversations(): Promise<Conversation[]> {
   return data ?? []
 }
 
-/**
- * Get single conversation by ID
- */
-export async function getConversationById(id: string): Promise<Conversation | null> {
+/* =========================
+   GET CONVERSATION BY ID
+========================= */
+
+export async function getConversationById(id: string) {
   const { data, error } = await supabase
     .from('conversations')
     .select('*')
@@ -38,23 +58,41 @@ export async function getConversationById(id: string): Promise<Conversation | nu
   return data
 }
 
-/**
- * Update conversation when a new message is sent/received
- */
+/* =========================
+   UPDATE CONVERSATION AFTER MESSAGE
+========================= */
+
 export async function updateConversationWithMessage(
   conversationId: string,
-  lastMessage: string
+  message: string
 ) {
   const { error } = await supabase
     .from('conversations')
     .update({
-      last_message: lastMessage,
+      last_message: message,
       last_message_at: new Date().toISOString(),
     })
     .eq('id', conversationId)
 
   if (error) {
     console.error('[conversation-store] updateConversationWithMessage failed:', error)
-    throw error
+  }
+}
+
+/* =========================
+   UPDATE MESSAGE STATUS
+========================= */
+
+export async function updateMessageStatus(
+  messageId: string,
+  status: string
+) {
+  const { error } = await supabase
+    .from('messages')
+    .update({ status })
+    .eq('id', messageId)
+
+  if (error) {
+    console.error('[conversation-store] updateMessageStatus failed:', error)
   }
 }

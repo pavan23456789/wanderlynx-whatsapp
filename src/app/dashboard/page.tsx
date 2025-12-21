@@ -1,5 +1,3 @@
-'use client';
-
 import {
     Card,
     CardContent,
@@ -7,14 +5,6 @@ import {
     CardTitle,
     CardDescription
 } from "@/components/ui/card"
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -30,7 +20,6 @@ import {
     MessageSquare,
     Send,
     ScrollText,
-    ArrowUpRight,
 } from "lucide-react"
 
 const chartdata = [
@@ -76,58 +65,58 @@ const recentConversations = [
 
 export default function DashboardPage() {
     return (
-        <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
-            <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
+        <main className="flex flex-1 flex-col gap-6 p-6 md:gap-8 md:p-10">
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Total Contacts</CardTitle>
-                        <Users className="h-4 w-4 text-muted-foreground" />
+                        <Users className="h-5 w-5 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">1,254</div>
-                        <p className="text-xs text-muted-foreground">+20.1% from last month</p>
+                        <div className="text-3xl font-bold">1,254</div>
+                        <p className="text-sm text-muted-foreground">+20.1% from last month</p>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Messages Sent</CardTitle>
-                        <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                        <MessageSquare className="h-5 w-5 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">+2350</div>
-                        <p className="text-xs text-muted-foreground">+180.1% from last month</p>
+                        <div className="text-3xl font-bold">+2350</div>
+                        <p className="text-sm text-muted-foreground">+180.1% from last month</p>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Active Campaigns</CardTitle>
-                        <Send className="h-4 w-4 text-muted-foreground" />
+                        <Send className="h-5 w-5 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">5</div>
-                        <p className="text-xs text-muted-foreground">+2 since last week</p>
+                        <div className="text-3xl font-bold">5</div>
+                        <p className="text-sm text-muted-foreground">+2 since last week</p>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Templates</CardTitle>
-                        <ScrollText className="h-4 w-4 text-muted-foreground" />
+                        <ScrollText className="h-5 w-5 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">28</div>
-                        <p className="text-xs text-muted-foreground">+5 approved this month</p>
+                        <div className="text-3xl font-bold">28</div>
+                        <p className="text-sm text-muted-foreground">+5 approved this month</p>
                     </CardContent>
                 </Card>
             </div>
-            <div className="grid gap-4 md:gap-8 lg:grid-cols-2 xl:grid-cols-3">
-                <Card className="xl:col-span-2">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-3 md:gap-8">
+                <Card className="md:col-span-2">
                     <CardHeader>
                         <CardTitle>Message Volume</CardTitle>
                         <CardDescription>
                             Total messages sent and received in the last 7 days.
                         </CardDescription>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="pl-2">
                         <ResponsiveContainer width="100%" height={350}>
                             <BarChart data={chartdata}>
                                 <XAxis
@@ -145,10 +134,15 @@ export default function DashboardPage() {
                                     tickFormatter={(value) => `${value}`}
                                 />
                                 <Tooltip
-                                    cursor={{ fill: 'hsl(var(--muted))' }}
-                                    contentStyle={{ backgroundColor: 'hsl(var(--background))' }}
+                                    cursor={{ fill: 'hsl(var(--muted))', radius: 'var(--radius)' }}
+                                    contentStyle={{ 
+                                        backgroundColor: 'hsl(var(--background))',
+                                        borderRadius: 'var(--radius)', 
+                                        border: '0',
+                                        boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' 
+                                    }}
                                 />
-                                <Bar dataKey="messages" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                                <Bar dataKey="messages" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
                             </BarChart>
                         </ResponsiveContainer>
                     </CardContent>
@@ -160,18 +154,18 @@ export default function DashboardPage() {
                             You have 12 unread messages.
                         </CardDescription>
                     </CardHeader>
-                    <CardContent className="grid gap-8">
+                    <CardContent className="grid gap-6">
                         {recentConversations.map((convo, index) => (
                             <div key={index} className="flex items-center gap-4">
-                                <Avatar className="hidden h-9 w-9 sm:flex" data-ai-hint="person portrait">
+                                <Avatar className="h-10 w-10" data-ai-hint="person portrait">
                                     <AvatarImage src={convo.avatar} alt="Avatar" />
                                     <AvatarFallback>{convo.name.substring(0, 2)}</AvatarFallback>
                                 </Avatar>
                                 <div className="grid gap-1">
-                                    <p className="text-sm font-medium leading-none">{convo.name}</p>
+                                    <p className="text-base font-medium leading-none">{convo.name}</p>
                                     <p className="text-sm text-muted-foreground">{convo.lastMessage}</p>
                                 </div>
-                                <div className="ml-auto font-medium text-xs text-muted-foreground">{convo.time}</div>
+                                <div className="ml-auto font-medium text-sm text-muted-foreground">{convo.time}</div>
                             </div>
                         ))}
                     </CardContent>

@@ -3,7 +3,8 @@ import {
     PlusCircle,
     Download,
     Send,
-    MoreHorizontal
+    MoreHorizontal,
+    Search
 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -22,15 +23,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table"
-import { Checkbox } from "@/components/ui/checkbox"
+import { Input } from "@/components/ui/input"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 
 const contacts = [
@@ -83,106 +76,89 @@ const contacts = [
 
 export default function ContactsPage() {
     return (
-        <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
-            <Card>
-                <CardHeader>
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <CardTitle>Contacts</CardTitle>
-                            <CardDescription>
-                                Manage your contacts and send them campaigns.
-                            </CardDescription>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Button variant="outline" size="sm">
-                                <Download className="h-4 w-4 mr-2" />
-                                Export
-                            </Button>
-                            <Button variant="outline" size="sm">
-                                <File className="h-4 w-4 mr-2" />
-                                Upload CSV
-                            </Button>
-                             <Button size="sm">
-                                <Send className="h-4 w-4 mr-2" />
-                                Send Campaign
-                            </Button>
-                            <Button size="sm">
-                                <PlusCircle className="h-4 w-4 mr-2" />
-                                Add Contact
-                            </Button>
-                        </div>
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead className="w-[40px]">
-                                    <Checkbox />
-                                </TableHead>
-                                <TableHead>Name</TableHead>
-                                <TableHead>Phone</TableHead>
-                                <TableHead>Email</TableHead>
-                                <TableHead>Trip Details</TableHead>
-                                <TableHead>Tags</TableHead>
-                                <TableHead>
-                                    <span className="sr-only">Actions</span>
-                                </TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {contacts.map((contact) => (
-                                <TableRow key={contact.id}>
-                                    <TableCell>
-                                        <Checkbox />
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="flex items-center gap-2">
-                                            <Avatar className="h-8 w-8" data-ai-hint="person portrait">
-                                                <AvatarImage src={contact.avatar} />
-                                                <AvatarFallback>{contact.name.charAt(0)}</AvatarFallback>
-                                            </Avatar>
-                                            <span className="font-medium">{contact.name}</span>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell>{contact.phone}</TableCell>
-                                    <TableCell>{contact.email}</TableCell>
-                                    <TableCell>{contact.trip}</TableCell>
-                                    <TableCell>
-                                        <div className="flex gap-1">
-                                            {contact.tags.map(tag => (
-                                                <Badge key={tag} variant={tag === 'new' ? 'default' : 'secondary'}>{tag}</Badge>
-                                            ))}
-                                        </div>
-                                    </TableCell>
-                                    <TableCell>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button
-                                                    aria-haspopup="true"
-                                                    size="icon"
-                                                    variant="ghost"
-                                                >
-                                                    <MoreHorizontal className="h-4 w-4" />
-                                                    <span className="sr-only">Toggle menu</span>
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                <DropdownMenuItem>Edit</DropdownMenuItem>
-                                                <DropdownMenuItem>View conversation</DropdownMenuItem>
-                                                <DropdownMenuItem className="text-destructive">
-                                                    Delete
-                                                </DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
+        <main className="flex flex-1 flex-col gap-6 p-6 md:gap-8 md:p-10">
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-3xl font-bold">Contacts</h1>
+                    <p className="text-muted-foreground">
+                        Manage your contacts and send them campaigns.
+                    </p>
+                </div>
+                <div className="flex items-center gap-4">
+                     <Button size="lg" className="rounded-full">
+                        <PlusCircle className="h-5 w-5 mr-2" />
+                        Add Contact
+                    </Button>
+                </div>
+            </div>
+
+             <div className="flex items-center justify-between gap-4">
+                <div className="relative w-full max-w-sm">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <Input placeholder="Search contacts..." className="pl-10 rounded-full" />
+                </div>
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" className="rounded-full">
+                        <Download className="h-4 w-4 mr-2" />
+                        Export
+                    </Button>
+                    <Button variant="outline" size="sm" className="rounded-full">
+                        <File className="h-4 w-4 mr-2" />
+                        Upload CSV
+                    </Button>
+                     <Button size="sm" className="rounded-full">
+                        <Send className="h-4 w-4 mr-2" />
+                        Send Campaign
+                    </Button>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {contacts.map((contact) => (
+                    <Card key={contact.id} className="group">
+                        <CardContent className="p-6 flex flex-col items-center text-center">
+                            <Avatar className="h-24 w-24 mb-4" data-ai-hint="person portrait">
+                                <AvatarImage src={contact.avatar} />
+                                <AvatarFallback>{contact.name.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                            <h3 className="text-xl font-semibold">{contact.name}</h3>
+                            <p className="text-muted-foreground text-sm">{contact.email}</p>
+                            <p className="text-muted-foreground text-sm">{contact.phone}</p>
+                            <p className="text-sm mt-2">{contact.trip}</p>
+                            <div className="flex gap-2 mt-4">
+                                {contact.tags.map(tag => (
+                                    <Badge key={tag} variant={tag === 'new' ? 'default' : tag === 'vip' ? 'destructive' : 'secondary'}>{tag}</Badge>
+                                ))}
+                            </div>
+                        </CardContent>
+                        <CardHeader className="p-0">
+                             <div className="absolute top-4 right-4">
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button
+                                            aria-haspopup="true"
+                                            size="icon"
+                                            variant="ghost"
+                                            className="rounded-full h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        >
+                                            <MoreHorizontal className="h-5 w-5" />
+                                            <span className="sr-only">Toggle menu</span>
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="rounded-xl">
+                                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                        <DropdownMenuItem>Edit</DropdownMenuItem>
+                                        <DropdownMenuItem>View conversation</DropdownMenuItem>
+                                        <DropdownMenuItem className="text-destructive">
+                                            Delete
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </div>
+                        </CardHeader>
+                    </Card>
+                ))}
+            </div>
         </main>
     )
 }

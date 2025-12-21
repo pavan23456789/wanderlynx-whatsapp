@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Search, Send, Paperclip, Smile, Archive, Trash2, MoreVertical, Phone, Video } from 'lucide-react';
+import { Search, Send, Paperclip, Smile, Phone, Video } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -91,11 +91,11 @@ export default function InboxPage() {
                 className="h-full max-h-screen items-stretch"
             >
                 <ResizablePanel defaultSize={25} minSize={20} maxSize={30}>
-                    <div className="flex h-full flex-col">
+                    <div className="flex h-full flex-col bg-card rounded-2xl shadow-sm m-4 mr-0">
                         <div className="p-4">
                             <div className="relative">
-                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                                <Input placeholder="Search conversations..." className="pl-8" />
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                                <Input placeholder="Search conversations..." className="pl-10 rounded-full" />
                             </div>
                         </div>
                         <ScrollArea className="flex-1">
@@ -104,18 +104,18 @@ export default function InboxPage() {
                                     <button
                                         key={conv.id}
                                         className={cn(
-                                            'flex flex-col items-start gap-2 rounded-lg border p-3 text-left text-sm transition-all hover:bg-accent',
-                                            selectedConv.id === conv.id && 'bg-accent'
+                                            'flex flex-col items-start gap-2 rounded-2xl p-4 text-left text-sm transition-all hover:bg-secondary',
+                                            selectedConv.id === conv.id && 'bg-secondary'
                                         )}
                                         onClick={() => setSelectedConv(conv)}
                                     >
                                         <div className="flex w-full items-center justify-between">
-                                            <div className="flex items-center gap-2">
-                                                <Avatar className="h-8 w-8" data-ai-hint="person portrait">
+                                            <div className="flex items-center gap-3">
+                                                <Avatar className="h-10 w-10" data-ai-hint="person portrait">
                                                     <AvatarImage src={conv.avatar} alt={conv.name} />
                                                     <AvatarFallback>{conv.name.charAt(0)}</AvatarFallback>
                                                 </Avatar>
-                                                <div className="font-semibold">{conv.name}</div>
+                                                <div className="font-semibold text-base">{conv.name}</div>
                                             </div>
                                             <div
                                                 className={cn(
@@ -126,11 +126,11 @@ export default function InboxPage() {
                                                 {conv.time}
                                             </div>
                                         </div>
-                                        <div className="line-clamp-2 text-xs text-muted-foreground">
+                                        <div className="line-clamp-2 text-sm text-muted-foreground">
                                             {conv.lastMessage}
                                         </div>
                                         {conv.unread && (
-                                            <Badge className="ml-auto">{conv.unread}</Badge>
+                                            <Badge className="ml-auto bg-primary text-primary-foreground">{conv.unread}</Badge>
                                         )}
                                     </button>
                                 ))}
@@ -141,36 +141,37 @@ export default function InboxPage() {
                 <ResizableHandle withHandle />
                 <ResizablePanel defaultSize={75}>
                     {selectedConv ? (
-                        <div className="flex h-full flex-col">
-                            <div className="flex items-center p-3">
+                        <div className="flex h-full flex-col bg-card rounded-2xl shadow-sm m-4 ml-0">
+                            <div className="flex items-center p-4">
                                 <div className="flex items-center gap-4">
-                                     <Avatar className="h-9 w-9" data-ai-hint="person portrait">
+                                     <Avatar className="h-10 w-10" data-ai-hint="person portrait">
                                         <AvatarImage src={selectedConv.avatar} alt={selectedConv.name} />
                                         <AvatarFallback>{selectedConv.name.charAt(0)}</AvatarFallback>
                                     </Avatar>
                                     <div>
-                                        <div className="font-semibold">{selectedConv.name}</div>
-                                        <div className="text-xs text-muted-foreground">Active 2m ago</div>
+                                        <div className="font-semibold text-base">{selectedConv.name}</div>
+                                        <div className="text-sm text-muted-foreground">Active 2m ago</div>
                                     </div>
                                 </div>
                                 <div className="ml-auto flex items-center gap-2">
-                                    <Button variant="ghost" size="icon"><Phone className="h-5 w-5"/></Button>
-                                    <Button variant="ghost" size="icon"><Video className="h-5 w-5"/></Button>
-                                    <Separator orientation="vertical" className="h-6" />
+                                    <Button variant="ghost" size="icon" className="rounded-full"><Phone className="h-5 w-5"/></Button>
+                                    <Button variant="ghost" size="icon" className="rounded-full"><Video className="h-5 w-5"/></Button>
+                                    <Separator orientation="vertical" className="h-8 mx-2" />
                                     <div className="flex items-center space-x-2 p-2">
                                         <Switch id="window-mode" checked={windowClosed} onCheckedChange={setWindowClosed} />
-                                        <Label htmlFor="window-mode" className="text-xs">24h Window Closed</Label>
+                                        <Label htmlFor="window-mode" className="text-sm">24h Window Closed</Label>
                                     </div>
                                 </div>
                             </div>
                             <Separator />
-                            <ScrollArea className="flex-1 p-4">
-                                <div className="space-y-4">
+                            <ScrollArea className="flex-1 p-6">
+                                <div className="space-y-6">
                                     {currentMessages.map((msg, index) => (
-                                        <div key={index} className={cn("flex", msg.sender === 'me' ? 'justify-end' : 'justify-start')}>
-                                            <div className={cn("max-w-xs rounded-lg p-3 text-sm", msg.sender === 'me' ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
+                                        <div key={index} className={cn("flex items-end gap-3", msg.sender === 'me' ? 'justify-end' : 'justify-start')}>
+                                            {msg.sender !== 'me' && <Avatar className="h-8 w-8"><AvatarImage src={selectedConv.avatar} /><AvatarFallback>{selectedConv.name.charAt(0)}</AvatarFallback></Avatar>}
+                                            <div className={cn("max-w-md rounded-2xl p-4 text-base", msg.sender === 'me' ? 'bg-primary text-primary-foreground rounded-br-none' : 'bg-secondary rounded-bl-none')}>
                                                 <p>{msg.text}</p>
-                                                <p className={cn("text-xs mt-1", msg.sender === 'me' ? 'text-primary-foreground/70' : 'text-muted-foreground')}>{msg.time}</p>
+                                                <p className={cn("text-xs mt-2", msg.sender === 'me' ? 'text-primary-foreground/70' : 'text-muted-foreground')}>{msg.time}</p>
                                             </div>
                                         </div>
                                     ))}
@@ -179,20 +180,21 @@ export default function InboxPage() {
                             <Separator />
                              <div className="p-4">
                                 {windowClosed ? (
-                                    <div className="flex items-center gap-2">
-                                        <Input disabled value="Select a template to reply..." />
-                                        <Button>Send Template</Button>
+                                    <div className="flex items-center gap-4">
+                                        <Input disabled value="Select a template to reply..." className="rounded-full" />
+                                        <Button size="lg" className="rounded-full">Send Template</Button>
                                     </div>
                                 ) : (
                                     <div className="relative">
                                         <Textarea
                                             placeholder="Type your message..."
-                                            className="resize-none pr-28"
+                                            className="resize-none pr-40 rounded-2xl p-4"
+                                            rows={1}
                                         />
-                                        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
+                                        <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center">
                                             <Tooltip>
                                                 <TooltipTrigger asChild>
-                                                    <Button variant="ghost" size="icon">
+                                                    <Button variant="ghost" size="icon" className="rounded-full">
                                                         <Paperclip className="h-5 w-5" />
                                                     </Button>
                                                 </TooltipTrigger>
@@ -200,14 +202,14 @@ export default function InboxPage() {
                                             </Tooltip>
                                             <Tooltip>
                                                 <TooltipTrigger asChild>
-                                                    <Button variant="ghost" size="icon">
+                                                    <Button variant="ghost" size="icon" className="rounded-full">
                                                         <Smile className="h-5 w-5" />
                                                     </Button>
                                                 </TooltipTrigger>
                                                 <TooltipContent>Add Emoji</TooltipContent>
                                             </Tooltip>
-                                            <Button size="sm" className="ml-2">
-                                                <Send className="h-4 w-4 mr-2"/>
+                                            <Button size="lg" className="ml-2 rounded-full">
+                                                <Send className="h-5 w-5 mr-2"/>
                                                 Send
                                             </Button>
                                         </div>

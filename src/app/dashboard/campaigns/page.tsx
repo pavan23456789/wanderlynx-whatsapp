@@ -1,4 +1,4 @@
-import { PlusCircle, MoreHorizontal } from "lucide-react"
+import { PlusCircle, MoreHorizontal, Search, Send, Clock, CheckCircle, XCircle } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -16,15 +16,6 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table"
-import { Progress } from "@/components/ui/progress"
 import { Input } from "@/components/ui/input"
 
 const campaigns = [
@@ -70,94 +61,109 @@ const campaigns = [
     },
 ];
 
-const statusVariant = {
-    Sent: "default",
-    Delivering: "secondary",
-    Scheduled: "outline",
-    Failed: "destructive",
+const statusConfig = {
+    Sent: { variant: "default", icon: CheckCircle },
+    Delivering: { variant: "secondary", icon: Send },
+    Scheduled: { variant: "outline", icon: Clock },
+    Failed: { variant: "destructive", icon: XCircle },
 }
 
 export default function CampaignsPage() {
     return (
-        <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
-            <Card>
-                <CardHeader>
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <CardTitle>Campaigns</CardTitle>
-                            <CardDescription>
-                                Track and manage your messaging campaigns.
-                            </CardDescription>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Input placeholder="Search campaigns..." className="w-64" />
-                            <Button size="sm">
-                                <PlusCircle className="h-4 w-4 mr-2" />
-                                Create Campaign
-                            </Button>
-                        </div>
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Campaign Name</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead>Template</TableHead>
-                                <TableHead>Progress (Sent/Delivered/Read)</TableHead>
-                                <TableHead>Date</TableHead>
-                                <TableHead>
-                                    <span className="sr-only">Actions</span>
-                                </TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {campaigns.map((campaign) => (
-                                <TableRow key={campaign.id}>
-                                    <TableCell className="font-medium">{campaign.name}</TableCell>
-                                    <TableCell>
-                                        <Badge variant={statusVariant[campaign.status as keyof typeof statusVariant] || "outline"}>
-                                            {campaign.status}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell>{campaign.template}</TableCell>
-                                    <TableCell>
-                                        <div className="flex items-center gap-2">
-                                            <Progress value={(campaign.delivered / campaign.sent) * 100 || 0} className="w-32" />
-                                            <span className="text-xs text-muted-foreground">{campaign.sent}/{campaign.delivered}/{campaign.read}</span>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell>{campaign.date}</TableCell>
-                                    <TableCell>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button
-                                                    aria-haspopup="true"
-                                                    size="icon"
-                                                    variant="ghost"
-                                                >
-                                                    <MoreHorizontal className="h-4 w-4" />
-                                                    <span className="sr-only">Toggle menu</span>
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                <DropdownMenuItem>View Details</DropdownMenuItem>
-                                                <DropdownMenuItem>Pause</DropdownMenuItem>
-                                                <DropdownMenuItem>Duplicate</DropdownMenuItem>
-                                                <DropdownMenuItem className="text-destructive">
-                                                    Archive
-                                                </DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
+        <main className="flex flex-1 flex-col gap-6 p-6 md:gap-8 md:p-10">
+             <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-3xl font-bold">Campaigns</h1>
+                    <p className="text-muted-foreground">
+                        Track and manage your messaging campaigns.
+                    </p>
+                </div>
+                <div className="flex items-center gap-4">
+                     <Button size="lg" className="rounded-full">
+                        <PlusCircle className="h-5 w-5 mr-2" />
+                        Create Campaign
+                    </Button>
+                </div>
+            </div>
+             <div className="flex items-center justify-between gap-4">
+                <div className="relative w-full max-w-sm">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <Input placeholder="Search campaigns..." className="pl-10 rounded-full" />
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {campaigns.map((campaign) => {
+                    const config = statusConfig[campaign.status as keyof typeof statusConfig] || statusConfig.Scheduled;
+                    const Icon = config.icon;
+                    return (
+                        <Card key={campaign.id} className="group">
+                             <CardHeader className="flex flex-row items-start justify-between">
+                                <div>
+                                    <CardTitle className="text-xl mb-1">{campaign.name}</CardTitle>
+                                    <CardDescription>{campaign.template}</CardDescription>
+                                </div>
+                                 <Badge variant={config.variant as any} className="flex items-center gap-2">
+                                    <Icon className="h-4 w-4" />
+                                    <span>{campaign.status}</span>
+                                </Badge>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                               <div className="space-y-2">
+                                    <div className="flex justify-between text-sm text-muted-foreground">
+                                        <span>Read</span>
+                                        <span>{Math.round((campaign.read / campaign.sent) * 100) || 0}%</span>
+                                    </div>
+                                    <div className="w-full bg-secondary rounded-full h-2.5">
+                                        <div className="bg-primary h-2.5 rounded-full" style={{ width: `${(campaign.read / campaign.sent) * 100 || 0}%` }}></div>
+                                    </div>
+                               </div>
+                                <div className="grid grid-cols-3 gap-4 text-center">
+                                    <div>
+                                        <p className="text-2xl font-bold">{campaign.sent}</p>
+                                        <p className="text-sm text-muted-foreground">Sent</p>
+                                    </div>
+                                     <div>
+                                        <p className="text-2xl font-bold">{campaign.delivered}</p>
+                                        <p className="text-sm text-muted-foreground">Delivered</p>
+                                    </div>
+                                     <div>
+                                        <p className="text-2xl font-bold">{campaign.read}</p>
+                                        <p className="text-sm text-muted-foreground">Read</p>
+                                    </div>
+                                </div>
+                                 <div className="text-sm text-muted-foreground pt-2">
+                                    Date: {campaign.date}
+                                 </div>
+                            </CardContent>
+                             <div className="absolute top-4 right-4">
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button
+                                            aria-haspopup="true"
+                                            size="icon"
+                                            variant="ghost"
+                                            className="rounded-full h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        >
+                                            <MoreHorizontal className="h-5 w-5" />
+                                            <span className="sr-only">Toggle menu</span>
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="rounded-xl">
+                                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                        <DropdownMenuItem>View Details</DropdownMenuItem>
+                                        <DropdownMenuItem>Pause</DropdownMenuItem>
+                                        <DropdownMenuItem>Duplicate</DropdownMenuItem>
+                                        <DropdownMenuItem className="text-destructive">
+                                            Archive
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </div>
+                        </Card>
+                    )
+                })}
+            </div>
         </main>
     )
 }

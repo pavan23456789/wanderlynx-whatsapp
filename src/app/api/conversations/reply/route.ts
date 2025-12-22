@@ -7,22 +7,23 @@ const supabase = createClient(
 );
 
 export async function POST(req: Request) {
+  console.log('Reply API hit');
+
   try {
     const body = await req.json();
+    console.log('Request body:', body);
 
-    // ✅ accept frontend payload names
-    const contactId = body.contactId;
-    const text = body.templateName; // FIX
-    const templateParams = body.params || []; // FIX
+    const { contactId, text, templateParams } = body;
 
     if (!contactId || !text) {
+      console.error('Missing contactId or text');
       return NextResponse.json(
         { error: 'Missing contactId or template name' },
         { status: 400 }
       );
     }
 
-    // 1️⃣ Fetch phone number
+    // 1️⃣ Fetch phone number from conversations table
     const { data: conversation, error: convError } = await supabase
       .from('conversations')
       .select('phone')
@@ -30,15 +31,38 @@ export async function POST(req: Request) {
       .single();
 
     if (convError || !conversation?.phone) {
+      console.error('Phone fetch error:', convError);
       return NextResponse.json(
-        { error: 'Phone number not found' },
+        { error: 'Phone number not found for contact' },
         { status: 404 }
       );
     }
 
     const phone = conversation.phone;
+    console.log('Sending to phone:', phone);
 
-    // 2️⃣ Send to Meta
+    // 2️⃣ Send template to Meta
+    const metaPayload = {
+      messaging_product: 'whatsapp',
+      to: phone,
+      type: 'template',
+      template: {
+        name: text,
+        language: { code: 'en_US' },
+        components: [
+          {
+            type: 'body',
+            parameters: (templateParams || []).map((p: string) => ({
+              type: 'text',
+              text: p,
+            })),
+          },
+        ],
+      },
+    };
+
+    console.log('Meta payload:', metaPayload);
+
     const metaRes = await fetch(
       `https://graph.facebook.com/v20.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
       {
@@ -47,50 +71,39 @@ export async function POST(req: Request) {
           Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          to: phone,
-          type: 'template',
-          template: {
-            name: text,
-            language: { code: 'en_US' },
-            components: [
-              {
-                type: 'body',
-                parameters: templateParams.map((p: string) => ({
-                  type: 'text',
-                  text: p,
-                })),
-              },
-            ],
-          },
-        }),
+        body: JSON.stringify(metaPayload),
       }
     );
 
+    const metaText = await metaRes.text();
+    console.log('Meta response status:', metaRes.status);
+    console.log('Meta response body:', metaText);
+
     if (!metaRes.ok) {
-      const err = await metaRes.text();
-      console.error('Meta API error:', err);
       return NextResponse.json(
-        { error: 'Meta API failed', details: err },
+        { error: 'Meta API failed', details: metaText },
         { status: 500 }
       );
     }
 
-    // 3️⃣ Save message locally
+    // 3️⃣ Save outbound message locally
     const { error: msgError } = await supabase.from('messages').insert({
       conversation_id: contactId,
       direction: 'outbound',
-      body: `${text}: ${templateParams.join(' | ')}`,
+      body: `${text}: ${(templateParams || []).join(' | ')}`,
     });
 
-    if (msgError) throw msgError;
+    if (msgError) {
+      console.error('Message insert error:', msgError);
+      throw msgError;
+    }
 
+    console.log('Reply API success');
     return NextResponse.json({ success: true });
   } catch (err: any) {
-    console.error('Reply API error:', err);
+    console.error('Reply API crashed:', err);
     return NextResponse.json(
-      { error: err.message },
+      { error: err.message || 'Unknown error' },
       { status: 500 }
     );
   }

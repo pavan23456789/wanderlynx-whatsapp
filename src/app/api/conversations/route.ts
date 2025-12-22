@@ -20,15 +20,11 @@ export async function GET() {
 
     const formatted = await Promise.all(
       (conversations ?? []).map(async (conv) => {
-        const { data: messages, error: msgError } = await supabase
+        const { data: messages } = await supabase
           .from('messages')
           .select('*')
           .eq('conversation_id', conv.id)
           .order('created_at', { ascending: true });
-
-        if (msgError) {
-          console.error('Message fetch error:', msgError);
-        }
 
         return {
           id: conv.id,
@@ -50,7 +46,7 @@ export async function GET() {
 
     return NextResponse.json(formatted);
   } catch (err) {
-    console.error('Conversations API crash:', err);
+    console.error('Conversations API crashed:', err);
     return NextResponse.json([]);
   }
 }

@@ -11,15 +11,15 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { contactId, text, templateParams } = body;
 
-    if (!contactId || !text) {
+    if (!contactId || !text || !Array.isArray(templateParams)) {
       return NextResponse.json(
-        { error: 'Missing contactId or template name' },
+        { error: 'Missing or invalid payload' },
         { status: 400 }
       );
     }
 
     /**
-     * 1️⃣ Fetch phone number from DB
+     * 1️⃣ Fetch phone number
      */
     const { data: conversation, error: convError } = await supabase
       .from('conversations')
@@ -29,15 +29,18 @@ export async function POST(req: Request) {
 
     if (convError || !conversation?.phone) {
       return NextResponse.json(
-        { error: 'Phone number not found for contact' },
+        { error: 'Phone number not found' },
         { status: 404 }
       );
     }
 
-    const phone = conversation.phone;
+    /**
+     * 2️⃣ Normalize phone (Meta requires NO +)
+     */
+    const phone = conversation.phone.replace(/\D/g, '');
 
     /**
-     * 2️⃣ Send template to Meta
+     * 3️⃣ Send template to Meta
      */
     const metaRes = await fetch(
       `https://graph.facebook.com/v20.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
@@ -57,9 +60,9 @@ export async function POST(req: Request) {
             components: [
               {
                 type: 'body',
-                parameters: (templateParams || []).map((p: string) => ({
+                parameters: templateParams.map((p: string) => ({
                   type: 'text',
-                  text: p,
+                  text: String(p),
                 })),
               },
             ],
@@ -69,30 +72,34 @@ export async function POST(req: Request) {
     );
 
     if (!metaRes.ok) {
-      const err = await metaRes.text();
-      console.error('Meta error:', err);
+      const metaError = await metaRes.json();
+      console.error('META ERROR:', JSON.stringify(metaError, null, 2));
+
       return NextResponse.json(
-        { error: 'Meta API failed', details: err },
+        { error: 'Meta API failed', metaError },
         { status: 500 }
       );
     }
 
     /**
-     * 3️⃣ Save outbound message
+     * 4️⃣ Save outbound message
      */
     const { error: msgError } = await supabase.from('messages').insert({
       conversation_id: contactId,
       direction: 'outbound',
-      body: `${text}: ${templateParams.join(' | ')}`,
+      body: `${text} → ${templateParams.join(' | ')}`,
     });
 
-    if (msgError) throw msgError;
+    if (msgError) {
+      console.error('DB insert error:', msgError);
+      throw msgError;
+    }
 
     return NextResponse.json({ success: true });
   } catch (err: any) {
     console.error('Send template error:', err);
     return NextResponse.json(
-      { error: err.message },
+      { error: err.message || 'Internal error' },
       { status: 500 }
     );
   }

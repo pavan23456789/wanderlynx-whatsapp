@@ -18,7 +18,9 @@ export async function POST(req: Request) {
       );
     }
 
-    // 1️⃣ Fetch conversation to get phone number
+    /**
+     * 1️⃣ Fetch phone number from DB
+     */
     const { data: conversation, error: convError } = await supabase
       .from('conversations')
       .select('phone')
@@ -27,12 +29,16 @@ export async function POST(req: Request) {
 
     if (convError || !conversation?.phone) {
       return NextResponse.json(
-        { error: 'Conversation or phone number not found' },
+        { error: 'Phone number not found for contact' },
         { status: 404 }
       );
     }
 
-    // 2️⃣ Send template message to Meta WhatsApp
+    const phone = conversation.phone;
+
+    /**
+     * 2️⃣ Send template to Meta
+     */
     const metaRes = await fetch(
       `https://graph.facebook.com/v20.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
       {
@@ -43,7 +49,7 @@ export async function POST(req: Request) {
         },
         body: JSON.stringify({
           messaging_product: 'whatsapp',
-          to: conversation.phone, // ✅ THIS WAS THE BUG
+          to: phone,
           type: 'template',
           template: {
             name: text,
@@ -51,9 +57,9 @@ export async function POST(req: Request) {
             components: [
               {
                 type: 'body',
-                parameters: (templateParams || []).map((p: any) => ({
+                parameters: (templateParams || []).map((p: string) => ({
                   type: 'text',
-                  text: String(p),
+                  text: p,
                 })),
               },
             ],
@@ -64,14 +70,20 @@ export async function POST(req: Request) {
 
     if (!metaRes.ok) {
       const err = await metaRes.text();
-      throw new Error(err);
+      console.error('Meta error:', err);
+      return NextResponse.json(
+        { error: 'Meta API failed', details: err },
+        { status: 500 }
+      );
     }
 
-    // 3️⃣ Save sent message to database
+    /**
+     * 3️⃣ Save outbound message
+     */
     const { error: msgError } = await supabase.from('messages').insert({
       conversation_id: contactId,
       direction: 'outbound',
-      body: `${text}: ${(templateParams || []).join(' | ')}`,
+      body: `${text}: ${templateParams.join(' | ')}`,
     });
 
     if (msgError) throw msgError;
@@ -80,7 +92,7 @@ export async function POST(req: Request) {
   } catch (err: any) {
     console.error('Send template error:', err);
     return NextResponse.json(
-      { error: err.message || 'Internal error' },
+      { error: err.message },
       { status: 500 }
     );
   }

@@ -13,17 +13,17 @@ export async function POST(req: Request) {
     const body = await req.json();
     console.log('Request body:', body);
 
-    const { contactId, text, templateParams } = body;
+    const { contactId, templateName, params } = body;
 
-    if (!contactId || !text) {
-      console.error('Missing contactId or text');
+    if (!contactId || !templateName) {
+      console.error('Missing contactId or templateName');
       return NextResponse.json(
-        { error: 'Missing contactId or template name' },
+        { error: 'Missing contactId or templateName' },
         { status: 400 }
       );
     }
 
-    // 1️⃣ Fetch phone number from conversations table
+    // 1️⃣ Fetch phone number
     const { data: conversation, error: convError } = await supabase
       .from('conversations')
       .select('phone')
@@ -31,7 +31,7 @@ export async function POST(req: Request) {
       .single();
 
     if (convError || !conversation?.phone) {
-      console.error('Phone fetch error:', convError);
+      console.error('Phone not found:', convError);
       return NextResponse.json(
         { error: 'Phone number not found for contact' },
         { status: 404 }
@@ -41,18 +41,18 @@ export async function POST(req: Request) {
     const phone = conversation.phone;
     console.log('Sending to phone:', phone);
 
-    // 2️⃣ Send template to Meta
+    // 2️⃣ Meta payload
     const metaPayload = {
       messaging_product: 'whatsapp',
       to: phone,
       type: 'template',
       template: {
-        name: text,
+        name: templateName,
         language: { code: 'en_US' },
         components: [
           {
             type: 'body',
-            parameters: (templateParams || []).map((p: string) => ({
+            parameters: (params || []).map((p: string) => ({
               type: 'text',
               text: p,
             })),
@@ -76,8 +76,7 @@ export async function POST(req: Request) {
     );
 
     const metaText = await metaRes.text();
-    console.log('Meta response status:', metaRes.status);
-    console.log('Meta response body:', metaText);
+    console.log('Meta response:', metaRes.status, metaText);
 
     if (!metaRes.ok) {
       return NextResponse.json(
@@ -86,15 +85,15 @@ export async function POST(req: Request) {
       );
     }
 
-    // 3️⃣ Save outbound message locally
+    // 3️⃣ Save outbound message
     const { error: msgError } = await supabase.from('messages').insert({
       conversation_id: contactId,
       direction: 'outbound',
-      body: `${text}: ${(templateParams || []).join(' | ')}`,
+      body: `${templateName}: ${(params || []).join(' | ')}`,
     });
 
     if (msgError) {
-      console.error('Message insert error:', msgError);
+      console.error('Message insert failed:', msgError);
       throw msgError;
     }
 

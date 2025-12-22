@@ -35,11 +35,16 @@ type Conversation = {
   lastMessageTimestamp: string | null;
 };
 
+type TemplateComponent = {
+  type: string;
+  text?: string;
+};
+
 type Template = {
   id: string;
   name: string;
-  content: string;
   status: string;
+  components: TemplateComponent[];
 };
 
 /* =========================
@@ -58,11 +63,18 @@ function TemplateReply({
   const [selected, setSelected] = React.useState<Template | null>(null);
   const [params, setParams] = React.useState<string[]>([]);
 
-  const paramCount = React.useMemo(() => {
-    if (!selected) return 0;
-    const matches = selected.content.match(/\{\{\d+\}\}/g);
-    return matches ? new Set(matches).size : 0;
+  // Safely extract BODY text
+  const bodyText = React.useMemo(() => {
+    if (!selected) return '';
+    const body = selected.components?.find(c => c.type === 'BODY');
+    return body?.text || '';
   }, [selected]);
+
+  const paramCount = React.useMemo(() => {
+    if (!bodyText) return 0;
+    const matches = bodyText.match(/\{\{\d+\}\}/g);
+    return matches ? new Set(matches).size : 0;
+  }, [bodyText]);
 
   React.useEffect(() => {
     setParams(Array(paramCount).fill(''));
@@ -128,16 +140,10 @@ export default function InboxPage() {
   const [sending, setSending] = React.useState(false);
   const { toast } = useToast();
 
-  /* =========================
-     FETCH CONVERSATIONS
-  ========================= */
-
   const fetchConversations = async () => {
     setLoading(true);
     try {
       const res = await fetch('/api/conversations');
-      if (!res.ok) throw new Error('Failed to fetch conversations');
-
       const raw = await res.json();
 
       const normalized: Conversation[] = raw.map((c: any) => ({
@@ -152,28 +158,14 @@ export default function InboxPage() {
       setSelected(prev =>
         prev ? normalized.find(c => c.id === prev.id) || normalized[0] : normalized[0]
       );
-    } catch (e: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: e.message,
-      });
     } finally {
       setLoading(false);
     }
   };
 
-  /* =========================
-     FETCH TEMPLATES (FIXED)
-  ========================= */
-
   const fetchTemplates = async () => {
     const res = await fetch('/api/templates');
-    if (!res.ok) return;
-
     const data = await res.json();
-
-    // 🔥 IMPORTANT FIX: handle APPROVED vs Approved
     setTemplates(
       data.filter((t: Template) => t.status?.toUpperCase() === 'APPROVED')
     );
@@ -182,17 +174,7 @@ export default function InboxPage() {
   React.useEffect(() => {
     fetchConversations();
     fetchTemplates();
-    const i = setInterval(fetchConversations, 15000);
-    return () => clearInterval(i);
   }, []);
-
-  const filtered = conversations.filter(c =>
-    c.name.toLowerCase().includes(search.toLowerCase())
-  );
-
-  /* =========================
-     SEND TEMPLATE
-  ========================= */
 
   const sendTemplate = async (templateName: string, params: string[]) => {
     if (!selected || sending) return;
@@ -209,7 +191,7 @@ export default function InboxPage() {
         }),
       });
 
-      if (!res.ok) throw new Error('Template send failed');
+      if (!res.ok) throw new Error('Send failed');
 
       toast({
         title: 'Message sent',
@@ -220,17 +202,13 @@ export default function InboxPage() {
     } catch (e: any) {
       toast({
         variant: 'destructive',
-        title: 'Send failed',
+        title: 'Error',
         description: e.message,
       });
     } finally {
       setSending(false);
     }
   };
-
-  /* =========================
-     RENDER
-  ========================= */
 
   return (
     <TooltipProvider>
@@ -249,7 +227,7 @@ export default function InboxPage() {
             </div>
 
             <ScrollArea className="h-full">
-              {filtered.map(c => (
+              {conversations.map(c => (
                 <button
                   key={c.id}
                   onClick={() => setSelected(c)}
@@ -276,7 +254,7 @@ export default function InboxPage() {
         <ResizableHandle />
 
         <ResizablePanel defaultSize={75}>
-          {selected ? (
+          {selected && (
             <div className="h-full flex flex-col">
               <div className="p-4 font-semibold border-b">
                 {selected.name}
@@ -293,10 +271,6 @@ export default function InboxPage() {
                 onSend={sendTemplate}
                 sending={sending}
               />
-            </div>
-          ) : (
-            <div className="h-full flex items-center justify-center">
-              Select a conversation
             </div>
           )}
         </ResizablePanel>

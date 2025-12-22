@@ -164,7 +164,7 @@ export default function InboxPage() {
   };
 
   /* =========================
-     FETCH TEMPLATES
+     FETCH TEMPLATES (FIXED)
   ========================= */
 
   const fetchTemplates = async () => {
@@ -172,7 +172,11 @@ export default function InboxPage() {
     if (!res.ok) return;
 
     const data = await res.json();
-    setTemplates(data.filter((t: Template) => t.status === 'Approved'));
+
+    // 🔥 IMPORTANT FIX: handle APPROVED vs Approved
+    setTemplates(
+      data.filter((t: Template) => t.status?.toUpperCase() === 'APPROVED')
+    );
   };
 
   React.useEffect(() => {
@@ -187,7 +191,7 @@ export default function InboxPage() {
   );
 
   /* =========================
-     SEND TEMPLATE (FIXED)
+     SEND TEMPLATE
   ========================= */
 
   const sendTemplate = async (templateName: string, params: string[]) => {

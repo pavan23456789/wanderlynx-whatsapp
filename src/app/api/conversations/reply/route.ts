@@ -9,18 +9,20 @@ const supabase = createClient(
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { contactId, text, templateParams } = body;
 
-    if (!contactId || !text || !Array.isArray(templateParams)) {
+    // ✅ accept frontend payload names
+    const contactId = body.contactId;
+    const text = body.templateName; // FIX
+    const templateParams = body.params || []; // FIX
+
+    if (!contactId || !text) {
       return NextResponse.json(
-        { error: 'Missing or invalid payload' },
+        { error: 'Missing contactId or template name' },
         { status: 400 }
       );
     }
 
-    /**
-     * 1️⃣ Fetch phone number
-     */
+    // 1️⃣ Fetch phone number
     const { data: conversation, error: convError } = await supabase
       .from('conversations')
       .select('phone')
@@ -34,14 +36,9 @@ export async function POST(req: Request) {
       );
     }
 
-    /**
-     * 2️⃣ Normalize phone (Meta requires NO +)
-     */
-    const phone = conversation.phone.replace(/\D/g, '');
+    const phone = conversation.phone;
 
-    /**
-     * 3️⃣ Send template to Meta
-     */
+    // 2️⃣ Send to Meta
     const metaRes = await fetch(
       `https://graph.facebook.com/v20.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
       {
@@ -62,7 +59,7 @@ export async function POST(req: Request) {
                 type: 'body',
                 parameters: templateParams.map((p: string) => ({
                   type: 'text',
-                  text: String(p),
+                  text: p,
                 })),
               },
             ],
@@ -72,34 +69,28 @@ export async function POST(req: Request) {
     );
 
     if (!metaRes.ok) {
-      const metaError = await metaRes.json();
-      console.error('META ERROR:', JSON.stringify(metaError, null, 2));
-
+      const err = await metaRes.text();
+      console.error('Meta API error:', err);
       return NextResponse.json(
-        { error: 'Meta API failed', metaError },
+        { error: 'Meta API failed', details: err },
         { status: 500 }
       );
     }
 
-    /**
-     * 4️⃣ Save outbound message
-     */
+    // 3️⃣ Save message locally
     const { error: msgError } = await supabase.from('messages').insert({
       conversation_id: contactId,
       direction: 'outbound',
-      body: `${text} → ${templateParams.join(' | ')}`,
+      body: `${text}: ${templateParams.join(' | ')}`,
     });
 
-    if (msgError) {
-      console.error('DB insert error:', msgError);
-      throw msgError;
-    }
+    if (msgError) throw msgError;
 
     return NextResponse.json({ success: true });
   } catch (err: any) {
-    console.error('Send template error:', err);
+    console.error('Reply API error:', err);
     return NextResponse.json(
-      { error: err.message || 'Internal error' },
+      { error: err.message },
       { status: 500 }
     );
   }

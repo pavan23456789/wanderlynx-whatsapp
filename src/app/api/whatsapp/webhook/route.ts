@@ -1,120 +1,120 @@
-import { NextResponse } from 'next/server';
-import { 
-    getConversations, 
-    updateConversationWithMessage, 
-    updateMessageStatus 
-} from '@/lib/conversation-store';
-import { getContactByPhone, addContact } from '@/lib/contact-store';
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 
 /**
- * Handles webhook verification for the WhatsApp channel.
- * Meta sends a GET request to this endpoint to verify the webhook.
+ * Supabase client
+ * Uses SERVICE ROLE because webhook must write to DB
  */
-export async function GET(request: Request) {
-    const { searchParams } = new URL(request.url);
-    const mode = searchParams.get('hub.mode');
-    const token = searchParams.get('hub.verify_token');
-    const challenge = searchParams.get('hub.challenge');
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
-    // The verify token must match the one set in the Meta Developer App dashboard.
-    const VERIFY_TOKEN = "travonex_verify";
+/**
+ * ---------------------------------------------------
+ * GET → Meta webhook verification
+ * ---------------------------------------------------
+ */
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
 
-    if (mode === 'subscribe' && token === VERIFY_TOKEN) {
-        console.log('[Webhook] Verification successful');
-        // Respond with the challenge token from the request
-        return new NextResponse(challenge, { status: 200 });
+  const mode = searchParams.get('hub.mode');
+  const token = searchParams.get('hub.verify_token');
+  const challenge = searchParams.get('hub.challenge');
+
+  if (
+    mode === 'subscribe' &&
+    token === process.env.WHATSAPP_VERIFY_TOKEN
+  ) {
+    console.log('[Webhook] Verification successful');
+    return new NextResponse(challenge, { status: 200 });
+  }
+
+  console.error('[Webhook] Verification failed');
+  return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+}
+
+/**
+ * ---------------------------------------------------
+ * POST → Incoming WhatsApp messages
+ * ---------------------------------------------------
+ */
+export async function POST(req: NextRequest) {
+  try {
+    const payload = await req.json();
+    console.log('[Webhook] Incoming payload:', JSON.stringify(payload));
+
+    const entry = payload.entry?.[0];
+    const change = entry?.changes?.[0];
+    const value = change?.value;
+
+    const message = value?.messages?.[0];
+    if (!message) {
+      // Delivery receipts, status updates, etc.
+      return NextResponse.json({ ok: true });
+    }
+
+    const from = message.from; // phone number WITHOUT +
+    const phone = `+${from}`;
+
+    const text =
+      message.text?.body ||
+      message.button?.text ||
+      '[Unsupported message]';
+
+    /**
+     * 1️⃣ Find or create conversation
+     */
+    let { data: conversation } = await supabase
+      .from('conversations')
+      .select('*')
+      .eq('phone', phone)
+      .single();
+
+    if (!conversation) {
+      const { data, error } = await supabase
+        .from('conversations')
+        .insert({
+          phone,
+          name: `WhatsApp ${phone}`,
+          last_message: text,
+          last_message_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('[Webhook] Conversation insert failed', error);
+        return NextResponse.json({ error: 'DB error' }, { status: 500 });
+      }
+
+      conversation = data;
     } else {
-        console.warn('[Webhook] Verification failed: Invalid token or mode.');
-        // Respond with '403 Forbidden' if tokens do not match
-        return new NextResponse('Forbidden', { status: 403 });
-    }
-}
-
-/**
- * Handles incoming webhook events from WhatsApp.
- * This can include new messages, status updates, etc.
- */
-export async function POST(request: Request) {
-    try {
-        const body = await request.json();
-        
-        // Log the entire incoming payload for debugging
-        console.log('[Webhook] Received POST request:', JSON.stringify(body, null, 2));
-
-        if (body.object === 'whatsapp_business_account') {
-            for (const entry of body.entry) {
-                for (const change of entry.changes) {
-                    const value = change.value;
-
-                    // Handle incoming messages
-                    if (value.messages) {
-                        for (const message of value.messages) {
-                            if (message.type === 'text') {
-                                await processIncomingMessage(value.contacts[0], message);
-                            }
-                        }
-                    }
-
-                    // Handle message status updates
-                    if (value.statuses) {
-                        for (const status of value.statuses) {
-                            await processStatusUpdate(status);
-                        }
-                    }
-                }
-            }
-        }
-
-        return NextResponse.json({ success: true, message: 'Webhook processed' });
-    } catch (error: any) {
-        console.error('[Webhook] Error processing POST request:', error);
-        return NextResponse.json({ success: false, message: 'Internal Server Error' }, { status: 500 });
-    }
-}
-
-async function processIncomingMessage(contact: { wa_id: string; profile: { name: string } }, message: any) {
-    const from = contact.wa_id; // User's phone number
-    const name = contact.profile.name;
-    const text = message.text.body;
-    const messageId = message.id;
-    const timestamp = parseInt(message.timestamp) * 1000; // Convert to milliseconds
-
-    console.log(`[Webhook] Incoming message from ${name} (${from}): "${text}"`);
-    
-    // Check if contact exists, if not, create one
-    let existingContact = await getContactByPhone(from);
-    if (!existingContact) {
-        console.log(`[Webhook] New contact detected. Creating contact for ${name} (${from}).`);
-        await addContact({
-            id: from, // Use phone number as ID for simplicity
-            phone: from,
-            name: name,
-            email: '',
-            trip: 'Unknown',
-            tags: ['new-lead'],
-            avatar: `https://picsum.photos/seed/${from}/40/40`,
-        });
+      await supabase
+        .from('conversations')
+        .update({
+          last_message: text,
+          last_message_at: new Date().toISOString(),
+        })
+        .eq('id', conversation.id);
     }
 
-    await updateConversationWithMessage({
-        contactId: from,
-        contactName: name,
-        message: {
-            id: messageId,
-            sender: 'other',
-            text: text,
-            time: new Date(timestamp).toISOString(),
-            status: 'read' // Assume read since it's an incoming message processed by our system
-        }
+    /**
+     * 2️⃣ Store inbound message
+     */
+    await supabase.from('messages').insert({
+      conversation_id: conversation.id,
+      direction: 'inbound',
+      body: text,
     });
-}
 
-async function processStatusUpdate(status: any) {
-    const messageId = status.id;
-    const newStatus = status.status; // e.g., 'sent', 'delivered', 'read'
-    const timestamp = parseInt(status.timestamp) * 1000;
-
-    console.log(`[Webhook] Status update for message ${messageId}: ${newStatus}`);
-
-    await updateMessageStatus(messageId, newStatus);
+    console.log('[Webhook] Message saved');
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('[Webhook] Error:', error);
+    return NextResponse.json(
+      { error: 'Webhook processing failed' },
+      { status: 500 }
+    );
+  }
 }

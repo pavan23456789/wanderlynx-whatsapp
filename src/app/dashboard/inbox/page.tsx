@@ -12,7 +12,13 @@ import {
   ResizablePanelGroup,
 } from '@/components/ui/resizable';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '@/components/ui/select';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -21,22 +27,12 @@ import { useToast } from '@/hooks/use-toast';
    TYPES
 ========================= */
 
-type Message = {
-  id: string;
-  text: string;
-  time: string;
-  sender: 'me' | 'them';
-};
-
 type Conversation = {
   id: string;
   name: string;
   phone: string;
-  avatar: string;
-  unread: number;
   lastMessage: string;
   lastMessageTimestamp: string | null;
-  messages: Message[];
 };
 
 type Template = {
@@ -99,7 +95,7 @@ function TemplateReply({
           key={i}
           placeholder={`Value for {{${i + 1}}}`}
           value={params[i]}
-          onChange={e => {
+          onChange={(e) => {
             const copy = [...params];
             copy[i] = e.target.value;
             setParams(copy);
@@ -147,12 +143,9 @@ export default function InboxPage() {
       const normalized: Conversation[] = raw.map((c: any) => ({
         id: c.id,
         name: c.name || c.phone || 'Unknown',
-        phone: c.phone ?? '',
-        avatar: '',
-        unread: 0,
+        phone: c.phone,
         lastMessage: c.last_message ?? '',
-        lastMessageTimestamp: c.last_message_at ?? null,
-        messages: [],
+        lastMessageTimestamp: c.updated_at ?? null,
       }));
 
       setConversations(normalized);
@@ -176,10 +169,10 @@ export default function InboxPage() {
 
   const fetchTemplates = async () => {
     const res = await fetch('/api/templates');
-    if (res.ok) {
-      const data = await res.json();
-      setTemplates(data.filter((t: Template) => t.status === 'Approved'));
-    }
+    if (!res.ok) return;
+
+    const data = await res.json();
+    setTemplates(data.filter((t: Template) => t.status === 'Approved'));
   };
 
   React.useEffect(() => {
@@ -194,25 +187,31 @@ export default function InboxPage() {
   );
 
   /* =========================
-     SEND TEMPLATE
+     SEND TEMPLATE (FIXED)
   ========================= */
 
-  const sendTemplate = async (template: string, params: string[]) => {
+  const sendTemplate = async (templateName: string, params: string[]) => {
     if (!selected || sending) return;
     setSending(true);
 
     try {
-      const res = await fetch('/api/conversations/reply', {
+      const res = await fetch('/api/whatsapp/send-template', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contactId: selected.id,
-          text: template,
-          templateParams: params,
+          phone: selected.phone,
+          template_name: templateName,
+          variables: params,
         }),
       });
 
-      if (!res.ok) throw new Error('Send failed');
+      if (!res.ok) throw new Error('Template send failed');
+
+      toast({
+        title: 'Message sent',
+        description: 'WhatsApp template sent successfully',
+      });
+
       fetchConversations();
     } catch (e: any) {
       toast({
@@ -256,11 +255,9 @@ export default function InboxPage() {
                   )}
                 >
                   <div className="font-semibold">{c.name}</div>
-
                   <div className="text-sm text-muted-foreground">
                     {c.lastMessage || '—'}
                   </div>
-
                   <div className="text-xs text-muted-foreground">
                     {c.lastMessageTimestamp
                       ? formatDistanceToNow(new Date(c.lastMessageTimestamp), { addSuffix: true })
@@ -283,7 +280,7 @@ export default function InboxPage() {
 
               <ScrollArea className="flex-1 p-4">
                 <p className="text-muted-foreground text-sm">
-                  No messages yet
+                  Messages will appear here via webhook.
                 </p>
               </ScrollArea>
 

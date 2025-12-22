@@ -8,62 +8,45 @@ const supabase = createClient(
 
 export async function GET() {
   try {
-    // 1️⃣ Fetch conversations
-    const { data: conversations, error: convError } = await supabase
+    const { data: conversations, error } = await supabase
       .from('conversations')
       .select('*')
       .order('last_message_at', { ascending: false });
 
-    if (convError) {
-      console.error('Conversation fetch error:', convError);
-      return NextResponse.json(
-        { message: convError.message },
-        { status: 500 }
-      );
+    if (error) {
+      console.error(error);
+      return NextResponse.json([]); // ✅ ALWAYS return array
     }
 
-    // 2️⃣ For each conversation, fetch messages
-    const formattedConversations = await Promise.all(
-      conversations.map(async (conv) => {
-        const { data: messages, error: msgError } = await supabase
+    const formatted = await Promise.all(
+      (conversations ?? []).map(async (conv) => {
+        const { data: messages } = await supabase
           .from('messages')
           .select('*')
           .eq('conversation_id', conv.id)
           .order('created_at', { ascending: true });
 
-        if (msgError) {
-          console.error('Message fetch error:', msgError);
-        }
-
-        // 3️⃣ Convert DB message → UI message
-        const formattedMessages = (messages || []).map((m) => ({
-          id: m.id,
-          text: m.body, // DB → UI
-          sender: m.direction === 'outbound' ? 'me' : 'user',
-          time: m.created_at,
-          status: 'delivered',
-        }));
-
         return {
           id: conv.id,
-          name: conv.name,
+          name: conv.name || conv.phone || 'Unknown',
           phone: conv.phone,
-          avatar: '', // optional
-          lastMessage: conv.last_message,
-          lastMessageTimestamp: conv.last_message_at,
+          avatar: '',
           unread: 0,
-          messages: formattedMessages,
+          lastMessage: conv.last_message || '',
+          lastMessageTimestamp: conv.last_message_at,
+          messages: (messages ?? []).map((m) => ({
+            id: m.id,
+            text: m.body,
+            sender: m.direction === 'outbound' ? 'me' : 'them',
+            time: m.created_at,
+          })),
         };
       })
     );
 
-    // 4️⃣ Return clean UI-ready data
-    return NextResponse.json(formattedConversations);
+    return NextResponse.json(formatted);
   } catch (err) {
-    console.error('Server error:', err);
-    return NextResponse.json(
-      { message: 'Internal server error' },
-      { status: 500 }
-    );
+    console.error(err);
+    return NextResponse.json([]); // ✅ NEVER break frontend
   }
 }

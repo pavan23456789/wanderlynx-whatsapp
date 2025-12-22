@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Search, Send, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Send, RefreshCw, AlertTriangle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 import { Button } from '@/components/ui/button';
@@ -27,28 +27,18 @@ import { useToast } from '@/hooks/use-toast';
    TYPES
 ========================= */
 
-type Message = {
-  id: string;
-  text: string;
-  time: string;
-  sender: 'me' | 'them';
-};
-
 type Conversation = {
   id: string;
   name: string;
   phone: string;
-  unread: number;
-  lastMessage: string;
+  lastMessage: string | null;
   lastMessageTimestamp: string | null;
-  messages: Message[];
 };
 
 type Template = {
   id: string;
   name: string;
-  content: string;
-  status: string;
+  components: any[];
 };
 
 /* =========================
@@ -67,18 +57,17 @@ function TemplateReply({
   const [selected, setSelected] = React.useState<Template | null>(null);
   const [params, setParams] = React.useState<string[]>([]);
 
-  const paramCount = React.useMemo(() => {
-    if (!selected) return 0;
-    const matches = selected.content.match(/\{\{\d+\}\}/g);
-    return matches ? new Set(matches).size : 0;
+  // count {{1}}, {{2}} etc from BODY
+  React.useEffect(() => {
+    if (!selected) return;
+
+    const body = selected.components?.find(c => c.type === 'BODY');
+    const matches = body?.text?.match(/\{\{\d+\}\}/g) || [];
+    setParams(Array(matches.length).fill(''));
   }, [selected]);
 
-  React.useEffect(() => {
-    setParams(Array(paramCount).fill(''));
-  }, [paramCount]);
-
   return (
-    <div className="p-4 space-y-3 border-t">
+    <div className="p-4 space-y-4 border-t">
       <div className="flex gap-2 rounded-xl border border-yellow-400 bg-yellow-50 p-3 text-yellow-900">
         <AlertTriangle className="h-5 w-5" />
         <p className="text-sm font-medium">
@@ -86,10 +75,16 @@ function TemplateReply({
         </p>
       </div>
 
-      <Select onValueChange={(v) => setSelected(templates.find(t => t.name === v) || null)}>
+      <Select
+        value={selected?.name}
+        onValueChange={(name) =>
+          setSelected(templates.find(t => t.name === name) || null)
+        }
+      >
         <SelectTrigger>
           <SelectValue placeholder="Select template" />
         </SelectTrigger>
+
         <SelectContent>
           {templates.map(t => (
             <SelectItem key={t.id} value={t.name}>
@@ -99,11 +94,11 @@ function TemplateReply({
         </SelectContent>
       </Select>
 
-      {params.map((_, i) => (
+      {params.map((val, i) => (
         <Input
           key={i}
           placeholder={`Value for {{${i + 1}}}`}
-          value={params[i]}
+          value={val}
           onChange={e => {
             const copy = [...params];
             copy[i] = e.target.value;
@@ -132,50 +127,30 @@ export default function InboxPage() {
   const [conversations, setConversations] = React.useState<Conversation[]>([]);
   const [selected, setSelected] = React.useState<Conversation | null>(null);
   const [templates, setTemplates] = React.useState<Template[]>([]);
-  const [search, setSearch] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const [sending, setSending] = React.useState(false);
   const { toast } = useToast();
-
-  /* =========================
-     FETCH CONVERSATIONS
-  ========================= */
 
   const fetchConversations = async () => {
     setLoading(true);
     try {
       const res = await fetch('/api/conversations');
-      const raw = await res.json();
-
-      const normalized: Conversation[] = raw.map((c: any) => ({
-        id: c.id,
-        name: c.name || c.phone || 'Unknown',
-        phone: c.phone ?? '',
-        unread: 0,
-        lastMessage: c.last_message ?? '',
-        lastMessageTimestamp: c.last_message_at ?? null,
-        messages: [],
-      }));
-
-      setConversations(normalized);
-      setSelected(prev =>
-        prev ? normalized.find(c => c.id === prev.id) || normalized[0] : normalized[0]
-      );
+      const data = await res.json();
+      setConversations(data);
+      setSelected(data[0] || null);
     } catch {
-      toast({ variant: 'destructive', title: 'Failed to load inbox' });
+      toast({ variant: 'destructive', title: 'Failed to load conversations' });
     } finally {
       setLoading(false);
     }
   };
 
-  /* =========================
-     FETCH TEMPLATES
-  ========================= */
-
   const fetchTemplates = async () => {
     const res = await fetch('/api/templates');
-    const data = await res.json();
-    setTemplates(data.filter((t: Template) => t.status === 'Approved'));
+    if (res.ok) {
+      const data = await res.json();
+      setTemplates(data);
+    }
   };
 
   React.useEffect(() => {
@@ -183,55 +158,20 @@ export default function InboxPage() {
     fetchTemplates();
   }, []);
 
-  const filtered = conversations.filter(c =>
-    c.name.toLowerCase().includes(search.toLowerCase())
-  );
-
-  /* =========================
-     SEND TEMPLATE (UI + API)
-  ========================= */
-
   const sendTemplate = async (template: string, params: string[]) => {
     if (!selected) return;
     setSending(true);
-
     try {
-      const res = await fetch('/api/conversations/reply', {
+      await fetch('/api/whatsapp/send-template', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contactId: selected.id,
-          text: template,
-          templateParams: params,
+          phone: selected.phone,
+          template_name: template,
+          variables: params,
         }),
       });
-
-      if (!res.ok) throw new Error();
-
-      const messageText = `${template}: ${params.join(', ')}`;
-
-      setConversations(prev =>
-        prev.map(c =>
-          c.id === selected.id
-            ? {
-                ...c,
-                lastMessage: messageText,
-                lastMessageTimestamp: new Date().toISOString(),
-                messages: [
-                  ...c.messages,
-                  {
-                    id: crypto.randomUUID(),
-                    text: messageText,
-                    time: new Date().toISOString(),
-                    sender: 'me',
-                  },
-                ],
-              }
-            : c
-        )
-      );
-
-      toast({ title: 'Message sent' });
+      fetchConversations();
     } catch {
       toast({ variant: 'destructive', title: 'Send failed' });
     } finally {
@@ -239,38 +179,32 @@ export default function InboxPage() {
     }
   };
 
-  /* =========================
-     RENDER
-  ========================= */
-
   return (
     <TooltipProvider>
       <ResizablePanelGroup direction="horizontal" className="h-full">
         <ResizablePanel defaultSize={25}>
-          <div className="h-full p-4 space-y-4">
-            <div className="flex gap-2">
-              <Input placeholder="Search" value={search} onChange={e => setSearch(e.target.value)} />
-              <Button size="icon" onClick={fetchConversations}>
-                <RefreshCw className={cn(loading && 'animate-spin')} />
-              </Button>
-            </div>
+          <div className="p-4 space-y-3">
+            <Button size="icon" onClick={fetchConversations}>
+              <RefreshCw className={cn(loading && 'animate-spin')} />
+            </Button>
 
             <ScrollArea className="h-full">
-              {filtered.map(c => (
+              {conversations.map(c => (
                 <button
                   key={c.id}
                   onClick={() => setSelected(c)}
                   className={cn(
-                    'w-full text-left p-3 rounded-xl hover:bg-secondary',
+                    'w-full p-3 text-left rounded-xl',
                     selected?.id === c.id && 'bg-secondary'
                   )}
                 >
                   <div className="font-semibold">{c.name}</div>
-                  <div className="text-sm text-muted-foreground">{c.lastMessage || '—'}</div>
                   <div className="text-xs text-muted-foreground">
                     {c.lastMessageTimestamp
-                      ? formatDistanceToNow(new Date(c.lastMessageTimestamp), { addSuffix: true })
-                      : 'No messages yet'}
+                      ? formatDistanceToNow(new Date(c.lastMessageTimestamp), {
+                          addSuffix: true,
+                        })
+                      : 'No messages'}
                   </div>
                 </button>
               ))}
@@ -281,40 +215,12 @@ export default function InboxPage() {
         <ResizableHandle />
 
         <ResizablePanel defaultSize={75}>
-          {selected ? (
-            <div className="h-full flex flex-col">
-              <div className="p-4 font-semibold border-b">{selected.name}</div>
-
-              <ScrollArea className="flex-1 p-4 space-y-2">
-                {selected.messages.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">No messages yet</p>
-                ) : (
-                  selected.messages.map(m => (
-                    <div
-                      key={m.id}
-                      className={cn(
-                        'max-w-[70%] p-3 rounded-xl text-sm',
-                        m.sender === 'me'
-                          ? 'ml-auto bg-primary text-primary-foreground'
-                          : 'bg-secondary'
-                      )}
-                    >
-                      {m.text}
-                    </div>
-                  ))
-                )}
-              </ScrollArea>
-
-              <TemplateReply
-                templates={templates}
-                onSend={sendTemplate}
-                sending={sending}
-              />
-            </div>
-          ) : (
-            <div className="h-full flex items-center justify-center">
-              Select a conversation
-            </div>
+          {selected && (
+            <TemplateReply
+              templates={templates}
+              onSend={sendTemplate}
+              sending={sending}
+            />
           )}
         </ResizablePanel>
       </ResizablePanelGroup>

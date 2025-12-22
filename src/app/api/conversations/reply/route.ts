@@ -19,8 +19,20 @@ export async function POST(req: Request) {
     }
 
     /**
-     * 1. Send template to Meta
-     * (You already have this working)
+     * 1️⃣ Fetch conversation (we need phone number)
+     */
+    const { data: conversation, error: convError } = await supabase
+      .from('conversations')
+      .select('*')
+      .eq('id', contactId)
+      .single();
+
+    if (convError || !conversation) {
+      throw new Error('Conversation not found');
+    }
+
+    /**
+     * 2️⃣ Send WhatsApp template via Meta
      */
     const metaRes = await fetch(
       `https://graph.facebook.com/v20.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
@@ -32,7 +44,7 @@ export async function POST(req: Request) {
         },
         body: JSON.stringify({
           messaging_product: 'whatsapp',
-          to: body.phone,
+          to: conversation.phone,
           type: 'template',
           template: {
             name: text,
@@ -40,7 +52,7 @@ export async function POST(req: Request) {
             components: [
               {
                 type: 'body',
-                parameters: templateParams.map((p: string) => ({
+                parameters: (templateParams || []).map((p: string) => ({
                   type: 'text',
                   text: p,
                 })),
@@ -51,24 +63,46 @@ export async function POST(req: Request) {
       }
     );
 
+    const metaJson = await metaRes.json();
+
     if (!metaRes.ok) {
-      const err = await metaRes.text();
-      throw new Error(err);
+      console.error('Meta error:', metaJson);
+      return NextResponse.json(
+        { error: metaJson },
+        { status: 500 }
+      );
     }
 
     /**
-     * 2. SAVE MESSAGE LOCALLY (THIS IS THE MISSING PIECE)
+     * 3️⃣ Save outbound message
      */
-    const { error } = await supabase.from('messages').insert({
-      contact_id: contactId,
-      direction: 'outbound',
-      content: `${text} → ${templateParams.join(' | ')}`,
-    });
+    const messageText =
+      `${text}: ${templateParams?.join(' | ') || ''}`;
 
-    if (error) throw error;
+    const { error: msgError } = await supabase
+      .from('messages')
+      .insert({
+        conversation_id: contactId,
+        body: messageText,
+        direction: 'outbound',
+      });
+
+    if (msgError) throw msgError;
+
+    /**
+     * 4️⃣ Update conversation last message
+     */
+    await supabase
+      .from('conversations')
+      .update({
+        last_message: messageText,
+        last_message_at: new Date().toISOString(),
+      })
+      .eq('id', contactId);
 
     return NextResponse.json({ success: true });
   } catch (err: any) {
+    console.error('[reply API error]', err);
     return NextResponse.json(
       { error: err.message },
       { status: 500 }

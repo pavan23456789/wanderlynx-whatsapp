@@ -52,6 +52,7 @@ const formatFuzzyDate = (date: Date | number) => {
 
 /**
  * The left panel component displaying the list of conversations.
+ * Optimized for density and scannability.
  */
 function ConversationList({
   conversations,
@@ -123,6 +124,7 @@ function ConversationList({
 
 /**
  * The component for displaying messages in the selected conversation.
+ * Designed to feel like a modern chat application.
  */
 function MessagePanel({ conversation }: { conversation: Conversation }) {
   const scrollAreaRef = React.useRef<HTMLDivElement>(null);
@@ -315,6 +317,13 @@ export default function InboxPage() {
   const [templates] = React.useState<Template[]>(mockTemplates);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const { toast } = useToast();
+
+  // On first load, select the first conversation if one exists
+  React.useEffect(() => {
+    if (conversations.length > 0 && !selectedId) {
+      setSelectedId(conversations[0].id);
+    }
+  }, [conversations, selectedId]);
 
   const selectedConversation = React.useMemo(
     () => conversations.find((c) => c.id === selectedId),

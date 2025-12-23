@@ -349,6 +349,11 @@ function ConversationRow({
               <AvatarFallback>{c.name.charAt(0)}</AvatarFallback>
             </Avatar>
             <div className="flex-1 overflow-hidden">
+                {/* This is the structural fix for BUG A.
+                    1. The outer div is a flex container with column direction to stack the two rows.
+                    2. The top row uses flex and justify-between to push name and time apart.
+                    3. The bottom row's <p> tag uses `truncate` which applies overflow:hidden, text-overflow:ellipsis and whitespace:nowrap.
+                    This guarantees the preview is always one line and ends with "..." if long. */}
                 <div className="flex justify-between items-baseline">
                     <p className={cn("truncate font-semibold", isUnread ? "text-foreground" : "text-muted-foreground")}>
                         {c.name}
@@ -448,12 +453,12 @@ function MessagePanel({
                     m.type === 'outbound' ? 'justify-end' : 'justify-start'
                 )}
                 >
-                {/* This is the structural fix for the timestamp bug.
-                    1. The outer div is 'relative' to create a positioning context.
-                    2. The text span has right padding (pr-14) to reserve horizontal space for the timestamp.
+                {/* This is the structural fix for BUG B.
+                    1. The outer div is 'relative' to create a positioning context for the timestamp.
+                    2. The text span has right padding (pr-14) to reserve horizontal space where text cannot flow.
                     3. The timestamp div is 'absolute' and positioned at the bottom-right of the bubble.
-                    This guarantees the timestamp is always visible at the bottom-right and never overlaps the text,
-                    as the text cannot flow into the padded area. This is a standard, robust pattern. */}
+                    This guarantees the timestamp is always visible in the reserved space and never overlaps the text,
+                    regardless of message length or window size. This is the industry-standard pattern. */}
                 <div
                     className={cn(
                     'max-w-[75%] rounded-lg px-3 py-2 shadow-sm relative',

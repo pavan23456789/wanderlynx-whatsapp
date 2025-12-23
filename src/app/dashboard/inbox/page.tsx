@@ -349,8 +349,6 @@ function ConversationRow({
               <AvatarFallback>{c.name.charAt(0)}</AvatarFallback>
             </Avatar>
             <div className="flex-1 overflow-hidden">
-                {/* This is the new structural container for the text content. */}
-                {/* It uses flexbox to ensure proper alignment and truncation. */}
                 <div className="flex justify-between items-baseline">
                     <p className={cn("truncate font-semibold", isUnread ? "text-foreground" : "text-muted-foreground")}>
                         {c.name}
@@ -452,25 +450,27 @@ function MessagePanel({
                 >
                 <div
                     className={cn(
-                    'max-w-[75%] rounded-lg px-3 py-2 shadow-sm',
+                    'max-w-[75%] rounded-lg px-3 py-2 shadow-sm relative', // BUG FIX: Add 'relative' for positioning context
                     m.type === 'outbound'
                         ? 'bg-green-100'
                         : 'bg-background'
                     )}
                 >
-                    {/* This is the new structural container for the message text and timestamp. */}
-                    {/* It uses inline-flex to keep them in the same flow, allowing text to wrap */}
-                    {/* while the timestamp aligns to the bottom-right of the last line. */}
-                    <div className="inline-flex items-baseline">
-                        <span className="whitespace-pre-wrap break-words">
-                        {m.text}
-                        </span>
-                        <div className="ml-2 self-end flex-shrink-0 whitespace-nowrap text-xs text-muted-foreground/70">
-                            <span>{format(new Date(m.time), 'p')}</span>
-                            {m.type === 'outbound' && (
-                            <ReadStatus status={(m as any).status} />
-                            )}
-                        </div>
+                    {/*
+                    BUG FIX IMPLEMENTATION:
+                    1. The text span has right padding (pr-14) to reserve horizontal space for the timestamp.
+                    2. The timestamp div is positioned absolutely within the bubble.
+                    This guarantees the timestamp is always visible at the bottom-right and never overlaps the text,
+                    as the text cannot flow into the padded area.
+                    */}
+                    <span className="whitespace-pre-wrap break-words pr-14">
+                      {m.text}
+                    </span>
+                    <div className="absolute bottom-1 right-2 flex-shrink-0 whitespace-nowrap text-xs text-muted-foreground/70">
+                        <span>{format(new Date(m.time), 'p')}</span>
+                        {m.type === 'outbound' && (
+                        <ReadStatus status={(m as any).status} />
+                        )}
                     </div>
                 </div>
                 </div>

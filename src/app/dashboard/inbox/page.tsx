@@ -9,7 +9,7 @@ import {
   RefreshCw,
   MessageSquare,
 } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -62,7 +62,7 @@ function ConversationList({
 
   return (
     <div className="flex h-full flex-col bg-card">
-      <div className="p-4">
+      <div className="p-4 border-b">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -75,18 +75,18 @@ function ConversationList({
         </div>
       </div>
       <ScrollArea className="flex-1">
-        <div className="flex flex-col gap-1 p-2">
+        <div className="flex flex-col gap-0.5 p-2">
           {filteredConversations.map((c) => (
             <button
               key={c.id}
               onClick={() => onSelect(c.id)}
               className={cn(
-                'w-full rounded-2xl p-4 text-left transition-colors hover:bg-secondary',
+                'w-full rounded-xl p-3 text-left transition-colors hover:bg-secondary/50',
                 selectedId === c.id && 'bg-secondary'
               )}
             >
-              <div className="flex items-start gap-4">
-                <Avatar className="h-12 w-12 border" data-ai-hint="person portrait">
+              <div className="flex items-start gap-3">
+                <Avatar className="h-11 w-11 border" data-ai-hint="person portrait">
                   <AvatarImage src={c.avatar} />
                   <AvatarFallback>{c.name.charAt(0)}</AvatarFallback>
                 </Avatar>
@@ -108,7 +108,7 @@ function ConversationList({
           ))}
         </div>
       </ScrollArea>
-      <div className="border-t p-4 text-center text-xs text-muted-foreground">
+      <div className="border-t p-3 text-center text-xs text-muted-foreground">
         {conversations.length} conversations
       </div>
     </div>
@@ -152,7 +152,7 @@ function MessagePanel({ conversation }: { conversation: Conversation }) {
             <div
               key={m.id}
               className={cn(
-                'flex',
+                'flex items-end gap-2',
                 m.sender === 'me' ? 'justify-end' : 'justify-start'
               )}
             >
@@ -336,7 +336,7 @@ export default function InboxPage() {
     <TooltipProvider>
       <ResizablePanelGroup
         direction="horizontal"
-        className="h-full max-h-full items-stretch"
+        className="h-full max-h-[calc(100vh-theme(spacing.14))] items-stretch md:max-h-screen"
       >
         <ResizablePanel defaultSize={25} minSize={20} maxSize={35}>
           {conversations.length > 0 ? (

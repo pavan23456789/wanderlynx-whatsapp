@@ -17,6 +17,9 @@ export type Conversation = {
   lastMessageTimestamp: number;
   isWindowOpen: boolean; // Determines if the 24hr WhatsApp window is open
   messages: Message[];
+  assignedTo?: string | null; // Agent ID from mockAgents.ts
+  pinned?: boolean;
+  unread?: number;
 };
 
 export type Template = {
@@ -42,6 +45,9 @@ export const mockConversations: Conversation[] = [
       { id: 'msg_1_1', sender: 'them', text: 'Hi there, I have a question about my booking.', time: new Date(now - 3 * 60 * 1000).toISOString() },
       { id: 'msg_1_2', sender: 'me', text: 'Sure, I can help with that. What is your booking ID?', time: new Date(now - 2 * 60 * 1000).toISOString() },
     ],
+    assignedTo: '2', // Assigned to John Doe
+    pinned: true,
+    unread: 0,
   },
   {
     id: 'conv_2',
@@ -55,6 +61,9 @@ export const mockConversations: Conversation[] = [
       { id: 'msg_2_1', sender: 'them', text: 'Hello, I booked the Bali trip for next month.', time: new Date(now - 70 * 60 * 1000).toISOString() },
       { id: 'msg_2_2', sender: 'them', text: 'Is it possible to upgrade my room?', time: new Date(now - 65 * 60 * 1000).toISOString() },
     ],
+    assignedTo: null, // Unassigned
+    pinned: true,
+    unread: 1,
   },
   {
     id: 'conv_3',
@@ -69,6 +78,9 @@ export const mockConversations: Conversation[] = [
       { id: 'msg_3_2', sender: 'me', text: 'I have processed the cancellation for you. Your reference is CAN-12345.', time: new Date(now - 26.5 * 60 * 60 * 1000).toISOString() },
       { id: 'msg_3_3', sender: 'them', text: 'Perfect, thank you so much for your help!', time: new Date(now - 26 * 60 * 60 * 1000).toISOString() },
     ],
+    assignedTo: '3', // Assigned to Jane Appleseed
+    pinned: false,
+    unread: 0,
   },
   {
     id: 'conv_4',
@@ -81,6 +93,24 @@ export const mockConversations: Conversation[] = [
     messages: [
       { id: 'msg_4_1', sender: 'them', text: 'Can I add another person to my booking?', time: new Date(now - 3 * 24 * 60 * 60 * 1000).toISOString() },
     ],
+    assignedTo: null,
+    pinned: false,
+    unread: 0,
+  },
+    {
+    id: 'conv_5',
+    name: 'Emma Dubois',
+    phone: '+33 1 40 20 50 50',
+    avatar: 'https://picsum.photos/seed/5/80/80',
+    lastMessage: 'Can you confirm my pickup time please?',
+    lastMessageTimestamp: now - 15 * 60 * 1000, // 15 mins ago
+    isWindowOpen: true,
+    messages: [
+      { id: 'msg_5_1', sender: 'them', text: 'Can you confirm my pickup time please?', time: new Date(now - 15 * 60 * 1000).toISOString() },
+    ],
+    assignedTo: null,
+    pinned: false,
+    unread: 1,
   },
 ];
 

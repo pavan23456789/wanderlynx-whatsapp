@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -8,6 +7,7 @@ import {
   MessageSquare,
   Check,
   CheckCheck,
+  UserPlus,
 } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
 
@@ -20,41 +20,98 @@ import {
 } from '@/components/ui/resizable';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import {
-  mockConversations,
-  type Conversation,
-  type Message,
-} from '@/lib/mock/mockInbox';
+import { mockConversations, type Conversation } from '@/lib/mock/mockInbox';
+import { mockAgents, type Agent } from '@/lib/mock/mockAgents';
 
-/* =================================================================
-   UTILS
-================================================================= */
+// INBOX v1 LOCKED
+// Conversation assignment approved by founder
+// Do NOT extend UI beyond this scope
+function AssignmentPopover({
+  agents,
+  assignedTo,
+  onAssign,
+}: {
+  agents: Agent[];
+  assignedTo: string | null | undefined;
+  onAssign: (agentId: string | null) => void;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const assignedAgent = agents.find((a) => a.id === assignedTo);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 rounded-full flex-shrink-0"
+        >
+          {assignedAgent ? (
+            <Avatar className="h-7 w-7" data-ai-hint="person portrait">
+              <AvatarImage src={assignedAgent.avatar} />
+              <AvatarFallback>{assignedAgent.name.charAt(0)}</AvatarFallback>
+            </Avatar>
+          ) : (
+            <UserPlus className="h-4 w-4 text-muted-foreground" />
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-0">
+        <div className="p-2 font-semibold text-sm">Assign to...</div>
+        <ScrollArea className="max-h-72">
+          <div className="p-1">
+            {agents.map((agent) => (
+              <button
+                key={agent.id}
+                onClick={() => {
+                  onAssign(agent.id);
+                  setOpen(false);
+                }}
+                className="w-full flex items-center gap-2 p-2 rounded-md text-left hover:bg-secondary"
+              >
+                <Avatar className="h-7 w-7" data-ai-hint="person portrait">
+                  <AvatarImage src={agent.avatar} />
+                  <AvatarFallback>{agent.name.charAt(0)}</AvatarFallback>
+                </Avatar>
+                <span className="text-sm">{agent.name}</span>
+                {assignedTo === agent.id && (
+                  <Check className="h-4 w-4 ml-auto text-primary" />
+                )}
+              </button>
+            ))}
+          </div>
+        </ScrollArea>
+        {assignedTo && (
+          <div className="border-t p-1">
+            <button
+              onClick={() => {
+                onAssign(null);
+                setOpen(false);
+              }}
+              className="w-full p-2 rounded-md text-left text-sm text-destructive hover:bg-destructive/10"
+            >
+              Unassign
+            </button>
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 const formatFuzzyDate = (date: Date | number) => {
   const d = new Date(date);
   if (isToday(d)) return format(d, 'p');
   if (isYesterday(d)) return 'Yesterday';
   return format(d, 'MM/dd/yy');
 };
-
-const ReadStatus = ({ status }: { status?: Message['status'] }) => {
-  if (!status || status === 'pending') return null;
-  if (status === 'read') {
-    return <CheckCheck className="h-4 w-4 text-blue-500" />;
-  }
-  if (status === 'delivered') {
-    return <CheckCheck className="h-4 w-4 text-muted-foreground" />;
-  }
-  if (status === 'sent') {
-    return <Check className="h-4 w-4 text-muted-foreground" />;
-  }
-  return null;
-};
-
-/* =================================================================
-   SUB-COMPONENTS
-================================================================= */
 
 function ConversationList({
   conversations,
@@ -71,85 +128,130 @@ function ConversationList({
   const filtered = conversations
     .filter((c) => c.name.toLowerCase().includes(search.toLowerCase()))
     .filter((c) => (filter === 'unread' ? (c.unread ?? 0) > 0 : true));
-  
-  const pinned = filtered.filter(c => (c as any).pinned);
-  const unpinned = filtered.filter(c => !(c as any).pinned);
 
+  const pinned = filtered.filter((c) => c.pinned);
+  const unpinned = filtered.filter((c) => !c.pinned);
 
   return (
     <div className="flex h-full flex-col border-r bg-background">
       <div className="flex-shrink-0 p-3 border-b">
-         <div className="relative">
+        <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search..."
-            className="h-9 rounded-full bg-secondary pl-9 focus-visible:ring-primary"
+            className="h-9 rounded-full bg-secondary pl-9"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             suppressHydrationWarning
           />
         </div>
         <div className="mt-3 flex gap-2">
-            <Button variant={filter === 'all' ? 'secondary' : 'ghost'} size="sm" onClick={() => setFilter('all')} className="rounded-full h-8 flex-1">All</Button>
-            <Button variant={filter === 'unread' ? 'secondary' : 'ghost'} size="sm" onClick={() => setFilter('unread')} className="rounded-full h-8 flex-1">Unread</Button>
+          <Button
+            variant={filter === 'all' ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => setFilter('all')}
+            className="rounded-full h-8 flex-1"
+          >
+            All
+          </Button>
+          <Button
+            variant={filter === 'unread' ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => setFilter('unread')}
+            className="rounded-full h-8 flex-1"
+          >
+            Unread
+          </Button>
         </div>
       </div>
       <ScrollArea className="flex-1">
         <div className="flex flex-col">
-            {pinned.map((c) => (
-                <ConversationRow key={c.id} conversation={c} selectedId={selectedId} onSelect={onSelect} />
-            ))}
-            {unpinned.map((c) => (
-                <ConversationRow key={c.id} conversation={c} selectedId={selectedId} onSelect={onSelect} />
-            ))}
+          {pinned.map((c) => (
+            <ConversationRow
+              key={c.id}
+              conversation={c}
+              selectedId={selectedId}
+              onSelect={onSelect}
+            />
+          ))}
+          {unpinned.map((c) => (
+            <ConversationRow
+              key={c.id}
+              conversation={c}
+              selectedId={selectedId}
+              onSelect={onSelect}
+            />
+          ))}
         </div>
       </ScrollArea>
     </div>
   );
 }
 
-function ConversationRow({ conversation, selectedId, onSelect }: { conversation: Conversation, selectedId: string | null, onSelect: (id: string) => void }) {
-    const c = conversation;
-    const isUnread = (c.unread ?? 0) > 0;
-    const isActive = selectedId === c.id;
+function ConversationRow({
+  conversation,
+  selectedId,
+  onSelect,
+}: {
+  conversation: Conversation;
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+}) {
+  const c = conversation;
+  const isUnread = (c.unread ?? 0) > 0;
+  const isActive = selectedId === c.id;
 
-    return (
-        <button
-          key={c.id}
-          onClick={() => onSelect(c.id)}
-          className={cn(
-            'w-full border-b px-3 py-2 text-left transition-colors hover:bg-secondary',
-            isActive && 'bg-secondary'
-          )}
-        >
-          <div className="flex items-center gap-3">
-             {isUnread && <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />}
-            <Avatar className={cn("h-8 w-8 border", !isUnread && "ml-5")} data-ai-hint="person portrait">
-              <AvatarImage src={c.avatar} />
-              <AvatarFallback>{c.name.charAt(0)}</AvatarFallback>
-            </Avatar>
-            <div className="flex-1 overflow-hidden">
-              <div className="flex items-baseline justify-between">
-                <p className={cn(
-                  "truncate", 
-                  isUnread ? "font-semibold text-foreground" : "font-medium text-muted-foreground"
-                  )}>
-                    {c.name}
-                </p>
-                <p className="text-xs text-muted-foreground/80">
-                  {formatFuzzyDate(c.lastMessageTimestamp)}
-                </p>
-              </div>
-              <p className="truncate text-sm text-muted-foreground mt-0.5">
-                    {c.lastMessage}
-              </p>
-            </div>
+  return (
+    <button
+      key={c.id}
+      onClick={() => onSelect(c.id)}
+      className={cn(
+        'w-full border-b px-3 py-2 text-left transition-colors hover:bg-secondary',
+        isActive && 'bg-secondary'
+      )}
+    >
+      <div className="flex items-center gap-3">
+        <Avatar className="h-9 w-9 border" data-ai-hint="person portrait">
+          <AvatarImage src={c.avatar} />
+          <AvatarFallback>{c.name.charAt(0)}</AvatarFallback>
+        </Avatar>
+        <div className="flex-1 overflow-hidden">
+          <div className="flex items-baseline justify-between">
+            <p
+              className={cn(
+                'truncate',
+                isUnread
+                  ? 'font-semibold text-foreground'
+                  : 'font-medium text-muted-foreground'
+              )}
+            >
+              {c.name}
+            </p>
+            <p className="text-xs text-muted-foreground/80 shrink-0">
+              {formatFuzzyDate(c.lastMessageTimestamp)}
+            </p>
           </div>
-        </button>
-    )
+          <div className="flex items-center justify-between mt-0.5">
+            <p className="truncate text-sm text-muted-foreground">
+              {c.lastMessage}
+            </p>
+            {isUnread && (
+              <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
+            )}
+          </div>
+        </div>
+      </div>
+    </button>
+  );
 }
 
-function MessagePanel({ conversation }: { conversation: Conversation }) {
+function MessagePanel({
+  conversation,
+  onAssign,
+}: {
+  conversation: Conversation;
+  onAssign: (agentId: string | null) => void;
+}) {
   const scrollAreaRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -168,17 +270,17 @@ function MessagePanel({ conversation }: { conversation: Conversation }) {
           <AvatarImage src={conversation.avatar} />
           <AvatarFallback>{conversation.name.charAt(0)}</AvatarFallback>
         </Avatar>
-        <div>
+        <div className="flex-1">
           <p className="font-semibold">{conversation.name}</p>
-          <p className="text-sm text-muted-foreground">
-            {conversation.phone}
-          </p>
+          <p className="text-sm text-muted-foreground">{conversation.phone}</p>
         </div>
+        <AssignmentPopover
+          agents={mockAgents}
+          assignedTo={conversation.assignedTo}
+          onAssign={onAssign}
+        />
       </div>
-      <ScrollArea
-        className="flex-1"
-        viewportRef={scrollAreaRef}
-      >
+      <ScrollArea className="flex-1" viewportRef={scrollAreaRef}>
         <div className="p-4 md:p-6 space-y-1">
           {conversation.messages.map((m) => (
             <div
@@ -197,10 +299,10 @@ function MessagePanel({ conversation }: { conversation: Conversation }) {
                 )}
               >
                 <p className="whitespace-pre-wrap">{m.text}</p>
-                 <div className="mt-1 flex items-center justify-end gap-1.5">
-                   <p className="text-xs text-muted-foreground/70">
-                       {format(new Date(m.time), 'p')}
-                   </p>
+                <div className="mt-1 flex items-center justify-end gap-1.5">
+                  <p className="text-xs text-muted-foreground/70">
+                    {format(new Date(m.time), 'p')}
+                  </p>
                   {m.sender === 'me' && <ReadStatus status={(m as any).status} />}
                 </div>
               </div>
@@ -212,53 +314,60 @@ function MessagePanel({ conversation }: { conversation: Conversation }) {
   );
 }
 
-function ReplyBox({
-  onSend,
-}: {
-  onSend: (text: string) => void;
-}) {
+const ReadStatus = ({ status }: { status?: 'sent' | 'delivered' | 'read' }) => {
+  if (!status || status === 'sent') {
+    return <Check className="h-4 w-4 text-muted-foreground" />;
+  }
+  if (status === 'delivered') {
+    return <CheckCheck className="h-4 w-4 text-muted-foreground" />;
+  }
+  if (status === 'read') {
+    return <CheckCheck className="h-4 w-4 text-blue-500" />;
+  }
+  return null;
+};
+
+function ReplyBox({ onSend }: { onSend: (text: string) => void }) {
   const [text, setText] = React.useState('');
 
   const handleSend = () => {
-      if (!text.trim()) return;
-      onSend(text);
-      setText('');
+    if (!text.trim()) return;
+    onSend(text);
+    setText('');
   };
 
   return (
     <div className="border-t bg-card p-3">
-        <div className="relative flex items-center">
-          <Input
-            placeholder="Type a message..."
-            className="rounded-full h-11 pr-12"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-            suppressHydrationWarning
-          />
-          <Button
-            size="icon"
-            className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2 rounded-full"
-            onClick={handleSend}
-            disabled={!text.trim()}
-          >
-            <Send className="h-4 w-4" />
-          </Button>
-        </div>
+      <div className="relative flex items-center">
+        <Input
+          placeholder="Type a message..."
+          className="rounded-full h-11 pr-12"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+          suppressHydrationWarning
+        />
+        <Button
+          size="icon"
+          className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2 rounded-full"
+          onClick={handleSend}
+          disabled={!text.trim()}
+        >
+          <Send className="h-4 w-4" />
+        </Button>
+      </div>
     </div>
   );
 }
 
-/* =================================================================
-   MAIN INBOX PAGE
-================================================================= */
-
 export default function InboxPage() {
-  const [conversations] = React.useState<Conversation[]>(() => {
-    const pinned = mockConversations.filter((c: any) => c.pinned);
-    const unpinned = mockConversations.filter((c: any) => !c.pinned);
+  // Local state to manage conversation data, including assignments
+  const [conversations, setConversations] = React.useState<Conversation[]>(() => {
+    const pinned = mockConversations.filter((c) => c.pinned);
+    const unpinned = mockConversations.filter((c) => !c.pinned);
     return [...pinned, ...unpinned];
   });
+  
   const [selectedId, setSelectedId] = React.useState<string | null>(conversations[0]?.id || null);
   const { toast } = useToast();
 
@@ -266,6 +375,18 @@ export default function InboxPage() {
     () => conversations.find((c) => c.id === selectedId),
     [selectedId, conversations]
   );
+  
+  const handleAssign = (agentId: string | null) => {
+    if (!selectedId) return;
+    setConversations(convs => convs.map(c => 
+      c.id === selectedId ? { ...c, assignedTo: agentId } : c
+    ));
+    const agentName = agentId ? mockAgents.find(a => a.id === agentId)?.name : 'unassigned';
+     toast({
+      title: 'Conversation Assigned',
+      description: `Assigned to ${agentName}.`,
+    });
+  };
 
   const handleSend = (text: string) => {
     toast({
@@ -273,17 +394,17 @@ export default function InboxPage() {
       description: `Text: "${text}"`,
     });
   };
-  
+
   if (conversations.length === 0) {
-      return (
-           <div className="flex h-full flex-col items-center justify-center p-4 text-center bg-background">
-            <MessageSquare className="mb-4 h-12 w-12 text-muted-foreground" />
-            <h3 className="text-xl font-semibold">No Conversations Yet</h3>
-            <p className="mt-2 text-muted-foreground">
-              When a customer sends you a message on WhatsApp, it will appear here.
-            </p>
-          </div>
-      )
+    return (
+      <div className="flex h-full flex-col items-center justify-center p-4 text-center bg-background">
+        <MessageSquare className="mb-4 h-12 w-12 text-muted-foreground" />
+        <h3 className="text-xl font-semibold">No Conversations Yet</h3>
+        <p className="mt-2 text-muted-foreground">
+          When a customer sends you a message on WhatsApp, it will appear here.
+        </p>
+      </div>
+    );
   }
 
   return (
@@ -291,7 +412,7 @@ export default function InboxPage() {
       direction="horizontal"
       className="h-full max-h-[calc(100vh-theme(spacing.14))] items-stretch bg-background md:max-h-full"
     >
-      <ResizablePanel defaultSize={25} minSize={20} maxSize={35} className="min-w-[300px]">
+      <ResizablePanel defaultSize={25} minSize={20} maxSize={35} className="min-w-[320px]">
         <ConversationList
           conversations={conversations}
           selectedId={selectedId}
@@ -304,25 +425,24 @@ export default function InboxPage() {
       <ResizablePanel defaultSize={75}>
         {selectedConversation ? (
           <div className="flex h-full flex-col">
-            <MessagePanel conversation={selectedConversation} />
+            <MessagePanel
+              conversation={selectedConversation}
+              onAssign={handleAssign}
+            />
             <ReplyBox onSend={handleSend} />
           </div>
         ) : (
-           <div className="flex h-full flex-col items-center justify-center p-4 text-center bg-background">
-             <div className="text-center">
-                <MessageSquare className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-                <h3 className="text-xl font-semibold">
-                    Select a conversation
-                </h3>
-                <p className="mt-2 text-muted-foreground">
-                    Choose from an existing conversation to start chatting.
-                </p>
-             </div>
+          <div className="flex h-full flex-col items-center justify-center p-4 text-center bg-background">
+            <div className="text-center">
+              <MessageSquare className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+              <h3 className="text-xl font-semibold">Select a conversation</h3>
+              <p className="mt-2 text-muted-foreground">
+                Choose from an existing conversation to start chatting.
+              </p>
+            </div>
           </div>
         )}
       </ResizablePanel>
     </ResizablePanelGroup>
   );
 }
-
-    

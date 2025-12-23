@@ -110,7 +110,7 @@ export const mockConversations: Conversation[] = [
     ],
     assignedTo: null,
     pinned: false,
-    unread: 1,
+    unread: 2,
   },
 ];
 

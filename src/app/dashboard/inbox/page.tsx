@@ -134,6 +134,40 @@ function ConversationList({
 
   const pinned = filtered.filter((c) => c.pinned);
   const unpinned = filtered.filter((c) => !c.pinned);
+  
+  const allFilteredConversations = [...pinned, ...unpinned];
+
+
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        
+        const currentIdx = allFilteredConversations.findIndex(c => c.id === selectedId);
+        let nextIdx;
+
+        if (e.key === 'ArrowDown') {
+          nextIdx = currentIdx < allFilteredConversations.length - 1 ? currentIdx + 1 : 0;
+        } else { // ArrowUp
+          nextIdx = currentIdx > 0 ? currentIdx - 1 : allFilteredConversations.length - 1;
+        }
+        
+        const nextConv = allFilteredConversations[nextIdx];
+        if (nextConv) {
+          onSelect(nextConv.id);
+          // Optional: scroll into view
+          const element = document.querySelector(`[data-conv-id="${nextConv.id}"]`);
+          element?.scrollIntoView({ block: 'nearest' });
+        }
+      } else if (e.key === 'Enter' && selectedId) {
+        onSelect(selectedId);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [selectedId, allFilteredConversations, onSelect]);
+
 
   return (
     <div className="h-full flex flex-col bg-background">
@@ -207,6 +241,7 @@ function ConversationRow({
   return (
     <button
       key={c.id}
+      data-conv-id={c.id}
       onClick={() => onSelect(c.id)}
       className={cn(
         'w-full border-b px-3 py-2 text-left transition-colors hover:bg-secondary',
@@ -301,23 +336,21 @@ function MessagePanel({
             >
               <div
                 className={cn(
-                  'max-w-[75%] rounded-lg px-3 py-2 shadow-sm',
+                  'max-w-[75%] rounded-lg px-3 py-2 shadow-sm relative',
                   m.sender === 'me'
                     ? 'bg-green-100'
                     : 'bg-background'
                 )}
               >
-                <div className="inline-flex items-baseline">
-                  <span className="whitespace-pre-wrap break-words">
+                  <span className="pr-16 break-words whitespace-pre-wrap">
                     {m.text}
                   </span>
-                  <div className="ml-2 self-end flex-shrink-0 whitespace-nowrap text-xs text-muted-foreground/70">
+                  <div className="absolute bottom-1 right-2 flex items-center gap-1 text-xs text-muted-foreground/70 whitespace-nowrap">
                     <span>{format(new Date(m.time), 'p')}</span>
                     {m.sender === 'me' && (
                       <ReadStatus status={(m as any).status} />
                     )}
                   </div>
-                </div>
               </div>
             </div>
           ))}
@@ -394,6 +427,35 @@ export default function InboxPage() {
   
   const [selectedId, setSelectedId] = React.useState<string | null>(conversations[0]?.id || null);
   const { toast } = useToast();
+
+  React.useEffect(() => {
+    // Mock receiving a message
+    const interval = setInterval(() => {
+      setConversations(convs => {
+        const convToUpdate = convs[Math.floor(Math.random() * convs.length)];
+        const newMessage: Message = {
+            id: `msg_${Date.now()}`,
+            sender: 'them',
+            text: 'This is a new message!',
+            time: new Date().toISOString(),
+          };
+          
+        return convs.map(c => 
+          c.id === convToUpdate.id 
+          ? { 
+              ...c, 
+              messages: [...c.messages, newMessage],
+              lastMessage: newMessage.text,
+              lastMessageTimestamp: new Date().getTime(),
+              unread: (c.unread || 0) + 1
+            } 
+          : c
+        );
+      });
+    }, 30000); // Receive a new message every 30 seconds
+
+    return () => clearInterval(interval);
+  }, []);
 
   const selectedConversation = React.useMemo(
     () => conversations.find((c) => c.id === selectedId),

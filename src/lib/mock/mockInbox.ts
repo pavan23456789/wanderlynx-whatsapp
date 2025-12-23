@@ -20,6 +20,8 @@ export type Conversation = {
   assignedTo?: string | null; // Agent ID from mockAgents.ts
   pinned?: boolean;
   unread?: number;
+  lastCustomerMessageAt?: number | null;
+  lastAgentMessageAt?: number | null;
 };
 
 export type Template = {
@@ -48,6 +50,8 @@ export const mockConversations: Conversation[] = [
     assignedTo: '2', // Assigned to John Doe
     pinned: true,
     unread: 0,
+    lastCustomerMessageAt: now - 3 * 60 * 1000,
+    lastAgentMessageAt: now - 2 * 60 * 1000,
   },
   {
     id: 'conv_2',
@@ -64,6 +68,8 @@ export const mockConversations: Conversation[] = [
     assignedTo: null, // Unassigned
     pinned: true,
     unread: 1,
+    lastCustomerMessageAt: now - 65 * 60 * 1000,
+    lastAgentMessageAt: null,
   },
   {
     id: 'conv_3',
@@ -81,6 +87,8 @@ export const mockConversations: Conversation[] = [
     assignedTo: '3', // Assigned to Jane Appleseed
     pinned: false,
     unread: 0,
+    lastCustomerMessageAt: now - 26 * 60 * 60 * 1000,
+    lastAgentMessageAt: now - 26.5 * 60 * 60 * 1000,
   },
   {
     id: 'conv_4',
@@ -96,6 +104,8 @@ export const mockConversations: Conversation[] = [
     assignedTo: null,
     pinned: false,
     unread: 0,
+    lastCustomerMessageAt: now - 3 * 24 * 60 * 60 * 1000,
+    lastAgentMessageAt: null,
   },
     {
     id: 'conv_5',
@@ -111,6 +121,8 @@ export const mockConversations: Conversation[] = [
     assignedTo: null,
     pinned: false,
     unread: 2,
+    lastCustomerMessageAt: now - 15 * 60 * 1000,
+    lastAgentMessageAt: null,
   },
 ];
 

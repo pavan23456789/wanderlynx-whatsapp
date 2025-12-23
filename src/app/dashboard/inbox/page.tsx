@@ -460,11 +460,12 @@ export default function InboxPage() {
         if (eligibleConvs.length === 0) return convs;
         
         const convToUpdate = eligibleConvs[Math.floor(Math.random() * eligibleConvs.length)];
+        const newTimestamp = new Date().getTime();
         const newMessage: Message = {
-            id: `msg_${Date.now()}`,
+            id: `msg_${newTimestamp}`,
             sender: 'them',
             text: 'This is a new incoming message!',
-            time: new Date().toISOString(),
+            time: new Date(newTimestamp).toISOString(),
           };
           
         return convs.map(c => 
@@ -473,8 +474,9 @@ export default function InboxPage() {
               ...c, 
               messages: [...c.messages, newMessage],
               lastMessage: newMessage.text,
-              lastMessageTimestamp: new Date().getTime(),
-              unread: (c.unread || 0) + 1
+              lastMessageTimestamp: newTimestamp,
+              unread: (c.unread || 0) + 1,
+              lastCustomerMessageAt: newTimestamp, // SLA: Update customer message time
             } 
           : c
         );
@@ -504,22 +506,31 @@ export default function InboxPage() {
   const handleSend = (text: string) => {
      if (!selectedId) return;
 
+    const newTimestamp = new Date().getTime();
     const newMessage: Message & { status: 'sent' | 'delivered' | 'read' } = {
-      id: `msg_${Date.now()}`,
+      id: `msg_${newTimestamp}`,
       sender: 'me',
       text: text,
-      time: new Date().toISOString(),
+      time: new Date(newTimestamp).toISOString(),
       status: 'sent'
     };
 
     setConversations(convs => {
       const newConvs = convs.map(c => {
         if (c.id === selectedId) {
+          // SLA: Update agent message time
+          const lastAgentMessageAt = newTimestamp;
+          
+          // SLA: This is where you would calculate the 'conversation state'
+          // const conversationState = c.lastCustomerMessageAt && lastAgentMessageAt > c.lastCustomerMessageAt ? 'waiting_on_customer' : 'waiting_on_agent';
+          // const timeSinceLastCustomerMessage = c.lastCustomerMessageAt ? newTimestamp - c.lastCustomerMessageAt : null;
+          
           return {
             ...c,
             messages: [...c.messages, newMessage],
             lastMessage: text,
-            lastMessageTimestamp: new Date().getTime(),
+            lastMessageTimestamp: newTimestamp,
+            lastAgentMessageAt,
           };
         }
         return c;

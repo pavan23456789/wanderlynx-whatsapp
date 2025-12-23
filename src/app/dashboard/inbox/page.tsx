@@ -8,6 +8,9 @@ import {
   Check,
   CheckCheck,
   UserPlus,
+  MoreVertical,
+  Paperclip,
+  Mic,
 } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
 
@@ -133,38 +136,38 @@ function ConversationList({
   const unpinned = filtered.filter((c) => !c.pinned);
 
   return (
-    <div className="flex h-full flex-col border-r bg-background">
-      <div className="flex-shrink-0 p-3 border-b">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search..."
-            className="h-9 rounded-full bg-secondary pl-9"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            suppressHydrationWarning
-          />
+    <div className="h-full flex flex-col bg-background">
+        <div className="flex-shrink-0 p-3 border-b border-r">
+             <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                    placeholder="Search..."
+                    className="h-9 rounded-full bg-secondary pl-9"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    suppressHydrationWarning
+                />
+            </div>
+             <div className="mt-3 flex gap-2">
+                <Button
+                    variant={filter === 'all' ? 'secondary' : 'ghost'}
+                    size="sm"
+                    onClick={() => setFilter('all')}
+                    className="rounded-full h-8 flex-1"
+                >
+                    All
+                </Button>
+                <Button
+                    variant={filter === 'unread' ? 'secondary' : 'ghost'}
+                    size="sm"
+                    onClick={() => setFilter('unread')}
+                    className="rounded-full h-8 flex-1"
+                >
+                    Unread
+                </Button>
+            </div>
         </div>
-        <div className="mt-3 flex gap-2">
-          <Button
-            variant={filter === 'all' ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => setFilter('all')}
-            className="rounded-full h-8 flex-1"
-          >
-            All
-          </Button>
-          <Button
-            variant={filter === 'unread' ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => setFilter('unread')}
-            className="rounded-full h-8 flex-1"
-          >
-            Unread
-          </Button>
-        </div>
-      </div>
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 border-r">
         <div className="flex flex-col">
           {pinned.map((c) => (
             <ConversationRow
@@ -264,8 +267,8 @@ function MessagePanel({
   }, [conversation.messages]);
 
   return (
-    <div className="flex h-full flex-col bg-background">
-      <div className="flex items-center gap-4 border-b bg-card p-3">
+    <div className="h-full flex flex-col bg-slate-50">
+      <div className="flex items-center gap-3 border-b bg-background p-2">
         <Avatar className="h-9 w-9 border" data-ai-hint="person portrait">
           <AvatarImage src={conversation.avatar} />
           <AvatarFallback>{conversation.name.charAt(0)}</AvatarFallback>
@@ -279,6 +282,12 @@ function MessagePanel({
           assignedTo={conversation.assignedTo}
           onAssign={onAssign}
         />
+        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
+            <Search className="h-5 w-5 text-muted-foreground" />
+        </Button>
+        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
+            <MoreVertical className="h-5 w-5 text-muted-foreground" />
+        </Button>
       </div>
       <ScrollArea className="flex-1" viewportRef={scrollAreaRef}>
         <div className="p-4 md:p-6 space-y-1">
@@ -292,18 +301,22 @@ function MessagePanel({
             >
               <div
                 className={cn(
-                  'max-w-[75%] rounded-lg px-3 py-2 flex flex-col',
+                  'max-w-[75%] rounded-lg px-3 py-2 flex flex-col shadow-sm',
                   m.sender === 'me'
-                    ? 'bg-green-100 text-foreground'
-                    : 'bg-secondary text-foreground'
+                    ? 'bg-green-100'
+                    : 'bg-background'
                 )}
               >
-                <div className="whitespace-pre-wrap break-words">{m.text}</div>
-                <div className="flex items-center gap-1.5 self-end text-xs text-muted-foreground/70 mt-1">
-                  {format(new Date(m.time), 'p')}
-                  {m.sender === 'me' && (
-                    <ReadStatus status={(m as any).status} />
-                  )}
+                <div className="flex items-end">
+                    <span className="whitespace-pre-wrap break-words">{m.text}</span>
+                    <div className="flex-shrink-0 ml-2 self-end text-xs text-muted-foreground/70">
+                        <div className="flex items-center gap-1">
+                        <span>{format(new Date(m.time), 'p')}</span>
+                        {m.sender === 'me' && (
+                            <ReadStatus status={(m as any).status} />
+                        )}
+                        </div>
+                    </div>
                 </div>
               </div>
             </div>
@@ -337,24 +350,35 @@ function ReplyBox({ onSend }: { onSend: (text: string) => void }) {
   };
 
   return (
-    <div className="border-t bg-card p-3">
-      <div className="relative flex items-center">
+    <div className="border-t bg-secondary/70 p-3">
+      <div className="flex items-center gap-3">
+        <Button variant="ghost" size="icon" className="rounded-full h-10 w-10">
+            <Paperclip className="h-5 w-5 text-muted-foreground" />
+        </Button>
         <Input
           placeholder="Type a message..."
-          className="rounded-full h-11 pr-12"
+          className="rounded-full h-11 flex-1"
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSend()}
           suppressHydrationWarning
         />
-        <Button
-          size="icon"
-          className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2 rounded-full"
-          onClick={handleSend}
-          disabled={!text.trim()}
-        >
-          <Send className="h-4 w-4" />
-        </Button>
+        {text.trim() ? (
+            <Button
+                size="icon"
+                className="h-10 w-10 rounded-full bg-primary text-primary-foreground"
+                onClick={handleSend}
+            >
+                <Send className="h-5 w-5" />
+            </Button>
+        ) : (
+             <Button
+                size="icon"
+                className="h-10 w-10 rounded-full bg-primary text-primary-foreground"
+            >
+                <Mic className="h-5 w-5" />
+            </Button>
+        )}
       </div>
     </div>
   );
@@ -389,23 +413,51 @@ export default function InboxPage() {
   };
 
   const handleSend = (text: string) => {
-    toast({
-      title: 'Message Sent (Mock)',
-      description: `Text: "${text}"`,
-    });
-  };
+     if (!selectedId) return;
 
-  if (conversations.length === 0) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center p-4 text-center bg-background">
-        <MessageSquare className="mb-4 h-12 w-12 text-muted-foreground" />
-        <h3 className="text-xl font-semibold">No Conversations Yet</h3>
-        <p className="mt-2 text-muted-foreground">
-          When a customer sends you a message on WhatsApp, it will appear here.
-        </p>
-      </div>
-    );
-  }
+    const newMessage = {
+      id: `msg_${Date.now()}`,
+      sender: 'me' as const,
+      text: text,
+      time: new Date().toISOString(),
+      status: 'sent' as const
+    };
+
+    setConversations(convs => {
+      return convs.map(c => {
+        if (c.id === selectedId) {
+          return {
+            ...c,
+            messages: [...c.messages, newMessage],
+            lastMessage: text,
+            lastMessageTimestamp: new Date().getTime(),
+          };
+        }
+        return c;
+      });
+    });
+    
+    // Mock status updates
+    setTimeout(() => {
+      setConversations(convs => convs.map(c => {
+        if (c.id === selectedId) {
+          const updatedMessages = c.messages.map(m => m.id === newMessage.id ? { ...m, status: 'delivered' as const } : m);
+          return { ...c, messages: updatedMessages };
+        }
+        return c;
+      }));
+    }, 1000);
+     setTimeout(() => {
+      setConversations(convs => convs.map(c => {
+        if (c.id === selectedId) {
+          const updatedMessages = c.messages.map(m => m.id === newMessage.id ? { ...m, status: 'read' as const } : m);
+          return { ...c, messages: updatedMessages };
+        }
+        return c;
+      }));
+    }, 2500);
+
+  };
 
   return (
     <ResizablePanelGroup
@@ -424,7 +476,7 @@ export default function InboxPage() {
 
       <ResizablePanel defaultSize={75}>
         {selectedConversation ? (
-          <div className="flex h-full flex-col">
+          <div className="h-full flex flex-col">
             <MessagePanel
               conversation={selectedConversation}
               onAssign={handleAssign}

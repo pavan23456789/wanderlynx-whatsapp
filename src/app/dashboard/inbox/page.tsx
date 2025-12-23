@@ -19,7 +19,6 @@ import {
 } from '@/components/ui/resizable';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -39,7 +38,7 @@ const formatFuzzyDate = (date: Date | number) => {
   return format(d, 'MM/dd/yy');
 };
 
-const ReadStatus = ({ status }: { status: Message['status'] }) => {
+const ReadStatus = ({ status }: { status?: Message['status'] }) => {
   if (!status || status === 'pending') return null;
   if (status === 'read') {
     return <CheckCheck className="h-4 w-4 text-blue-500" />;
@@ -91,8 +90,8 @@ function ConversationList({
           />
         </div>
         <div className="mt-3 flex gap-2">
-            <Button variant={filter === 'all' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('all')} className="rounded-full h-8 flex-1">All</Button>
-            <Button variant={filter === 'unread' ? 'default' : 'ghost'} size="sm" onClick={() => setFilter('unread')} className="rounded-full h-8 flex-1">Unread</Button>
+            <Button variant={filter === 'all' ? 'secondary' : 'ghost'} size="sm" onClick={() => setFilter('all')} className="rounded-full h-8 flex-1">All</Button>
+            <Button variant={filter === 'unread' ? 'secondary' : 'ghost'} size="sm" onClick={() => setFilter('unread')} className="rounded-full h-8 flex-1">Unread</Button>
         </div>
       </div>
       <ScrollArea className="flex-1">
@@ -112,39 +111,35 @@ function ConversationList({
 function ConversationRow({ conversation, selectedId, onSelect }: { conversation: Conversation, selectedId: string | null, onSelect: (id: string) => void }) {
     const c = conversation;
     const isUnread = (c.unread ?? 0) > 0;
+    const isActive = selectedId === c.id;
+
     return (
         <button
           key={c.id}
           onClick={() => onSelect(c.id)}
           className={cn(
-            'w-full border-b px-3 py-2.5 text-left transition-colors hover:bg-secondary',
-            selectedId === c.id && 'bg-secondary'
+            'w-full border-b px-3 py-2 text-left transition-colors hover:bg-secondary',
+            isActive && 'bg-primary/10 hover:bg-primary/20'
           )}
         >
           <div className="flex items-center gap-3">
-            <Avatar className="h-9 w-9 border" data-ai-hint="person portrait">
+             {isUnread && <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />}
+            <Avatar className={cn("h-9 w-9 border", !isUnread && "ml-5")} data-ai-hint="person portrait">
               <AvatarImage src={c.avatar} />
               <AvatarFallback>{c.name.charAt(0)}</AvatarFallback>
             </Avatar>
             <div className="flex-1 overflow-hidden">
               <div className="flex items-center justify-between">
-                <p className={cn("truncate", isUnread ? "font-bold" : "font-semibold")}>
+                <p className={cn("truncate font-semibold", isUnread && "font-bold")}>
                     {c.name}
                 </p>
-                <p className={cn("text-xs", isUnread ? "text-primary font-medium" : "text-muted-foreground")}>
+                <p className="text-xs text-muted-foreground">
                   {formatFuzzyDate(c.lastMessageTimestamp)}
                 </p>
               </div>
-              <div className="flex items-center justify-between mt-0.5">
-                <p className={cn("truncate text-sm", isUnread ? "text-foreground" : "text-muted-foreground")}>
+              <p className="truncate text-sm text-muted-foreground mt-0.5">
                     {c.lastMessage}
-                </p>
-                {isUnread && (
-                  <Badge className="h-5 w-5 justify-center rounded-full bg-primary p-0 text-primary-foreground">
-                    {c.unread}
-                  </Badge>
-                )}
-              </div>
+              </p>
             </div>
           </div>
         </button>
@@ -256,8 +251,11 @@ function ReplyBox({
 ================================================================= */
 
 export default function InboxPage() {
-  const [conversations] = React.useState<Conversation[]>(mockConversations);
-  const [selectedId, setSelectedId] = React.useState<string | null>('conv_1');
+  const [conversations] = React.useState<Conversation[]>(() => [
+    ...mockConversations.filter(c => c.pinned),
+    ...mockConversations.filter(c => !c.pinned)
+  ]);
+  const [selectedId, setSelectedId] = React.useState<string | null>(conversations[0]?.id || null);
   const { toast } = useToast();
 
   const selectedConversation = React.useMemo(

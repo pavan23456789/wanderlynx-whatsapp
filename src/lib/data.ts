@@ -37,6 +37,7 @@ export type Template = {
     category: 'Marketing' | 'Utility';
     content: string;
     status: 'Approved' | 'Pending' | 'Rejected';
+    components?: any[]; // Added for template variable parsing
 };
 
 export type CampaignMessage = {

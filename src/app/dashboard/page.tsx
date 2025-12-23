@@ -23,30 +23,12 @@ import {
   MessageSquare,
   Send,
   ScrollText,
-  Loader,
   AlertTriangle,
 } from 'lucide-react';
-import type { Conversation, Campaign, Template, Contact } from '@/lib/data';
+import type { Conversation } from '@/lib/data';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-
-const chartdata = [
-  { name: 'Mon', messages: 186 },
-  { name: 'Tue', messages: 305 },
-  { name: 'Wed', messages: 237 },
-  { name: 'Thu', messages: 273 },
-  { name: 'Fri', messages: 209 },
-  { name: 'Sat', messages: 214 },
-  { name: 'Sun', messages: 345 },
-];
-
-type DashboardStats = {
-  totalContacts: number;
-  activeCampaigns: number;
-  totalTemplates: number;
-  recentConversations: Conversation[];
-  messagesSent: number;
-};
+import { mockDashboardStats, chartdata, type DashboardStats } from '@/lib/mock/mockDashboard';
 
 const StatCardSkeleton = () => (
     <Card>
@@ -66,52 +48,27 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
-  const fetchData = async () => {
+  const fetchData = React.useCallback(async () => {
     setIsLoading(true);
     setError(null);
-    try {
-        const [
-            contactsRes,
-            campaignsRes,
-            templatesRes,
-            conversationsRes
-        ] = await Promise.all([
-            fetch('/api/contacts'),
-            fetch('/api/campaigns'),
-            fetch('/api/templates'),
-            fetch('/api/conversations')
-        ]);
-
-        if (!contactsRes.ok || !campaignsRes.ok || !templatesRes.ok || !conversationsRes.ok) {
-            throw new Error('Failed to fetch dashboard data. Some services might be down.');
-        }
-
-        const contacts: Contact[] = await contactsRes.json();
-        const campaigns: Campaign[] = await campaignsRes.json();
-        const templates: Template[] = await templatesRes.json();
-        const conversations: Conversation[] = await conversationsRes.json();
-
-        // Calculate total messages sent from completed campaigns
-        const messagesSent = campaigns.reduce((acc, c) => acc + (c.sent || 0), 0);
-
-        setStats({
-            totalContacts: contacts.length,
-            activeCampaigns: campaigns.filter(c => c.status === 'Sending').length,
-            totalTemplates: templates.length,
-            recentConversations: conversations.slice(0, 4),
-            messagesSent,
-        });
-
-    } catch (e: any) {
-        setError(e.message || 'An unexpected error occurred.');
-    } finally {
+    // Simulate API call with mock data
+    setTimeout(() => {
+        // To test error state, uncomment the following line:
+        // setError("Failed to connect to the server. Please check your connection and try again.");
+        
+        // To test with data:
+        setStats(mockDashboardStats);
+        
+        // To test empty state, uncomment the following line:
+        // setStats({ totalContacts: 0, activeCampaigns: 0, totalTemplates: 0, recentConversations: [], messagesSent: 0 });
+        
         setIsLoading(false);
-    }
-  };
+    }, 1000);
+  }, []);
 
   React.useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   if (isLoading) {
     return (
@@ -184,7 +141,7 @@ export default function DashboardPage() {
             <Users className="h-5 w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{stats.totalContacts}</div>
+            <div className="text-3xl font-bold">{stats.totalContacts.toLocaleString()}</div>
             <p className="text-sm text-muted-foreground">
               Total contacts in the system
             </p>
@@ -234,7 +191,7 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle>Message Volume</CardTitle>
             <CardDescription>
-              Total messages sent and received in the last 7 days (mock data).
+              Total messages sent and received in the last 7 days.
             </CardDescription>
           </CardHeader>
           <CardContent className="pl-2">
@@ -280,13 +237,13 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="grid gap-6">
             {stats.recentConversations.length > 0 ? (
-                stats.recentConversations.map((convo) => (
+                stats.recentConversations.map((convo: Conversation) => (
                     <Link href="/dashboard/inbox" key={convo.id} className="flex items-center gap-4 hover:bg-secondary p-2 rounded-lg -m-2">
                         <Avatar className="h-10 w-10" data-ai-hint="person portrait">
                             <AvatarImage src={convo.avatar} alt="Avatar" />
                             <AvatarFallback>{convo.name?.substring(0, 2) || '??'}</AvatarFallback>
                         </Avatar>
-                        <div className="grid gap-1 flex-1">
+                        <div className="grid gap-1 flex-1 overflow-hidden">
                             <p className="text-base font-medium leading-none truncate">{convo.name}</p>
                             <p className="text-sm text-muted-foreground truncate">{convo.lastMessage}</p>
                         </div>
@@ -295,7 +252,8 @@ export default function DashboardPage() {
             ) : (
                 <div className="text-center text-muted-foreground py-10">
                     <MessageSquare className="mx-auto h-8 w-8 mb-2" />
-                    <p>No recent conversations.</p>
+                    <p className="text-sm font-medium">No recent conversations</p>
+                    <p className="text-xs">When a customer messages you, it will appear here.</p>
                 </div>
             )}
           </CardContent>

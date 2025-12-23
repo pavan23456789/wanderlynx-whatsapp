@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import type { Conversation, Campaign, Template, Contact } from '@/lib/data';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const chartdata = [
   { name: 'Mon', messages: 186 },
@@ -50,16 +51,15 @@ type DashboardStats = {
 const StatCardSkeleton = () => (
     <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <div className="h-4 w-24 bg-muted rounded-md animate-pulse" />
-            <div className="h-5 w-5 bg-muted rounded-full animate-pulse" />
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-5 w-5 rounded-full" />
         </CardHeader>
         <CardContent>
-            <div className="h-8 w-16 bg-muted rounded-md animate-pulse mb-2" />
-            <div className="h-3 w-32 bg-muted rounded-md animate-pulse" />
+            <Skeleton className="h-8 w-16 mb-2" />
+            <Skeleton className="h-3 w-32" />
         </CardContent>
     </Card>
 );
-
 
 export default function DashboardPage() {
   const [stats, setStats] = React.useState<DashboardStats | null>(null);
@@ -122,7 +122,34 @@ export default function DashboardPage() {
                 <StatCardSkeleton />
                 <StatCardSkeleton />
             </div>
-            {/* Skeletons for charts and recent convos can be added here */}
+             <div className="grid grid-cols-1 gap-6 md:grid-cols-3 md:gap-8">
+                <Card className="md:col-span-2">
+                    <CardHeader>
+                        <Skeleton className="h-6 w-1/3" />
+                        <Skeleton className="h-4 w-2/3" />
+                    </CardHeader>
+                    <CardContent>
+                        <Skeleton className="h-[350px] w-full" />
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader>
+                        <Skeleton className="h-6 w-1/2" />
+                         <Skeleton className="h-4 w-3/4" />
+                    </CardHeader>
+                    <CardContent className="grid gap-6">
+                        {Array.from({ length: 4 }).map((_, i) => (
+                             <div key={i} className="flex items-center gap-4">
+                                <Skeleton className="h-10 w-10 rounded-full" />
+                                <div className="grid gap-1 flex-1">
+                                    <Skeleton className="h-4 w-2/3" />
+                                    <Skeleton className="h-3 w-full" />
+                                </div>
+                            </div>
+                        ))}
+                    </CardContent>
+                </Card>
+            </div>
         </main>
     );
   }
@@ -254,7 +281,7 @@ export default function DashboardPage() {
           <CardContent className="grid gap-6">
             {stats.recentConversations.length > 0 ? (
                 stats.recentConversations.map((convo) => (
-                    <Link href="/dashboard/inbox" key={convo.id} className="flex items-center gap-4 hover:bg-secondary p-2 rounded-lg">
+                    <Link href="/dashboard/inbox" key={convo.id} className="flex items-center gap-4 hover:bg-secondary p-2 rounded-lg -m-2">
                         <Avatar className="h-10 w-10" data-ai-hint="person portrait">
                             <AvatarImage src={convo.avatar} alt="Avatar" />
                             <AvatarFallback>{convo.name?.substring(0, 2) || '??'}</AvatarFallback>

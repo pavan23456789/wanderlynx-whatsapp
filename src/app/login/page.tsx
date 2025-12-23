@@ -50,15 +50,15 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-sm shadow-lg rounded-3xl">
+    <div className="flex min-h-screen items-center justify-center bg-secondary/50 p-4">
+      <Card className="w-full max-w-sm shadow-lg rounded-3xl border-0">
         <CardHeader className="space-y-2 text-center p-8">
-          <div className="flex justify-center mb-2">
-            <TravonexLogo className="h-12 w-12 text-primary" />
+          <div className="flex justify-center mb-4">
+            <TravonexLogo className="h-14 w-14 text-primary" />
           </div>
-          <CardTitle className="text-3xl font-bold">Wanderlynx Login</CardTitle>
+          <CardTitle className="text-3xl font-bold">Wanderlynx</CardTitle>
           <CardDescription>
-            Enter your credentials to access the Messaging Platform
+            Sign in to the WhatsApp Messaging Platform
           </CardDescription>
         </CardHeader>
         <CardContent className="p-8 pt-0">
@@ -68,7 +68,7 @@ export default function LoginPage() {
               <Input
                 id="email"
                 type="email"
-                placeholder="m@example.com"
+                placeholder="admin@travonex.com"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -84,7 +84,7 @@ export default function LoginPage() {
                   className="ml-auto inline-block text-sm text-primary hover:underline"
                   onClick={(e) => e.preventDefault()}
                 >
-                  Forgot your password?
+                  Forgot password?
                 </a>
               </div>
               <Input 
@@ -94,11 +94,12 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="rounded-xl h-12"
+                placeholder="••••••••"
                 suppressHydrationWarning={true}
               />
             </div>
-            <Button type="submit" className="w-full h-12 rounded-xl text-base" disabled={isLoading} suppressHydrationWarning={true}>
-              {isLoading ? 'Logging in...' : 'Login'}
+            <Button type="submit" className="w-full h-12 rounded-xl text-base font-bold" disabled={isLoading} suppressHydrationWarning={true}>
+              {isLoading ? 'Signing In...' : 'Sign In'}
             </Button>
           </form>
         </CardContent>

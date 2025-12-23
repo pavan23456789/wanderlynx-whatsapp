@@ -61,7 +61,7 @@ function ConversationList({
   );
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col bg-card">
       <div className="p-4">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -94,7 +94,7 @@ function ConversationList({
                   <div className="flex items-center justify-between">
                     <p className="truncate font-semibold">{c.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {formatDistanceToNow(c.lastMessageTimestamp, {
+                      {formatDistanceToNow(new Date(c.lastMessageTimestamp), {
                         addSuffix: true,
                       })}
                     </p>
@@ -108,7 +108,7 @@ function ConversationList({
           ))}
         </div>
       </ScrollArea>
-      <div className="p-4 text-center text-xs text-muted-foreground">
+      <div className="border-t p-4 text-center text-xs text-muted-foreground">
         {conversations.length} conversations
       </div>
     </div>
@@ -254,7 +254,7 @@ function ReplyBox({
       ) : (
         <div className="space-y-3">
           <div className="flex gap-2 rounded-lg border-l-4 border-yellow-400 bg-yellow-50 p-3 text-sm text-yellow-900 dark:bg-yellow-900/20 dark:text-yellow-300">
-            <AlertTriangle className="h-5 w-5" />
+            <AlertTriangle className="h-5 w-5 flex-shrink-0" />
             <span>
               The 24-hour customer service window is closed. You must reply
               with a template.
@@ -267,7 +267,7 @@ function ReplyBox({
             <SelectContent>
               {templates.map((t) => (
                 <SelectItem key={t.id} value={t.name}>
-                  {t.name}
+                  {t.name} ({t.category})
                 </SelectItem>
               ))}
             </SelectContent>
@@ -336,7 +336,7 @@ export default function InboxPage() {
     <TooltipProvider>
       <ResizablePanelGroup
         direction="horizontal"
-        className="h-full max-h-full"
+        className="h-full max-h-full items-stretch"
       >
         <ResizablePanel defaultSize={25} minSize={20} maxSize={35}>
           {conversations.length > 0 ? (
@@ -346,7 +346,7 @@ export default function InboxPage() {
               onSelect={setSelectedId}
             />
           ) : (
-            <div className="flex h-full flex-col items-center justify-center p-4 text-center">
+            <div className="flex h-full flex-col items-center justify-center p-4 text-center bg-card">
               <FileText className="mb-4 h-12 w-12 text-muted-foreground" />
               <h3 className="text-xl font-semibold">No Conversations Yet</h3>
               <p className="mt-2 text-muted-foreground">

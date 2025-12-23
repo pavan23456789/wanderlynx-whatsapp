@@ -157,6 +157,7 @@ function ConversationList({
   onBulkAssign,
   onBulkPin,
   onBulkMarkRead,
+  onTogglePin,
 }: {
   conversations: Conversation[];
   selectedId: string | null;
@@ -167,6 +168,7 @@ function ConversationList({
   onBulkAssign: (agentId: string | null) => void;
   onBulkPin: (pinned: boolean) => void;
   onBulkMarkRead: () => void;
+  onTogglePin: (id: string) => void;
 }) {
   const [search, setSearch] = React.useState('');
   const [filter, setFilter] = React.useState('all');
@@ -186,10 +188,7 @@ function ConversationList({
         return true;
     });
 
-  const pinned = filtered.filter((c) => c.pinned);
-  const unpinned = filtered.filter((c) => !c.pinned);
-  
-  const allFilteredConversations = [...pinned, ...unpinned];
+  const allFilteredConversations = filtered;
 
   const handleSelectAll = (checked: boolean) => {
     allFilteredConversations.forEach(c => onSelectId(c.id, checked));
@@ -298,6 +297,7 @@ function ConversationList({
               isSelected={selectedIds.includes(c.id)}
               onSelect={onSelect}
               onSelectId={onSelectId}
+              onTogglePin={onTogglePin}
             />
           ))}
         </div>
@@ -312,12 +312,14 @@ function ConversationRow({
   isSelected,
   onSelect,
   onSelectId,
+  onTogglePin,
 }: {
   conversation: Conversation;
   selectedId: string | null;
   isSelected: boolean;
   onSelect: (id: string) => void;
   onSelectId: (id: string, checked: boolean) => void;
+  onTogglePin: (id: string) => void;
 }) {
   const c = conversation;
   const isUnread = (c.unread ?? 0) > 0;
@@ -373,6 +375,23 @@ function ConversationRow({
               </div>
             </div>
           </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-8 w-8 rounded-full opacity-0 group-hover/row:opacity-100 focus:opacity-100"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <MoreVertical className="h-4 w-4 text-muted-foreground"/>
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => onTogglePin(c.id)}>
+                    {c.pinned ? 'Unpin Conversation' : 'Pin Conversation'}
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </div>
@@ -389,7 +408,6 @@ function MessagePanel({
   disabled?: boolean;
 }) {
   const scrollAreaRef = React.useRef<HTMLDivElement>(null);
-  const currentUser = getCurrentUser();
 
   React.useEffect(() => {
     if (scrollAreaRef.current) {
@@ -592,7 +610,11 @@ export default function InboxPage() {
               lastCustomerMessageAt: newTimestamp,
             } 
           : c
-        );
+        ).sort((a, b) => {
+            if (a.pinned && !b.pinned) return -1;
+            if (!a.pinned && b.pinned) return 1;
+            return b.lastMessageTimestamp - a.lastMessageTimestamp;
+        });
       });
     }, 30000);
 
@@ -650,6 +672,18 @@ export default function InboxPage() {
     setSelectedIds([]);
   };
 
+  const handleTogglePin = (id: string) => {
+    setConversations(convs => {
+      const newConvs = convs.map(c => c.id === id ? { ...c, pinned: !c.pinned } : c);
+      return newConvs.sort((a, b) => {
+        if (a.pinned && !b.pinned) return -1;
+        if (!a.pinned && b.pinned) return 1;
+        return b.lastMessageTimestamp - a.lastMessageTimestamp;
+      });
+    });
+     toast({ title: 'Conversation Updated', description: `Conversation has been ${conversations.find(c=>c.id===id)?.pinned ? 'unpinned' : 'pinned'}.` });
+  };
+
   const handleBulkMarkRead = () => {
     setConversations(convs => convs.map(c => 
         selectedIds.includes(c.id) ? { ...c, unread: 0 } : c
@@ -699,16 +733,11 @@ export default function InboxPage() {
         return c;
       });
 
-      const updatedConv = newConvs.find(c => c.id === selectedId);
-      if (updatedConv) {
-          const otherConvs = newConvs.filter(c => c.id !== selectedId);
-          return [updatedConv, ...otherConvs].sort((a, b) => {
-            if (a.pinned && !b.pinned) return -1;
-            if (!a.pinned && b.pinned) return 1;
-            return b.lastMessageTimestamp - a.lastMessageTimestamp;
-        });
-      }
-      return newConvs;
+      return newConvs.sort((a, b) => {
+        if (a.pinned && !b.pinned) return -1;
+        if (!a.pinned && b.pinned) return 1;
+        return b.lastMessageTimestamp - a.lastMessageTimestamp;
+      });
     });
     
     // Mock status updates only for actual messages
@@ -762,6 +791,7 @@ export default function InboxPage() {
           onBulkAssign={handleBulkAssign}
           onBulkPin={handleBulkPin}
           onBulkMarkRead={handleBulkMarkRead}
+          onTogglePin={handleTogglePin}
         />
       </ResizablePanel>
 

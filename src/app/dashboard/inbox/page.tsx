@@ -11,6 +11,7 @@ import {
   MoreVertical,
   Paperclip,
   Mic,
+  FileText,
 } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
 
@@ -339,6 +340,7 @@ function MessagePanel({
   disabled?: boolean;
 }) {
   const scrollAreaRef = React.useRef<HTMLDivElement>(null);
+  const currentUser = getCurrentUser();
 
   React.useEffect(() => {
     if (scrollAreaRef.current) {
@@ -375,40 +377,65 @@ function MessagePanel({
       </div>
       <ScrollArea className="flex-1" viewportRef={scrollAreaRef}>
         <div className="p-4 md:p-6 space-y-1">
-          {conversation.messages.map((m) => (
-            <div
-              key={m.id}
-              className={cn(
-                'flex items-end gap-2',
-                m.sender === 'me' ? 'justify-end' : 'justify-start'
-              )}
-            >
-              <div
+          {conversation.messages.map((m) => {
+            if (m.type === 'internal') {
+                return <InternalNote key={m.id} message={m} />;
+            }
+            return (
+                <div
+                key={m.id}
                 className={cn(
-                  'max-w-[75%] rounded-lg px-3 py-2 shadow-sm',
-                  m.sender === 'me'
-                    ? 'bg-green-100'
-                    : 'bg-background'
+                    'flex items-end gap-2',
+                    m.type === 'outbound' ? 'justify-end' : 'justify-start'
                 )}
-              >
-                  <div className="inline-flex items-baseline">
-                    <span className="whitespace-pre-wrap break-words">
-                      {m.text}
-                    </span>
-                    <div className="ml-2 self-end flex-shrink-0 whitespace-nowrap text-xs text-muted-foreground/70">
-                        <span>{format(new Date(m.time), 'p')}</span>
-                        {m.sender === 'me' && (
-                          <ReadStatus status={(m as any).status} />
-                        )}
+                >
+                <div
+                    className={cn(
+                    'max-w-[75%] rounded-lg px-3 py-2 shadow-sm',
+                    m.type === 'outbound'
+                        ? 'bg-green-100'
+                        : 'bg-background'
+                    )}
+                >
+                    <div className="inline-flex items-baseline">
+                        <span className="whitespace-pre-wrap break-words">
+                        {m.text}
+                        </span>
+                        <div className="ml-2 self-end flex-shrink-0 whitespace-nowrap text-xs text-muted-foreground/70">
+                            <span>{format(new Date(m.time), 'p')}</span>
+                            {m.type === 'outbound' && (
+                            <ReadStatus status={(m as any).status} />
+                            )}
+                        </div>
                     </div>
-                  </div>
-              </div>
-            </div>
-          ))}
+                </div>
+                </div>
+            );
+          })}
         </div>
       </ScrollArea>
     </div>
   );
+}
+
+function InternalNote({ message }: { message: Message }) {
+    const agent = mockAgents.find(a => a.id === message.agentId);
+    return (
+        <div className="flex items-center justify-center my-4">
+            <div className="max-w-md w-full text-center text-xs text-muted-foreground bg-secondary/70 p-2 rounded-xl">
+                 <div className="font-semibold text-gray-600 mb-1 flex items-center justify-center gap-2">
+                    <FileText className="h-3 w-3" />
+                    Internal Note by {agent?.name || 'an agent'}
+                 </div>
+                 <p className="italic">
+                    {message.text}
+                 </p>
+                 <p className="mt-1 text-gray-400">
+                    {format(new Date(message.time), 'Pp')}
+                 </p>
+            </div>
+        </div>
+    );
 }
 
 const ReadStatus = ({ status }: { status?: 'sent' | 'delivered' | 'read' }) => {
@@ -440,7 +467,7 @@ function ReplyBox({ onSend, disabled }: { onSend: (text: string) => void; disabl
             <Paperclip className="h-5 w-5 text-muted-foreground" />
         </Button>
         <Input
-          placeholder={disabled ? "Assigned to another agent" : "Type a message..."}
+          placeholder={disabled ? "Assigned to another agent" : "Type a message or /note for an internal note..."}
           className="rounded-full h-11 flex-1"
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -499,7 +526,7 @@ export default function InboxPage() {
         const newTimestamp = new Date().getTime();
         const newMessage: Message = {
             id: `msg_${newTimestamp}`,
-            sender: 'them',
+            type: 'inbound',
             text: 'This is a new incoming message!',
             time: new Date(newTimestamp).toISOString(),
           };
@@ -553,27 +580,41 @@ export default function InboxPage() {
   };
 
   const handleSend = (text: string) => {
-     if (!selectedId) return;
+     if (!selectedId || !currentUser) return;
 
     const newTimestamp = new Date().getTime();
-    const newMessage: Message & { status: 'sent' | 'delivered' | 'read' } = {
-      id: `msg_${newTimestamp}`,
-      sender: 'me',
-      text: text,
-      time: new Date(newTimestamp).toISOString(),
-      status: 'sent'
-    };
+    let newMessage: Message;
+    let newLastMessage = text;
+
+    if (text.startsWith('/note ')) {
+        newMessage = {
+            id: `msg_${newTimestamp}`,
+            type: 'internal',
+            agentId: currentUser.id,
+            text: text.substring(6), // Remove '/note '
+            time: new Date(newTimestamp).toISOString(),
+        };
+        newLastMessage = 'Internal note added'; // Don't show note content in convo list
+    } else {
+        newMessage = {
+            id: `msg_${newTimestamp}`,
+            type: 'outbound',
+            text: text,
+            time: new Date(newTimestamp).toISOString(),
+            status: 'sent'
+        };
+    }
 
     setConversations(convs => {
       const newConvs = convs.map(c => {
         if (c.id === selectedId) {
-          const lastAgentMessageAt = newTimestamp;
+          const isInternal = newMessage.type === 'internal';
           return {
             ...c,
             messages: [...c.messages, newMessage],
-            lastMessage: text,
+            lastMessage: isInternal ? c.lastMessage : newLastMessage, // Keep old last msg on internal note
             lastMessageTimestamp: newTimestamp,
-            lastAgentMessageAt,
+            lastAgentMessageAt: isInternal ? c.lastAgentMessageAt : newTimestamp,
           };
         }
         return c;
@@ -591,25 +632,27 @@ export default function InboxPage() {
       return newConvs;
     });
     
-    // Mock status updates
-    setTimeout(() => {
-      setConversations(convs => convs.map(c => {
-        if (c.id === selectedId) {
-          const updatedMessages = c.messages.map(m => m.id === newMessage.id ? { ...m, status: 'delivered' as const } : m);
-          return { ...c, messages: updatedMessages };
-        }
-        return c;
-      }));
-    }, 1000);
-     setTimeout(() => {
-      setConversations(convs => convs.map(c => {
-        if (c.id === selectedId) {
-          const updatedMessages = c.messages.map(m => m.id === newMessage.id ? { ...m, status: 'read' as const } : m);
-          return { ...c, messages: updatedMessages };
-        }
-        return c;
-      }));
-    }, 2500);
+    // Mock status updates only for actual messages
+    if (newMessage.type === 'outbound') {
+        setTimeout(() => {
+          setConversations(convs => convs.map(c => {
+            if (c.id === selectedId) {
+              const updatedMessages = c.messages.map(m => m.id === newMessage.id ? { ...m, status: 'delivered' as const } : m);
+              return { ...c, messages: updatedMessages };
+            }
+            return c;
+          }));
+        }, 1000);
+         setTimeout(() => {
+          setConversations(convs => convs.map(c => {
+            if (c.id === selectedId) {
+              const updatedMessages = c.messages.map(m => m.id === newMessage.id ? { ...m, status: 'read' as const } : m);
+              return { ...c, messages: updatedMessages };
+            }
+            return c;
+          }));
+        }, 2500);
+    }
 
   };
 

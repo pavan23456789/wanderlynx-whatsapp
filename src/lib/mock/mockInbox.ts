@@ -3,9 +3,11 @@
 
 export type Message = {
   id: string;
-  sender: 'me' | 'them';
+  type: 'inbound' | 'outbound' | 'internal';
   text: string;
   time: string; // ISO 8601 string
+  status?: 'sent' | 'delivered' | 'read' | 'failed'; // Optional, only for outbound
+  agentId?: string; // Optional, only for internal notes
 };
 
 export type Conversation = {
@@ -44,8 +46,8 @@ export const mockConversations: Conversation[] = [
     lastMessageTimestamp: now - 2 * 60 * 1000, // 2 minutes ago
     isWindowOpen: true,
     messages: [
-      { id: 'msg_1_1', sender: 'them', text: 'Hi there, I have a question about my booking.', time: new Date(now - 3 * 60 * 1000).toISOString() },
-      { id: 'msg_1_2', sender: 'me', text: 'Sure, I can help with that. What is your booking ID?', time: new Date(now - 2 * 60 * 1000).toISOString() },
+      { id: 'msg_1_1', type: 'inbound', text: 'Hi there, I have a question about my booking.', time: new Date(now - 3 * 60 * 1000).toISOString() },
+      { id: 'msg_1_2', type: 'outbound', text: 'Sure, I can help with that. What is your booking ID?', time: new Date(now - 2 * 60 * 1000).toISOString(), status: 'read' },
     ],
     assignedTo: '2', // Assigned to John Doe
     pinned: true,
@@ -62,8 +64,8 @@ export const mockConversations: Conversation[] = [
     lastMessageTimestamp: now - 65 * 60 * 1000, // 1 hour 5 mins ago
     isWindowOpen: true,
     messages: [
-      { id: 'msg_2_1', sender: 'them', text: 'Hello, I booked the Bali trip for next month.', time: new Date(now - 70 * 60 * 1000).toISOString() },
-      { id: 'msg_2_2', sender: 'them', text: 'Is it possible to upgrade my room?', time: new Date(now - 65 * 60 * 1000).toISOString() },
+      { id: 'msg_2_1', type: 'inbound', text: 'Hello, I booked the Bali trip for next month.', time: new Date(now - 70 * 60 * 1000).toISOString() },
+      { id: 'msg_2_2', type: 'inbound', text: 'Is it possible to upgrade my room?', time: new Date(now - 65 * 60 * 1000).toISOString() },
     ],
     assignedTo: null, // Unassigned
     pinned: true,
@@ -80,9 +82,9 @@ export const mockConversations: Conversation[] = [
     lastMessageTimestamp: now - 26 * 60 * 60 * 1000, // 26 hours ago
     isWindowOpen: false, // Window is closed
     messages: [
-      { id: 'msg_3_1', sender: 'them', text: 'I need to cancel my trip.', time: new Date(now - 27 * 60 * 60 * 1000).toISOString() },
-      { id: 'msg_3_2', sender: 'me', text: 'I have processed the cancellation for you. Your reference is CAN-12345.', time: new Date(now - 26.5 * 60 * 60 * 1000).toISOString() },
-      { id: 'msg_3_3', sender: 'them', text: 'Perfect, thank you so much for your help!', time: new Date(now - 26 * 60 * 60 * 1000).toISOString() },
+      { id: 'msg_3_1', type: 'inbound', text: 'I need to cancel my trip.', time: new Date(now - 27 * 60 * 60 * 1000).toISOString() },
+      { id: 'msg_3_2', type: 'outbound', text: 'I have processed the cancellation for you. Your reference is CAN-12345.', time: new Date(now - 26.5 * 60 * 60 * 1000).toISOString(), status: 'read' },
+      { id: 'msg_3_3', type: 'inbound', text: 'Perfect, thank you so much for your help!', time: new Date(now - 26 * 60 * 60 * 1000).toISOString() },
     ],
     assignedTo: '3', // Assigned to Jane Appleseed
     pinned: false,
@@ -99,7 +101,7 @@ export const mockConversations: Conversation[] = [
     lastMessageTimestamp: now - 3 * 24 * 60 * 60 * 1000, // 3 days ago
     isWindowOpen: false,
     messages: [
-      { id: 'msg_4_1', sender: 'them', text: 'Can I add another person to my booking?', time: new Date(now - 3 * 24 * 60 * 60 * 1000).toISOString() },
+      { id: 'msg_4_1', type: 'inbound', text: 'Can I add another person to my booking?', time: new Date(now - 3 * 24 * 60 * 60 * 1000).toISOString() },
     ],
     assignedTo: null,
     pinned: false,
@@ -116,7 +118,7 @@ export const mockConversations: Conversation[] = [
     lastMessageTimestamp: now - 15 * 60 * 1000, // 15 mins ago
     isWindowOpen: true,
     messages: [
-      { id: 'msg_5_1', sender: 'them', text: 'Can you confirm my pickup time please?', time: new Date(now - 15 * 60 * 1000).toISOString() },
+      { id: 'msg_5_1', type: 'inbound', text: 'Can you confirm my pickup time please?', time: new Date(now - 15 * 60 * 1000).toISOString() },
     ],
     assignedTo: null,
     pinned: false,

@@ -17,6 +17,12 @@ import { format, isToday, isYesterday } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
@@ -125,11 +131,13 @@ function ConversationList({
   conversations,
   selectedId,
   onSelect,
+  onTogglePin,
   currentUser,
 }: {
   conversations: Conversation[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  onTogglePin: (id: string) => void;
   currentUser: User | null;
 }) {
   const [search, setSearch] = React.useState('');
@@ -228,6 +236,7 @@ function ConversationList({
               conversation={c}
               selectedId={selectedId}
               onSelect={onSelect}
+              onTogglePin={onTogglePin}
             />
           ))}
         </div>
@@ -240,57 +249,83 @@ function ConversationRow({
   conversation,
   selectedId,
   onSelect,
+  onTogglePin,
 }: {
   conversation: Conversation;
   selectedId: string | null;
   onSelect: (id: string) => void;
+  onTogglePin: (id: string) => void;
 }) {
   const c = conversation;
   const isUnread = (c.unread ?? 0) > 0;
   const isActive = selectedId === c.id;
 
   return (
-    <button
-      key={c.id}
-      data-conv-id={c.id}
-      onClick={() => onSelect(c.id)}
-      className={cn(
-        'w-full border-b px-3 py-2 text-left transition-colors hover:bg-secondary',
-        isActive && 'bg-secondary'
-      )}
-    >
-      <div className="flex items-center gap-3">
-        <Avatar className="h-9 w-9 border" data-ai-hint="person portrait">
-          <AvatarImage src={c.avatar} />
-          <AvatarFallback>{c.name.charAt(0)}</AvatarFallback>
-        </Avatar>
-        <div className="flex-1 overflow-hidden">
-          <div className="flex items-baseline justify-between">
-            <p
-              className={cn(
-                'truncate text-base',
-                isUnread
-                  ? 'font-semibold text-foreground'
-                  : 'font-medium text-muted-foreground'
+    <div className={cn('group relative w-full', isActive && 'bg-secondary')}>
+      <button
+        key={c.id}
+        data-conv-id={c.id}
+        onClick={() => onSelect(c.id)}
+        className={cn(
+          'w-full border-b px-3 py-2 text-left transition-colors hover:bg-secondary'
+        )}
+      >
+        <div className="flex items-center gap-3">
+          <Avatar className="h-9 w-9 border" data-ai-hint="person portrait">
+            <AvatarImage src={c.avatar} />
+            <AvatarFallback>{c.name.charAt(0)}</AvatarFallback>
+          </Avatar>
+          <div className="flex-1 overflow-hidden">
+            <div className="flex items-baseline justify-between">
+              <p
+                className={cn(
+                  'truncate text-base',
+                  isUnread
+                    ? 'font-semibold text-foreground'
+                    : 'font-medium text-muted-foreground'
+                )}
+              >
+                {c.name}
+              </p>
+              <p className="shrink-0 whitespace-nowrap text-xs text-muted-foreground/80">
+                {formatFuzzyDate(c.lastMessageTimestamp)}
+              </p>
+            </div>
+            <div className="mt-0.5 flex items-center justify-between">
+              <p className="truncate text-sm text-muted-foreground">
+                {c.lastMessage}
+              </p>
+              {isUnread && (
+                <div className="h-2 w-2 flex-shrink-0 rounded-full bg-primary" />
               )}
-            >
-              {c.name}
-            </p>
-            <p className="text-xs text-muted-foreground/80 shrink-0 whitespace-nowrap">
-              {formatFuzzyDate(c.lastMessageTimestamp)}
-            </p>
-          </div>
-          <div className="flex items-center justify-between mt-0.5">
-            <p className="truncate text-sm text-muted-foreground">
-              {c.lastMessage}
-            </p>
-            {isUnread && (
-              <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
-            )}
+            </div>
           </div>
         </div>
+      </button>
+      <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 rounded-full"
+            >
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                onTogglePin(c.id);
+              }}
+            >
+              {c.pinned ? 'Unpin Conversation' : 'Pin Conversation'}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -357,10 +392,10 @@ function MessagePanel({
                 )}
               >
                   <div className="inline-flex items-baseline">
-                    <span className='whitespace-pre-wrap break-words'>
+                    <span className="whitespace-pre-wrap break-words">
                       {m.text}
                     </span>
-                    <div className='ml-2 self-end flex-shrink-0 whitespace-nowrap text-xs text-muted-foreground/70'>
+                    <div className="ml-2 self-end flex-shrink-0 whitespace-nowrap text-xs text-muted-foreground/70">
                         <span>{format(new Date(m.time), 'p')}</span>
                         {m.sender === 'me' && (
                           <ReadStatus status={(m as any).status} />
@@ -444,9 +479,11 @@ export default function InboxPage() {
   }, []);
 
   const [conversations, setConversations] = React.useState<Conversation[]>(() => {
-    const pinned = initialConversations.filter((c) => c.pinned);
-    const unpinned = initialConversations.filter((c) => !c.pinned);
-    return [...pinned, ...unpinned];
+    return [...initialConversations].sort((a, b) => {
+        if (a.pinned && !b.pinned) return -1;
+        if (!a.pinned && b.pinned) return 1;
+        return b.lastMessageTimestamp - a.lastMessageTimestamp;
+    });
   });
   
   const [selectedId, setSelectedId] = React.useState<string | null>(conversations[0]?.id || null);
@@ -455,7 +492,6 @@ export default function InboxPage() {
   React.useEffect(() => {
     const interval = setInterval(() => {
       setConversations(convs => {
-        // Find a random conversation that is NOT the currently selected one to mark unread
         const eligibleConvs = convs.filter(c => c.id !== selectedId);
         if (eligibleConvs.length === 0) return convs;
         
@@ -476,12 +512,12 @@ export default function InboxPage() {
               lastMessage: newMessage.text,
               lastMessageTimestamp: newTimestamp,
               unread: (c.unread || 0) + 1,
-              lastCustomerMessageAt: newTimestamp, // SLA: Update customer message time
+              lastCustomerMessageAt: newTimestamp,
             } 
           : c
         );
       });
-    }, 30000); // Receive a new message every 30 seconds
+    }, 30000);
 
     return () => clearInterval(interval);
   }, [selectedId]);
@@ -503,6 +539,19 @@ export default function InboxPage() {
     });
   };
 
+  const handleTogglePin = (id: string) => {
+    setConversations(convs => {
+        const newConvs = convs.map(c => 
+            c.id === id ? { ...c, pinned: !c.pinned } : c
+        );
+        return newConvs.sort((a, b) => {
+            if (a.pinned && !b.pinned) return -1;
+            if (!a.pinned && b.pinned) return 1;
+            return b.lastMessageTimestamp - a.lastMessageTimestamp;
+        });
+    });
+  };
+
   const handleSend = (text: string) => {
      if (!selectedId) return;
 
@@ -518,13 +567,7 @@ export default function InboxPage() {
     setConversations(convs => {
       const newConvs = convs.map(c => {
         if (c.id === selectedId) {
-          // SLA: Update agent message time
           const lastAgentMessageAt = newTimestamp;
-          
-          // SLA: This is where you would calculate the 'conversation state'
-          // const conversationState = c.lastCustomerMessageAt && lastAgentMessageAt > c.lastCustomerMessageAt ? 'waiting_on_customer' : 'waiting_on_agent';
-          // const timeSinceLastCustomerMessage = c.lastCustomerMessageAt ? newTimestamp - c.lastCustomerMessageAt : null;
-          
           return {
             ...c,
             messages: [...c.messages, newMessage],
@@ -536,13 +579,14 @@ export default function InboxPage() {
         return c;
       });
 
-      // Move the updated conversation to the top of the unpinned list
       const updatedConv = newConvs.find(c => c.id === selectedId);
-      if (updatedConv && !updatedConv.pinned) {
-        const otherConvs = newConvs.filter(c => c.id !== selectedId);
-        const pinnedConvs = otherConvs.filter(c => c.pinned);
-        const unpinnedConvs = otherConvs.filter(c => !c.pinned);
-        return [...pinnedConvs, updatedConv, ...unpinnedConvs];
+      if (updatedConv) {
+          const otherConvs = newConvs.filter(c => c.id !== selectedId);
+          return [updatedConv, ...otherConvs].sort((a, b) => {
+            if (a.pinned && !b.pinned) return -1;
+            if (!a.pinned && b.pinned) return 1;
+            return b.lastMessageTimestamp - a.lastMessageTimestamp;
+        });
       }
       return newConvs;
     });
@@ -571,7 +615,6 @@ export default function InboxPage() {
 
   const handleSelectConversation = (id: string) => {
     setSelectedId(id);
-    // Mark as read
     setConversations(convs => convs.map(c => 
       c.id === id ? { ...c, unread: 0 } : c
     ));
@@ -590,6 +633,7 @@ export default function InboxPage() {
           conversations={conversations}
           selectedId={selectedId}
           onSelect={handleSelectConversation}
+          onTogglePin={handleTogglePin}
           currentUser={currentUser}
         />
       </ResizablePanel>

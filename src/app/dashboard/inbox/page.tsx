@@ -292,7 +292,7 @@ function MessagePanel({
             >
               <div
                 className={cn(
-                  'max-w-[75%] rounded-lg px-3 py-2',
+                  'max-w-[75%] rounded-lg px-3 py-2 break-words',
                   m.sender === 'me'
                     ? 'bg-green-100 text-foreground'
                     : 'bg-secondary text-foreground'

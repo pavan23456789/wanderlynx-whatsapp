@@ -325,73 +325,91 @@ function ConversationRow({
   const isActive = selectedId === c.id;
 
   return (
-    <div className={cn('group/row relative w-full', isActive && !isSelected && 'bg-secondary')}>
+    <div
+      data-conv-id={c.id}
+      className={cn(
+        'group/row relative flex w-full cursor-pointer items-center border-b px-3 py-3 text-left transition-colors',
+        isActive && !isSelected && 'bg-secondary',
+        isSelected ? 'bg-primary/10' : 'hover:bg-secondary'
+      )}
+      onClick={() => onSelect(c.id)}
+    >
+      {/* SELECTION ZONE (LEFT) - Appears on hover/selection */}
       <div
         className={cn(
-          'w-full border-b px-3 py-2 text-left transition-colors',
-          isSelected ? 'bg-primary/10' : 'hover:bg-secondary'
+          'flex items-center justify-center self-start transition-all pr-3',
+          isSelected
+            ? 'w-8 opacity-100'
+            : 'w-0 opacity-0 group-hover/row:w-8 group-hover/row:opacity-100'
         )}
+        onClick={(e) => {
+          e.stopPropagation();
+          onSelectId(c.id, !isSelected);
+        }}
       >
-        <div className="flex items-center gap-3">
-          <div className={cn(
-              "flex items-center justify-center transition-all",
-              isSelected ? 'w-5 opacity-100' : 'w-0 opacity-0 group-hover/row:w-5 group-hover/row:opacity-100'
-          )}>
-             <Checkbox 
-                checked={isSelected} 
-                onCheckedChange={(checked) => onSelectId(c.id, Boolean(checked))}
-                className="h-4 w-4"
-             />
-          </div>
-          <button onClick={() => onSelect(c.id)} className="flex-1 w-full flex items-center gap-3 text-left min-w-0" data-conv-id={c.id}>
-            <Avatar className="h-9 w-9 border flex-shrink-0" data-ai-hint="person portrait">
-              <AvatarImage src={c.avatar} />
-              <AvatarFallback>{c.name.charAt(0)}</AvatarFallback>
-            </Avatar>
-            <div className="flex-1 overflow-hidden">
-                {/* Structural hardening for BUG A.
-                    1. The outer div is a flex container with column direction to stack the two rows.
-                    2. The top row uses flex and justify-between to push name and time apart.
-                    3. The bottom row's <p> tag uses `truncate` which applies overflow:hidden, text-overflow:ellipsis and whitespace:nowrap.
-                    This guarantees the preview is always one line and ends with "..." if long.
-                    4. `min-w-0` on parent allows child `truncate` to work correctly.
-                    5. `shrink-0` and `whitespace-nowrap` on timestamp prevents it from wrapping or shrinking. */}
-                <div className="flex justify-between items-baseline">
-                    <p className={cn("truncate font-semibold", isUnread ? "text-foreground" : "text-muted-foreground")}>
-                        {c.name}
-                    </p>
-                    <p className="shrink-0 whitespace-nowrap text-xs text-muted-foreground/80 ml-2">
-                        {formatFuzzyDate(c.lastMessageTimestamp)}
-                    </p>
-                </div>
-                <div className="mt-0.5 flex items-center justify-between">
-                    <p className="truncate text-sm text-muted-foreground">
-                        {c.lastMessage}
-                    </p>
-                    {isUnread && (
-                        <div className="h-2 w-2 flex-shrink-0 rounded-full bg-primary" />
-                    )}
-                </div>
-            </div>
-          </button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-8 w-8 rounded-full opacity-0 group-hover/row:opacity-100 focus:opacity-100"
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    <MoreVertical className="h-4 w-4 text-muted-foreground"/>
-                </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => onTogglePin(c.id)}>
-                    {c.pinned ? 'Unpin Conversation' : 'Pin Conversation'}
-                </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+        <Checkbox checked={isSelected} className="h-4 w-4" />
+      </div>
+
+      {/* AVATAR ZONE */}
+      <div className="flex-shrink-0 pr-3">
+        <Avatar className="h-10 w-10 border" data-ai-hint="person portrait">
+          <AvatarImage src={c.avatar} />
+          <AvatarFallback>{c.name.charAt(0)}</AvatarFallback>
+        </Avatar>
+      </div>
+
+      {/* CONTENT ZONE - min-w-0 is critical for child truncation */}
+      <div className="flex-1 min-w-0">
+        {/* ROW 1: Identity (Name + Timestamp) */}
+        <div className="flex items-baseline justify-between">
+          <p
+            className={cn(
+              'truncate font-semibold',
+              isUnread ? 'text-foreground' : 'text-muted-foreground'
+            )}
+          >
+            {c.name}
+          </p>
+          <p className="ml-2 shrink-0 whitespace-nowrap text-xs text-muted-foreground/80">
+            {formatFuzzyDate(c.lastMessageTimestamp)}
+          </p>
         </div>
+
+        {/* ROW 2: Message Preview */}
+        <div className="mt-0.5 flex items-center justify-between">
+          <p className="truncate text-sm text-muted-foreground">
+            {c.lastMessage}
+          </p>
+        </div>
+      </div>
+
+      {/* STATUS ZONE (RIGHT) */}
+      <div className="ml-3 flex flex-col items-end self-start flex-shrink-0">
+         {c.pinned && <Pin className="h-3.5 w-3.5 text-muted-foreground/70 mb-1.5" />}
+         {isUnread && (
+            <div className="h-2 w-2 flex-shrink-0 rounded-full bg-primary" />
+         )}
+      </div>
+
+      {/* ACTIONS (Absolute position, appears on hover) */}
+      <div className="absolute top-1 right-1">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 rounded-full opacity-0 group-hover/row:opacity-100 focus:opacity-100"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <MoreVertical className="h-4 w-4 text-muted-foreground" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onTogglePin(c.id); }}>
+              {c.pinned ? 'Unpin Conversation' : 'Pin Conversation'}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );
@@ -455,12 +473,12 @@ function MessagePanel({
                     m.type === 'outbound' ? 'justify-end' : 'justify-start'
                 )}
                 >
-                {/* Structural fix for BUG B (Timestamp visibility)
-                  1. The outer div is `relative` to create a positioning context for the timestamp.
-                  2. The text span has right padding (`pr-14`) to reserve horizontal space where text cannot flow.
-                  3. The timestamp div is `absolute` and positioned at the bottom-right of the bubble.
-                  This guarantees the timestamp is always visible in the reserved space and never overlaps the text,
-                  regardless of message length or window size. This is the industry-standard pattern for chat bubbles. */}
+                {/* This is the standard, robust chat bubble structure.
+                    1. The outer div is `relative` to create a positioning context for the timestamp.
+                    2. The text span has right padding (`pr-14`) to reserve horizontal space where text cannot flow.
+                    3. The timestamp div is `absolute` and positioned at the bottom-right corner of the bubble.
+                    This guarantees the timestamp is always visible in its reserved space and never overlaps
+                    the text, regardless of message length or window size. */}
                 <div
                     className={cn(
                     'max-w-[75%] rounded-lg px-3 py-2 shadow-sm relative',
@@ -677,14 +695,20 @@ export default function InboxPage() {
 
   const handleTogglePin = (id: string) => {
     setConversations(convs => {
+      const conv = convs.find(c => c.id === id);
       const newConvs = convs.map(c => c.id === id ? { ...c, pinned: !c.pinned } : c);
-      return newConvs.sort((a, b) => {
+      // Immediately re-sort after pinning/unpinning
+      newConvs.sort((a, b) => {
         if (a.pinned && !b.pinned) return -1;
         if (!a.pinned && b.pinned) return 1;
+        // Pinned items are sorted by last message time amongst themselves
+        if (a.pinned && b.pinned) return b.lastMessageTimestamp - a.lastMessageTimestamp;
+        // Unpinned items are sorted by last message time
         return b.lastMessageTimestamp - a.lastMessageTimestamp;
       });
+      toast({ title: 'Conversation Updated', description: `Conversation has been ${conv?.pinned ? 'unpinned' : 'pinned'}.` });
+      return newConvs;
     });
-     toast({ title: 'Conversation Updated', description: `Conversation has been ${conversations.find(c=>c.id===id)?.pinned ? 'unpinned' : 'pinned'}.` });
   };
 
   const handleBulkMarkRead = () => {

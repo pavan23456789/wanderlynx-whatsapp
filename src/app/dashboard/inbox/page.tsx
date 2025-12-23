@@ -343,22 +343,24 @@ function ConversationRow({
                 className="h-4 w-4"
              />
           </div>
-          <button onClick={() => onSelect(c.id)} className="flex-1 w-full flex items-center gap-3 text-left" data-conv-id={c.id}>
-            <Avatar className="h-9 w-9 border" data-ai-hint="person portrait">
+          <button onClick={() => onSelect(c.id)} className="flex-1 w-full flex items-center gap-3 text-left min-w-0" data-conv-id={c.id}>
+            <Avatar className="h-9 w-9 border flex-shrink-0" data-ai-hint="person portrait">
               <AvatarImage src={c.avatar} />
               <AvatarFallback>{c.name.charAt(0)}</AvatarFallback>
             </Avatar>
             <div className="flex-1 overflow-hidden">
-                {/* This is the structural fix for BUG A.
+                {/* Structural hardening for BUG A.
                     1. The outer div is a flex container with column direction to stack the two rows.
                     2. The top row uses flex and justify-between to push name and time apart.
                     3. The bottom row's <p> tag uses `truncate` which applies overflow:hidden, text-overflow:ellipsis and whitespace:nowrap.
-                    This guarantees the preview is always one line and ends with "..." if long. */}
+                    This guarantees the preview is always one line and ends with "..." if long.
+                    4. `min-w-0` on parent allows child `truncate` to work correctly.
+                    5. `shrink-0` and `whitespace-nowrap` on timestamp prevents it from wrapping or shrinking. */}
                 <div className="flex justify-between items-baseline">
                     <p className={cn("truncate font-semibold", isUnread ? "text-foreground" : "text-muted-foreground")}>
                         {c.name}
                     </p>
-                    <p className="shrink-0 whitespace-nowrap text-xs text-muted-foreground/80">
+                    <p className="shrink-0 whitespace-nowrap text-xs text-muted-foreground/80 ml-2">
                         {formatFuzzyDate(c.lastMessageTimestamp)}
                     </p>
                 </div>
@@ -453,12 +455,12 @@ function MessagePanel({
                     m.type === 'outbound' ? 'justify-end' : 'justify-start'
                 )}
                 >
-                {/* This is the structural fix for BUG B.
-                    1. The outer div is 'relative' to create a positioning context for the timestamp.
-                    2. The text span has right padding (pr-14) to reserve horizontal space where text cannot flow.
-                    3. The timestamp div is 'absolute' and positioned at the bottom-right of the bubble.
-                    This guarantees the timestamp is always visible in the reserved space and never overlaps the text,
-                    regardless of message length or window size. This is the industry-standard pattern. */}
+                {/* Structural fix for BUG B (Timestamp visibility)
+                  1. The outer div is `relative` to create a positioning context for the timestamp.
+                  2. The text span has right padding (`pr-14`) to reserve horizontal space where text cannot flow.
+                  3. The timestamp div is `absolute` and positioned at the bottom-right of the bubble.
+                  This guarantees the timestamp is always visible in the reserved space and never overlaps the text,
+                  regardless of message length or window size. This is the industry-standard pattern for chat bubbles. */}
                 <div
                     className={cn(
                     'max-w-[75%] rounded-lg px-3 py-2 shadow-sm relative',

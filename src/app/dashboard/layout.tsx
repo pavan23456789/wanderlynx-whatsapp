@@ -162,10 +162,8 @@ export default function DashboardLayout({
                 <TravonexLogo className="size-7 text-primary" />
                 <span className="text-md font-semibold">Wanderlynx</span>
             </div>
-            <SidebarTrigger asChild>
-                <Button variant="outline" size="icon" className="h-9 w-9">
-                    <Menu className="size-5" />
-                </Button>
+            <SidebarTrigger variant="outline" size="icon" className="h-9 w-9">
+              <Menu className="size-5" />
             </SidebarTrigger>
         </header>
         {children}

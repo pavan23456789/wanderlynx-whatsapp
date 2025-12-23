@@ -6,10 +6,9 @@ import {
   Search,
   FileText,
   AlertTriangle,
-  RefreshCw,
   MessageSquare,
 } from 'lucide-react';
-import { format, formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow, isToday, isYesterday } from 'date-fns';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,7 +25,6 @@ import {
   SelectContent,
   SelectItem,
 } from '@/components/ui/select';
-import { TooltipProvider } from '@/components/ui/tooltip';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -37,6 +35,16 @@ import {
   type Message,
   type Template,
 } from '@/lib/mock/mockInbox';
+
+/* =================================================================
+   UTILS
+================================================================= */
+const formatFuzzyDate = (date: Date | number) => {
+  const d = new Date(date);
+  if (isToday(d)) return format(d, 'p');
+  if (isYesterday(d)) return 'Yesterday';
+  return format(d, 'MM/dd/yy');
+};
 
 /* =================================================================
    SUB-COMPONENTS
@@ -94,9 +102,7 @@ function ConversationList({
                   <div className="flex items-center justify-between">
                     <p className="truncate font-semibold">{c.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {formatDistanceToNow(new Date(c.lastMessageTimestamp), {
-                        addSuffix: true,
-                      })}
+                      {formatFuzzyDate(c.lastMessageTimestamp)}
                     </p>
                   </div>
                   <p className="mt-1 truncate text-sm text-muted-foreground">
@@ -333,59 +339,57 @@ export default function InboxPage() {
   };
 
   return (
-    <TooltipProvider>
-      <ResizablePanelGroup
-        direction="horizontal"
-        className="h-full max-h-[calc(100vh-theme(spacing.14))] items-stretch md:max-h-screen"
-      >
-        <ResizablePanel defaultSize={25} minSize={20} maxSize={35}>
-          {conversations.length > 0 ? (
-            <ConversationList
-              conversations={conversations}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
+    <ResizablePanelGroup
+      direction="horizontal"
+      className="h-full max-h-[calc(100vh-theme(spacing.14))] items-stretch md:max-h-screen"
+    >
+      <ResizablePanel defaultSize={25} minSize={20} maxSize={35}>
+        {conversations.length > 0 ? (
+          <ConversationList
+            conversations={conversations}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+          />
+        ) : (
+          <div className="flex h-full flex-col items-center justify-center p-4 text-center bg-card">
+            <FileText className="mb-4 h-12 w-12 text-muted-foreground" />
+            <h3 className="text-xl font-semibold">No Conversations Yet</h3>
+            <p className="mt-2 text-muted-foreground">
+              When a customer sends you a message on WhatsApp, it will appear
+              here.
+            </p>
+          </div>
+        )}
+      </ResizablePanel>
+
+      <ResizableHandle withHandle />
+
+      <ResizablePanel defaultSize={75}>
+        {selectedConversation ? (
+          <div className="flex h-full flex-col">
+            <div className="flex-1">
+              <MessagePanel conversation={selectedConversation} />
+            </div>
+            <ReplyBox
+              isWindowOpen={selectedConversation.isWindowOpen}
+              templates={templates}
+              onSend={handleSend}
             />
-          ) : (
-            <div className="flex h-full flex-col items-center justify-center p-4 text-center bg-card">
-              <FileText className="mb-4 h-12 w-12 text-muted-foreground" />
-              <h3 className="text-xl font-semibold">No Conversations Yet</h3>
+          </div>
+        ) : (
+          <div className="flex h-full items-center justify-center p-4 text-center">
+            <div>
+              <MessageSquare className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+              <h3 className="text-xl font-semibold">
+                Select a Conversation
+              </h3>
               <p className="mt-2 text-muted-foreground">
-                When a customer sends you a message on WhatsApp, it will appear
-                here.
+                Choose a conversation from the left panel to see the messages.
               </p>
             </div>
-          )}
-        </ResizablePanel>
-
-        <ResizableHandle withHandle />
-
-        <ResizablePanel defaultSize={75}>
-          {selectedConversation ? (
-            <div className="flex h-full flex-col">
-              <div className="flex-1">
-                <MessagePanel conversation={selectedConversation} />
-              </div>
-              <ReplyBox
-                isWindowOpen={selectedConversation.isWindowOpen}
-                templates={templates}
-                onSend={handleSend}
-              />
-            </div>
-          ) : (
-            <div className="flex h-full items-center justify-center p-4 text-center">
-              <div>
-                <MessageSquare className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-                <h3 className="text-xl font-semibold">
-                  Select a Conversation
-                </h3>
-                <p className="mt-2 text-muted-foreground">
-                  Choose a conversation from the left panel to see the messages.
-                </p>
-              </div>
-            </div>
-          )}
-        </ResizablePanel>
-      </ResizablePanelGroup>
-    </TooltipProvider>
+          </div>
+        )}
+      </ResizablePanel>
+    </ResizablePanelGroup>
   );
 }

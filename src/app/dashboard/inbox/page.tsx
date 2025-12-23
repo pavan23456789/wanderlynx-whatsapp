@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -25,7 +26,6 @@ import {
   mockConversations,
   type Conversation,
   type Message,
-  type Template,
 } from '@/lib/mock/mockInbox';
 
 /* =================================================================
@@ -72,8 +72,8 @@ function ConversationList({
     .filter((c) => c.name.toLowerCase().includes(search.toLowerCase()))
     .filter((c) => (filter === 'unread' ? (c.unread ?? 0) > 0 : true));
   
-  const pinned = filtered.filter(c => c.pinned);
-  const unpinned = filtered.filter(c => !c.pinned);
+  const pinned = filtered.filter(c => (c as any).pinned);
+  const unpinned = filtered.filter(c => !(c as any).pinned);
 
 
   return (
@@ -119,21 +119,24 @@ function ConversationRow({ conversation, selectedId, onSelect }: { conversation:
           onClick={() => onSelect(c.id)}
           className={cn(
             'w-full border-b px-3 py-2 text-left transition-colors hover:bg-secondary',
-            isActive && 'bg-primary/10 hover:bg-primary/20'
+            isActive && 'bg-secondary'
           )}
         >
           <div className="flex items-center gap-3">
              {isUnread && <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />}
-            <Avatar className={cn("h-9 w-9 border", !isUnread && "ml-5")} data-ai-hint="person portrait">
+            <Avatar className={cn("h-8 w-8 border", !isUnread && "ml-5")} data-ai-hint="person portrait">
               <AvatarImage src={c.avatar} />
               <AvatarFallback>{c.name.charAt(0)}</AvatarFallback>
             </Avatar>
             <div className="flex-1 overflow-hidden">
-              <div className="flex items-center justify-between">
-                <p className={cn("truncate font-semibold", isUnread && "font-bold")}>
+              <div className="flex items-baseline justify-between">
+                <p className={cn(
+                  "truncate", 
+                  isUnread ? "font-semibold text-foreground" : "font-medium text-muted-foreground"
+                  )}>
                     {c.name}
                 </p>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground/80">
                   {formatFuzzyDate(c.lastMessageTimestamp)}
                 </p>
               </div>
@@ -198,7 +201,7 @@ function MessagePanel({ conversation }: { conversation: Conversation }) {
                    <p className="text-xs text-muted-foreground/70">
                        {format(new Date(m.time), 'p')}
                    </p>
-                  {m.sender === 'me' && <ReadStatus status={m.status} />}
+                  {m.sender === 'me' && <ReadStatus status={(m as any).status} />}
                 </div>
               </div>
             </div>
@@ -251,10 +254,11 @@ function ReplyBox({
 ================================================================= */
 
 export default function InboxPage() {
-  const [conversations] = React.useState<Conversation[]>(() => [
-    ...mockConversations.filter(c => c.pinned),
-    ...mockConversations.filter(c => !c.pinned)
-  ]);
+  const [conversations] = React.useState<Conversation[]>(() => {
+    const pinned = mockConversations.filter((c: any) => c.pinned);
+    const unpinned = mockConversations.filter((c: any) => !c.pinned);
+    return [...pinned, ...unpinned];
+  });
   const [selectedId, setSelectedId] = React.useState<string | null>(conversations[0]?.id || null);
   const { toast } = useToast();
 
@@ -320,3 +324,5 @@ export default function InboxPage() {
     </ResizablePanelGroup>
   );
 }
+
+    

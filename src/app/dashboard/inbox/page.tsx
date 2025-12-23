@@ -15,7 +15,6 @@ import {
   Pin,
   PinOff,
   Mail,
-  X,
 } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
 
@@ -350,29 +349,24 @@ function ConversationRow({
               <AvatarFallback>{c.name.charAt(0)}</AvatarFallback>
             </Avatar>
             <div className="flex-1 overflow-hidden">
-              <div className="flex items-baseline justify-between">
-                <p
-                  className={cn(
-                    'truncate text-base',
-                    isUnread
-                      ? 'font-semibold text-foreground'
-                      : 'font-medium text-muted-foreground'
-                  )}
-                >
-                  {c.name}
-                </p>
-                <p className="shrink-0 whitespace-nowrap text-xs text-muted-foreground/80">
-                  {formatFuzzyDate(c.lastMessageTimestamp)}
-                </p>
-              </div>
-              <div className="mt-0.5 flex items-center justify-between">
-                <p className="truncate text-sm text-muted-foreground">
-                  {c.lastMessage}
-                </p>
-                {isUnread && (
-                  <div className="h-2 w-2 flex-shrink-0 rounded-full bg-primary" />
-                )}
-              </div>
+                {/* This is the new structural container for the text content. */}
+                {/* It uses flexbox to ensure proper alignment and truncation. */}
+                <div className="flex justify-between items-baseline">
+                    <p className={cn("truncate font-semibold", isUnread ? "text-foreground" : "text-muted-foreground")}>
+                        {c.name}
+                    </p>
+                    <p className="shrink-0 whitespace-nowrap text-xs text-muted-foreground/80">
+                        {formatFuzzyDate(c.lastMessageTimestamp)}
+                    </p>
+                </div>
+                <div className="mt-0.5 flex items-center justify-between">
+                    <p className="truncate text-sm text-muted-foreground">
+                        {c.lastMessage}
+                    </p>
+                    {isUnread && (
+                        <div className="h-2 w-2 flex-shrink-0 rounded-full bg-primary" />
+                    )}
+                </div>
             </div>
           </button>
           <DropdownMenu>
@@ -464,6 +458,9 @@ function MessagePanel({
                         : 'bg-background'
                     )}
                 >
+                    {/* This is the new structural container for the message text and timestamp. */}
+                    {/* It uses inline-flex to keep them in the same flow, allowing text to wrap */}
+                    {/* while the timestamp aligns to the bottom-right of the last line. */}
                     <div className="inline-flex items-baseline">
                         <span className="whitespace-pre-wrap break-words">
                         {m.text}

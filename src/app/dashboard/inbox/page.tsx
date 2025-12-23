@@ -32,6 +32,8 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { mockConversations as initialConversations, type Conversation, type Message } from '@/lib/mock/mockInbox';
 import { mockAgents, type Agent } from '@/lib/mock/mockAgents';
+import { getCurrentUser, User } from '@/lib/auth';
+
 
 // INBOX v1 LOCKED
 // Conversation assignment approved by founder
@@ -40,10 +42,12 @@ function AssignmentPopover({
   agents,
   assignedTo,
   onAssign,
+  disabled,
 }: {
   agents: Agent[];
   assignedTo: string | null | undefined;
   onAssign: (agentId: string | null) => void;
+  disabled?: boolean;
 }) {
   const [open, setOpen] = React.useState(false);
   const assignedAgent = agents.find((a) => a.id === assignedTo);
@@ -55,6 +59,7 @@ function AssignmentPopover({
           variant="ghost"
           size="icon"
           className="h-8 w-8 rounded-full flex-shrink-0"
+          disabled={disabled}
         >
           {assignedAgent ? (
             <Avatar className="h-7 w-7" data-ai-hint="person portrait">
@@ -120,17 +125,23 @@ function ConversationList({
   conversations,
   selectedId,
   onSelect,
+  currentUser,
 }: {
   conversations: Conversation[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  currentUser: User | null;
 }) {
   const [search, setSearch] = React.useState('');
   const [filter, setFilter] = React.useState('all');
 
   const filtered = conversations
     .filter((c) => c.name.toLowerCase().includes(search.toLowerCase()))
-    .filter((c) => (filter === 'unread' ? (c.unread ?? 0) > 0 : true));
+    .filter((c) => {
+        if (filter === 'unread') return (c.unread ?? 0) > 0;
+        if (filter === 'me') return c.assignedTo === currentUser?.id;
+        return true;
+    });
 
   const pinned = filtered.filter((c) => c.pinned);
   const unpinned = filtered.filter((c) => !c.pinned);
@@ -198,6 +209,14 @@ function ConversationList({
                     className="rounded-full h-8 flex-1"
                 >
                     Unread
+                </Button>
+                <Button
+                    variant={filter === 'me' ? 'secondary' : 'ghost'}
+                    size="sm"
+                    onClick={() => setFilter('me')}
+                    className="rounded-full h-8 flex-1"
+                >
+                    Assigned to me
                 </Button>
             </div>
         </div>
@@ -286,9 +305,11 @@ function ConversationRow({
 function MessagePanel({
   conversation,
   onAssign,
+  disabled = false,
 }: {
   conversation: Conversation;
   onAssign: (agentId: string | null) => void;
+  disabled?: boolean;
 }) {
   const scrollAreaRef = React.useRef<HTMLDivElement>(null);
 
@@ -316,6 +337,7 @@ function MessagePanel({
           agents={mockAgents}
           assignedTo={conversation.assignedTo}
           onAssign={onAssign}
+          disabled={disabled}
         />
         <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
             <Search className="h-5 w-5 text-muted-foreground" />
@@ -342,14 +364,16 @@ function MessagePanel({
                     : 'bg-background'
                 )}
               >
-                  <span className="pr-16 break-words whitespace-pre-wrap">
-                    {m.text}
-                  </span>
-                  <div className="absolute bottom-1 right-2 flex items-center gap-1 text-xs text-muted-foreground/70 whitespace-nowrap">
-                    <span>{format(new Date(m.time), 'p')}</span>
-                    {m.sender === 'me' && (
-                      <ReadStatus status={(m as any).status} />
-                    )}
+                  <div className="inline-flex items-baseline">
+                    <span className='whitespace-pre-wrap break-words'>
+                      {m.text}
+                    </span>
+                    <div className='ml-2 self-end flex-shrink-0 whitespace-nowrap text-xs text-muted-foreground/70'>
+                        <span>{format(new Date(m.time), 'p')}</span>
+                        {m.sender === 'me' && (
+                          <ReadStatus status={(m as any).status} />
+                        )}
+                    </div>
                   </div>
               </div>
             </div>
@@ -373,11 +397,11 @@ const ReadStatus = ({ status }: { status?: 'sent' | 'delivered' | 'read' }) => {
   return null;
 };
 
-function ReplyBox({ onSend }: { onSend: (text: string) => void }) {
+function ReplyBox({ onSend, disabled }: { onSend: (text: string) => void; disabled?: boolean }) {
   const [text, setText] = React.useState('');
 
   const handleSend = () => {
-    if (!text.trim()) return;
+    if (!text.trim() || disabled) return;
     onSend(text);
     setText('');
   };
@@ -385,22 +409,24 @@ function ReplyBox({ onSend }: { onSend: (text: string) => void }) {
   return (
     <div className="border-t bg-secondary/70 p-3">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" className="rounded-full h-10 w-10">
+        <Button variant="ghost" size="icon" className="rounded-full h-10 w-10" disabled={disabled}>
             <Paperclip className="h-5 w-5 text-muted-foreground" />
         </Button>
         <Input
-          placeholder="Type a message..."
+          placeholder={disabled ? "Assigned to another agent" : "Type a message..."}
           className="rounded-full h-11 flex-1"
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSend()}
           suppressHydrationWarning
+          disabled={disabled}
         />
         {text.trim() ? (
             <Button
                 size="icon"
                 className="h-10 w-10 rounded-full bg-primary text-primary-foreground"
                 onClick={handleSend}
+                disabled={disabled}
             >
                 <Send className="h-5 w-5" />
             </Button>
@@ -408,6 +434,7 @@ function ReplyBox({ onSend }: { onSend: (text: string) => void }) {
              <Button
                 size="icon"
                 className="h-10 w-10 rounded-full bg-primary text-primary-foreground"
+                disabled={disabled}
             >
                 <Mic className="h-5 w-5" />
             </Button>
@@ -418,7 +445,12 @@ function ReplyBox({ onSend }: { onSend: (text: string) => void }) {
 }
 
 export default function InboxPage() {
-  // Local state to manage conversation data, including assignments
+  const [currentUser, setCurrentUser] = React.useState<User | null>(null);
+
+  React.useEffect(() => {
+    setCurrentUser(getCurrentUser());
+  }, []);
+
   const [conversations, setConversations] = React.useState<Conversation[]>(() => {
     const pinned = initialConversations.filter((c) => c.pinned);
     const unpinned = initialConversations.filter((c) => !c.pinned);
@@ -429,14 +461,17 @@ export default function InboxPage() {
   const { toast } = useToast();
 
   React.useEffect(() => {
-    // Mock receiving a message
     const interval = setInterval(() => {
       setConversations(convs => {
-        const convToUpdate = convs[Math.floor(Math.random() * convs.length)];
+        // Find a random conversation that is NOT the currently selected one to mark unread
+        const eligibleConvs = convs.filter(c => c.id !== selectedId);
+        if (eligibleConvs.length === 0) return convs;
+        
+        const convToUpdate = eligibleConvs[Math.floor(Math.random() * eligibleConvs.length)];
         const newMessage: Message = {
             id: `msg_${Date.now()}`,
             sender: 'them',
-            text: 'This is a new message!',
+            text: 'This is a new incoming message!',
             time: new Date().toISOString(),
           };
           
@@ -455,7 +490,7 @@ export default function InboxPage() {
     }, 30000); // Receive a new message every 30 seconds
 
     return () => clearInterval(interval);
-  }, []);
+  }, [selectedId]);
 
   const selectedConversation = React.useMemo(
     () => conversations.find((c) => c.id === selectedId),
@@ -538,6 +573,8 @@ export default function InboxPage() {
       c.id === id ? { ...c, unread: 0 } : c
     ));
   };
+  
+  const isReadOnly = selectedConversation?.assignedTo && selectedConversation.assignedTo !== currentUser?.id;
 
 
   return (
@@ -550,6 +587,7 @@ export default function InboxPage() {
           conversations={conversations}
           selectedId={selectedId}
           onSelect={handleSelectConversation}
+          currentUser={currentUser}
         />
       </ResizablePanel>
 
@@ -561,8 +599,9 @@ export default function InboxPage() {
             <MessagePanel
               conversation={selectedConversation}
               onAssign={handleAssign}
+              disabled={isReadOnly}
             />
-            <ReplyBox onSend={handleSend} />
+            <ReplyBox onSend={handleSend} disabled={isReadOnly} />
           </div>
         ) : (
           <div className="flex h-full flex-col items-center justify-center p-4 text-center bg-background">

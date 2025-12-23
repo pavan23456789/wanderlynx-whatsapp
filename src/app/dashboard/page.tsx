@@ -23,112 +23,12 @@ import {
   MessageSquare,
   Send,
   ScrollText,
-  AlertTriangle,
 } from 'lucide-react';
 import type { Conversation } from '@/lib/data';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { mockDashboardStats, chartdata, type DashboardStats } from '@/lib/mock/mockDashboard';
-
-const StatCardSkeleton = () => (
-    <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-5 w-5 rounded-full" />
-        </CardHeader>
-        <CardContent>
-            <Skeleton className="h-8 w-16 mb-2" />
-            <Skeleton className="h-3 w-32" />
-        </CardContent>
-    </Card>
-);
+import { mockDashboardStats, chartdata } from '@/lib/mock/mockDashboard';
 
 export default function DashboardPage() {
-  const [stats, setStats] = React.useState<DashboardStats | null>(null);
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
-
-  const fetchData = React.useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    // Simulate API call with mock data
-    setTimeout(() => {
-        // To test error state, uncomment the following line:
-        // setError("Failed to connect to the server. Please check your connection and try again.");
-        
-        // To test with data:
-        setStats(mockDashboardStats);
-        
-        // To test empty state, uncomment the following line:
-        // setStats({ totalContacts: 0, activeCampaigns: 0, totalTemplates: 0, recentConversations: [], messagesSent: 0 });
-        
-        setIsLoading(false);
-    }, 1000);
-  }, []);
-
-  React.useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  if (isLoading) {
-    return (
-        <main className="flex flex-1 flex-col gap-6 p-6 md:gap-8 md:p-10">
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                <StatCardSkeleton />
-                <StatCardSkeleton />
-                <StatCardSkeleton />
-                <StatCardSkeleton />
-            </div>
-             <div className="grid grid-cols-1 gap-6 md:grid-cols-3 md:gap-8">
-                <Card className="md:col-span-2">
-                    <CardHeader>
-                        <Skeleton className="h-6 w-1/3" />
-                        <Skeleton className="h-4 w-2/3" />
-                    </CardHeader>
-                    <CardContent>
-                        <Skeleton className="h-[350px] w-full" />
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <Skeleton className="h-6 w-1/2" />
-                         <Skeleton className="h-4 w-3/4" />
-                    </CardHeader>
-                    <CardContent className="grid gap-6">
-                        {Array.from({ length: 4 }).map((_, i) => (
-                             <div key={i} className="flex items-center gap-4">
-                                <Skeleton className="h-10 w-10 rounded-full" />
-                                <div className="grid gap-1 flex-1">
-                                    <Skeleton className="h-4 w-2/3" />
-                                    <Skeleton className="h-3 w-full" />
-                                </div>
-                            </div>
-                        ))}
-                    </CardContent>
-                </Card>
-            </div>
-        </main>
-    );
-  }
-
-  if (error || !stats) {
-      return (
-        <main className="flex flex-1 flex-col items-center justify-center gap-6 p-6 md:gap-8 md:p-10">
-            <Card className="max-w-lg text-center">
-                <CardHeader>
-                    <div className="mx-auto bg-destructive/10 p-3 rounded-full">
-                        <AlertTriangle className="h-8 w-8 text-destructive" />
-                    </div>
-                    <CardTitle className="mt-4">Could Not Load Dashboard</CardTitle>
-                    <CardDescription>{error || "There was a problem retrieving data from the backend."}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Button onClick={fetchData} className="rounded-full">Retry</Button>
-                </CardContent>
-            </Card>
-        </main>
-      );
-  }
+  const stats = mockDashboardStats;
 
   return (
     <main className="flex flex-1 flex-col gap-6 p-6 md:gap-8 md:p-10">

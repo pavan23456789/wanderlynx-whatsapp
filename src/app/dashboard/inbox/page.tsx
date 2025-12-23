@@ -145,7 +145,14 @@ function ConversationList({
   const [filter, setFilter] = React.useState('all');
 
   const filtered = conversations
-    .filter((c) => c.name.toLowerCase().includes(search.toLowerCase()))
+    .filter((c) => {
+      if (search.trim() === '') return true;
+      const searchTerm = search.toLowerCase();
+      const inName = c.name.toLowerCase().includes(searchTerm);
+      const inPhone = c.phone.toLowerCase().includes(searchTerm);
+      const inMessages = c.messages.some(m => m.text.toLowerCase().includes(searchTerm));
+      return inName || inPhone || inMessages;
+    })
     .filter((c) => {
         if (filter === 'unread') return (c.unread ?? 0) > 0;
         if (filter === 'me') return c.assignedTo === currentUser?.id;

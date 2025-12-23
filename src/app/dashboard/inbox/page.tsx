@@ -222,15 +222,7 @@ function ConversationList({
         </div>
       <ScrollArea className="flex-1 border-r">
         <div className="flex flex-col">
-          {pinned.map((c) => (
-            <ConversationRow
-              key={c.id}
-              conversation={c}
-              selectedId={selectedId}
-              onSelect={onSelect}
-            />
-          ))}
-          {unpinned.map((c) => (
+          {allFilteredConversations.map((c) => (
             <ConversationRow
               key={c.id}
               conversation={c}
@@ -358,7 +350,7 @@ function MessagePanel({
             >
               <div
                 className={cn(
-                  'max-w-[75%] rounded-lg px-3 py-2 shadow-sm relative',
+                  'max-w-[75%] rounded-lg px-3 py-2 shadow-sm',
                   m.sender === 'me'
                     ? 'bg-green-100'
                     : 'bg-background'

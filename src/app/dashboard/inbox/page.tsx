@@ -448,21 +448,20 @@ function MessagePanel({
                     m.type === 'outbound' ? 'justify-end' : 'justify-start'
                 )}
                 >
+                {/* This is the structural fix for the timestamp bug.
+                    1. The outer div is 'relative' to create a positioning context.
+                    2. The text span has right padding (pr-14) to reserve horizontal space for the timestamp.
+                    3. The timestamp div is 'absolute' and positioned at the bottom-right of the bubble.
+                    This guarantees the timestamp is always visible at the bottom-right and never overlaps the text,
+                    as the text cannot flow into the padded area. This is a standard, robust pattern. */}
                 <div
                     className={cn(
-                    'max-w-[75%] rounded-lg px-3 py-2 shadow-sm relative', // BUG FIX: Add 'relative' for positioning context
+                    'max-w-[75%] rounded-lg px-3 py-2 shadow-sm relative',
                     m.type === 'outbound'
                         ? 'bg-green-100'
                         : 'bg-background'
                     )}
                 >
-                    {/*
-                    BUG FIX IMPLEMENTATION:
-                    1. The text span has right padding (pr-14) to reserve horizontal space for the timestamp.
-                    2. The timestamp div is positioned absolutely within the bubble.
-                    This guarantees the timestamp is always visible at the bottom-right and never overlaps the text,
-                    as the text cannot flow into the padded area.
-                    */}
                     <span className="whitespace-pre-wrap break-words pr-14">
                       {m.text}
                     </span>

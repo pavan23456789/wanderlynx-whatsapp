@@ -292,21 +292,19 @@ function MessagePanel({
             >
               <div
                 className={cn(
-                  'max-w-[75%] rounded-lg px-3 py-2 break-words',
+                  'max-w-[75%] rounded-lg px-3 py-2 flex flex-col',
                   m.sender === 'me'
                     ? 'bg-green-100 text-foreground'
                     : 'bg-secondary text-foreground'
                 )}
               >
-                <span className="whitespace-pre-wrap">
-                  {m.text}
-                  <span className="float-right ml-2 mt-2 flex items-center gap-1.5 self-end text-xs text-muted-foreground/70">
-                    {format(new Date(m.time), 'p')}
-                    {m.sender === 'me' && (
-                      <ReadStatus status={(m as any).status} />
-                    )}
-                  </span>
-                </span>
+                <div className="whitespace-pre-wrap break-words">{m.text}</div>
+                <div className="flex items-center gap-1.5 self-end text-xs text-muted-foreground/70 mt-1">
+                  {format(new Date(m.time), 'p')}
+                  {m.sender === 'me' && (
+                    <ReadStatus status={(m as any).status} />
+                  )}
+                </div>
               </div>
             </div>
           ))}

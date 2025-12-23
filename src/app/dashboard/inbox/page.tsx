@@ -12,6 +12,10 @@ import {
   Paperclip,
   Mic,
   FileText,
+  Pin,
+  PinOff,
+  Mail,
+  X,
 } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
 
@@ -40,6 +44,7 @@ import { useToast } from '@/hooks/use-toast';
 import { mockConversations as initialConversations, type Conversation, type Message } from '@/lib/mock/mockInbox';
 import { mockAgents, type Agent } from '@/lib/mock/mockAgents';
 import { getCurrentUser, User } from '@/lib/auth';
+import { Checkbox } from '@/components/ui/checkbox';
 
 
 // INBOX v1 LOCKED
@@ -50,11 +55,13 @@ function AssignmentPopover({
   assignedTo,
   onAssign,
   disabled,
+  isBulk = false,
 }: {
   agents: Agent[];
-  assignedTo: string | null | undefined;
+  assignedTo?: string | null | undefined;
   onAssign: (agentId: string | null) => void;
   disabled?: boolean;
+  isBulk?: boolean;
 }) {
   const [open, setOpen] = React.useState(false);
   const assignedAgent = agents.find((a) => a.id === assignedTo);
@@ -62,21 +69,33 @@ function AssignmentPopover({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 rounded-full flex-shrink-0"
-          disabled={disabled}
-        >
-          {assignedAgent ? (
-            <Avatar className="h-7 w-7" data-ai-hint="person portrait">
-              <AvatarImage src={assignedAgent.avatar} />
-              <AvatarFallback>{assignedAgent.name.charAt(0)}</AvatarFallback>
-            </Avatar>
-          ) : (
-            <UserPlus className="h-4 w-4 text-muted-foreground" />
-          )}
-        </Button>
+        {isBulk ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 gap-2"
+            disabled={disabled}
+          >
+            <UserPlus className="h-4 w-4" />
+            <span>Assign</span>
+          </Button>
+        ) : (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-full flex-shrink-0"
+            disabled={disabled}
+          >
+            {assignedAgent ? (
+              <Avatar className="h-7 w-7" data-ai-hint="person portrait">
+                <AvatarImage src={assignedAgent.avatar} />
+                <AvatarFallback>{assignedAgent.name.charAt(0)}</AvatarFallback>
+              </Avatar>
+            ) : (
+              <UserPlus className="h-4 w-4 text-muted-foreground" />
+            )}
+          </Button>
+        )}
       </PopoverTrigger>
       <PopoverContent className="w-64 p-0">
         <div className="p-2 font-semibold text-sm">Assign to...</div>
@@ -96,14 +115,14 @@ function AssignmentPopover({
                   <AvatarFallback>{agent.name.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <span className="text-sm">{agent.name}</span>
-                {assignedTo === agent.id && (
+                {!isBulk && assignedTo === agent.id && (
                   <Check className="h-4 w-4 ml-auto text-primary" />
                 )}
               </button>
             ))}
           </div>
         </ScrollArea>
-        {assignedTo && (
+        {assignedTo && !isBulk && (
           <div className="border-t p-1">
             <button
               onClick={() => {
@@ -132,14 +151,22 @@ function ConversationList({
   conversations,
   selectedId,
   onSelect,
-  onTogglePin,
   currentUser,
+  selectedIds,
+  onSelectId,
+  onBulkAssign,
+  onBulkPin,
+  onBulkMarkRead,
 }: {
   conversations: Conversation[];
   selectedId: string | null;
   onSelect: (id: string) => void;
-  onTogglePin: (id: string) => void;
   currentUser: User | null;
+  selectedIds: string[];
+  onSelectId: (id: string, checked: boolean) => void;
+  onBulkAssign: (agentId: string | null) => void;
+  onBulkPin: (pinned: boolean) => void;
+  onBulkMarkRead: () => void;
 }) {
   const [search, setSearch] = React.useState('');
   const [filter, setFilter] = React.useState('all');
@@ -164,6 +191,11 @@ function ConversationList({
   
   const allFilteredConversations = [...pinned, ...unpinned];
 
+  const handleSelectAll = (checked: boolean) => {
+    allFilteredConversations.forEach(c => onSelectId(c.id, checked));
+  };
+  
+  const isAllSelected = allFilteredConversations.length > 0 && allFilteredConversations.every(c => selectedIds.includes(c.id));
 
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -199,16 +231,36 @@ function ConversationList({
   return (
     <div className="h-full flex flex-col bg-background">
         <div className="flex-shrink-0 p-3 border-b border-r">
-             <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                    placeholder="Search..."
-                    className="h-9 rounded-full bg-secondary pl-9"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    suppressHydrationWarning
-                />
-            </div>
+             {selectedIds.length > 0 ? (
+                 <div className="h-9 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                         <Checkbox
+                            id="select-all"
+                            checked={isAllSelected}
+                            onCheckedChange={(checked) => handleSelectAll(Boolean(checked))}
+                            aria-label="Select all"
+                         />
+                         <label htmlFor="select-all" className="text-sm font-medium">{selectedIds.length} selected</label>
+                    </div>
+                     <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="sm" className="h-8 gap-2" onClick={onBulkMarkRead}><Mail className="h-4 w-4"/><span>Read</span></Button>
+                        <AssignmentPopover agents={mockAgents} onAssign={onBulkAssign} isBulk />
+                        <Button variant="ghost" size="sm" className="h-8 gap-2" onClick={() => onBulkPin(true)}><Pin className="h-4 w-4"/><span>Pin</span></Button>
+                        <Button variant="ghost" size="sm" className="h-8 gap-2" onClick={() => onBulkPin(false)}><PinOff className="h-4 w-4"/><span>Unpin</span></Button>
+                     </div>
+                 </div>
+             ) : (
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                        placeholder="Search..."
+                        className="h-9 rounded-full bg-secondary pl-9"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        suppressHydrationWarning
+                    />
+                </div>
+             )}
              <div className="mt-3 flex gap-2">
                 <Button
                     variant={filter === 'all' ? 'secondary' : 'ghost'}
@@ -243,8 +295,9 @@ function ConversationList({
               key={c.id}
               conversation={c}
               selectedId={selectedId}
+              isSelected={selectedIds.includes(c.id)}
               onSelect={onSelect}
-              onTogglePin={onTogglePin}
+              onSelectId={onSelectId}
             />
           ))}
         </div>
@@ -256,82 +309,71 @@ function ConversationList({
 function ConversationRow({
   conversation,
   selectedId,
+  isSelected,
   onSelect,
-  onTogglePin,
+  onSelectId,
 }: {
   conversation: Conversation;
   selectedId: string | null;
+  isSelected: boolean;
   onSelect: (id: string) => void;
-  onTogglePin: (id: string) => void;
+  onSelectId: (id: string, checked: boolean) => void;
 }) {
   const c = conversation;
   const isUnread = (c.unread ?? 0) > 0;
   const isActive = selectedId === c.id;
 
   return (
-    <div className={cn('group relative w-full', isActive && 'bg-secondary')}>
-      <button
-        key={c.id}
-        data-conv-id={c.id}
-        onClick={() => onSelect(c.id)}
+    <div className={cn('group/row relative w-full', isActive && !isSelected && 'bg-secondary')}>
+      <div
         className={cn(
-          'w-full border-b px-3 py-2 text-left transition-colors hover:bg-secondary'
+          'w-full border-b px-3 py-2 text-left transition-colors',
+          isSelected ? 'bg-primary/10' : 'hover:bg-secondary'
         )}
       >
         <div className="flex items-center gap-3">
-          <Avatar className="h-9 w-9 border" data-ai-hint="person portrait">
-            <AvatarImage src={c.avatar} />
-            <AvatarFallback>{c.name.charAt(0)}</AvatarFallback>
-          </Avatar>
-          <div className="flex-1 overflow-hidden">
-            <div className="flex items-baseline justify-between">
-              <p
-                className={cn(
-                  'truncate text-base',
-                  isUnread
-                    ? 'font-semibold text-foreground'
-                    : 'font-medium text-muted-foreground'
-                )}
-              >
-                {c.name}
-              </p>
-              <p className="shrink-0 whitespace-nowrap text-xs text-muted-foreground/80">
-                {formatFuzzyDate(c.lastMessageTimestamp)}
-              </p>
-            </div>
-            <div className="mt-0.5 flex items-center justify-between">
-              <p className="truncate text-sm text-muted-foreground">
-                {c.lastMessage}
-              </p>
-              {isUnread && (
-                <div className="h-2 w-2 flex-shrink-0 rounded-full bg-primary" />
-              )}
-            </div>
+          <div className={cn(
+              "flex items-center justify-center transition-all",
+              isSelected ? 'w-5 opacity-100' : 'w-0 opacity-0 group-hover/row:w-5 group-hover/row:opacity-100'
+          )}>
+             <Checkbox 
+                checked={isSelected} 
+                onCheckedChange={(checked) => onSelectId(c.id, Boolean(checked))}
+                className="h-4 w-4"
+             />
           </div>
+          <button onClick={() => onSelect(c.id)} className="flex-1 w-full flex items-center gap-3 text-left" data-conv-id={c.id}>
+            <Avatar className="h-9 w-9 border" data-ai-hint="person portrait">
+              <AvatarImage src={c.avatar} />
+              <AvatarFallback>{c.name.charAt(0)}</AvatarFallback>
+            </Avatar>
+            <div className="flex-1 overflow-hidden">
+              <div className="flex items-baseline justify-between">
+                <p
+                  className={cn(
+                    'truncate text-base',
+                    isUnread
+                      ? 'font-semibold text-foreground'
+                      : 'font-medium text-muted-foreground'
+                  )}
+                >
+                  {c.name}
+                </p>
+                <p className="shrink-0 whitespace-nowrap text-xs text-muted-foreground/80">
+                  {formatFuzzyDate(c.lastMessageTimestamp)}
+                </p>
+              </div>
+              <div className="mt-0.5 flex items-center justify-between">
+                <p className="truncate text-sm text-muted-foreground">
+                  {c.lastMessage}
+                </p>
+                {isUnread && (
+                  <div className="h-2 w-2 flex-shrink-0 rounded-full bg-primary" />
+                )}
+              </div>
+            </div>
+          </button>
         </div>
-      </button>
-      <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 rounded-full"
-            >
-              <MoreVertical className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              onClick={(e) => {
-                e.stopPropagation();
-                onTogglePin(c.id);
-              }}
-            >
-              {c.pinned ? 'Unpin Conversation' : 'Pin Conversation'}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
     </div>
   );
@@ -521,6 +563,7 @@ export default function InboxPage() {
   });
   
   const [selectedId, setSelectedId] = React.useState<string | null>(conversations[0]?.id || null);
+  const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
   const { toast } = useToast();
 
   React.useEffect(() => {
@@ -561,6 +604,16 @@ export default function InboxPage() {
     [selectedId, conversations]
   );
   
+  const handleSelectId = (id: string, checked: boolean) => {
+    setSelectedIds(prev => {
+        if (checked) {
+            return [...prev, id];
+        } else {
+            return prev.filter(i => i !== id);
+        }
+    });
+  };
+
   const handleAssign = (agentId: string | null) => {
     if (!selectedId) return;
     setConversations(convs => convs.map(c => 
@@ -573,10 +626,19 @@ export default function InboxPage() {
     });
   };
 
-  const handleTogglePin = (id: string) => {
+  const handleBulkAssign = (agentId: string | null) => {
+    setConversations(convs => convs.map(c => 
+        selectedIds.includes(c.id) ? { ...c, assignedTo: agentId } : c
+    ));
+    const agentName = agentId ? mockAgents.find(a => a.id === agentId)?.name : 'unassigned';
+    toast({ title: 'Bulk Action', description: `${selectedIds.length} conversations assigned to ${agentName}.` });
+    setSelectedIds([]);
+  };
+  
+  const handleBulkPin = (pinned: boolean) => {
     setConversations(convs => {
         const newConvs = convs.map(c => 
-            c.id === id ? { ...c, pinned: !c.pinned } : c
+            selectedIds.includes(c.id) ? { ...c, pinned } : c
         );
         return newConvs.sort((a, b) => {
             if (a.pinned && !b.pinned) return -1;
@@ -584,6 +646,16 @@ export default function InboxPage() {
             return b.lastMessageTimestamp - a.lastMessageTimestamp;
         });
     });
+    toast({ title: 'Bulk Action', description: `${selectedIds.length} conversations ${pinned ? 'pinned' : 'unpinned'}.` });
+    setSelectedIds([]);
+  };
+
+  const handleBulkMarkRead = () => {
+    setConversations(convs => convs.map(c => 
+        selectedIds.includes(c.id) ? { ...c, unread: 0 } : c
+    ));
+    toast({ title: 'Bulk Action', description: `${selectedIds.length} conversations marked as read.` });
+    setSelectedIds([]);
   };
 
   const handleSend = (text: string) => {
@@ -668,6 +740,7 @@ export default function InboxPage() {
     setConversations(convs => convs.map(c => 
       c.id === id ? { ...c, unread: 0 } : c
     ));
+    setSelectedIds([]); // Clear bulk selection when a single conversation is selected
   };
   
   const isReadOnly = selectedConversation?.assignedTo && selectedConversation.assignedTo !== currentUser?.id;
@@ -683,8 +756,12 @@ export default function InboxPage() {
           conversations={conversations}
           selectedId={selectedId}
           onSelect={handleSelectConversation}
-          onTogglePin={handleTogglePin}
           currentUser={currentUser}
+          selectedIds={selectedIds}
+          onSelectId={handleSelectId}
+          onBulkAssign={handleBulkAssign}
+          onBulkPin={handleBulkPin}
+          onBulkMarkRead={handleBulkMarkRead}
         />
       </ResizablePanel>
 

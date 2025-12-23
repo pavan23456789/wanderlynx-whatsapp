@@ -301,22 +301,22 @@ function MessagePanel({
             >
               <div
                 className={cn(
-                  'max-w-[75%] rounded-lg px-3 py-2 shadow-sm relative',
+                  'max-w-[75%] rounded-lg px-3 py-2 shadow-sm',
                   m.sender === 'me'
                     ? 'bg-green-100'
                     : 'bg-background'
                 )}
               >
                 <div className="inline-flex items-baseline">
-                  <span className="whitespace-pre-wrap break-words pr-12">
+                  <span className="whitespace-pre-wrap break-words">
                     {m.text}
                   </span>
-                </div>
-                 <div className="absolute bottom-1 right-2 flex items-center gap-1 text-xs text-muted-foreground/70 whitespace-nowrap">
-                  <span>{format(new Date(m.time), 'p')}</span>
-                  {m.sender === 'me' && (
-                    <ReadStatus status={(m as any).status} />
-                  )}
+                  <div className="ml-2 self-end flex-shrink-0 whitespace-nowrap text-xs text-muted-foreground/70">
+                    <span>{format(new Date(m.time), 'p')}</span>
+                    {m.sender === 'me' && (
+                      <ReadStatus status={(m as any).status} />
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -329,13 +329,13 @@ function MessagePanel({
 
 const ReadStatus = ({ status }: { status?: 'sent' | 'delivered' | 'read' }) => {
   if (!status || status === 'sent') {
-    return <Check className="h-4 w-4 text-muted-foreground" />;
+    return <Check className="h-4 w-4 inline text-muted-foreground" />;
   }
   if (status === 'delivered') {
-    return <CheckCheck className="h-4 w-4 text-muted-foreground" />;
+    return <CheckCheck className="h-4 w-4 inline text-muted-foreground" />;
   }
   if (status === 'read') {
-    return <CheckCheck className="h-4 w-4 text-blue-500" />;
+    return <CheckCheck className="h-4 w-4 inline text-blue-500" />;
   }
   return null;
 };

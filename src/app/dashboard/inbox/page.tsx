@@ -222,7 +222,7 @@ function ConversationRow({
           <div className="flex items-baseline justify-between">
             <p
               className={cn(
-                'truncate',
+                'truncate text-base',
                 isUnread
                   ? 'font-semibold text-foreground'
                   : 'font-medium text-muted-foreground'
@@ -420,7 +420,7 @@ export default function InboxPage() {
     };
 
     setConversations(convs => {
-      return convs.map(c => {
+      const newConvs = convs.map(c => {
         if (c.id === selectedId) {
           return {
             ...c,
@@ -431,6 +431,16 @@ export default function InboxPage() {
         }
         return c;
       });
+
+      // Move the updated conversation to the top of the unpinned list
+      const updatedConv = newConvs.find(c => c.id === selectedId);
+      if (updatedConv && !updatedConv.pinned) {
+        const otherConvs = newConvs.filter(c => c.id !== selectedId);
+        const pinnedConvs = otherConvs.filter(c => c.pinned);
+        const unpinnedConvs = otherConvs.filter(c => !c.pinned);
+        return [...pinnedConvs, updatedConv, ...unpinnedConvs];
+      }
+      return newConvs;
     });
     
     // Mock status updates
@@ -455,6 +465,15 @@ export default function InboxPage() {
 
   };
 
+  const handleSelectConversation = (id: string) => {
+    setSelectedId(id);
+    // Mark as read
+    setConversations(convs => convs.map(c => 
+      c.id === id ? { ...c, unread: 0 } : c
+    ));
+  };
+
+
   return (
     <ResizablePanelGroup
       direction="horizontal"
@@ -464,7 +483,7 @@ export default function InboxPage() {
         <ConversationList
           conversations={conversations}
           selectedId={selectedId}
-          onSelect={setSelectedId}
+          onSelect={handleSelectConversation}
         />
       </ResizablePanel>
 

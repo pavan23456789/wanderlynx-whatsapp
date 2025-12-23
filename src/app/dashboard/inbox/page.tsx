@@ -298,13 +298,15 @@ function MessagePanel({
                     : 'bg-secondary text-foreground'
                 )}
               >
-                <p className="whitespace-pre-wrap">{m.text}</p>
-                <div className="mt-1 flex items-center justify-end gap-1.5">
-                  <p className="text-xs text-muted-foreground/70">
+                <span className="whitespace-pre-wrap">
+                  {m.text}
+                  <span className="float-right ml-2 mt-2 flex items-center gap-1.5 self-end text-xs text-muted-foreground/70">
                     {format(new Date(m.time), 'p')}
-                  </p>
-                  {m.sender === 'me' && <ReadStatus status={(m as any).status} />}
-                </div>
+                    {m.sender === 'me' && (
+                      <ReadStatus status={(m as any).status} />
+                    )}
+                  </span>
+                </span>
               </div>
             </div>
           ))}

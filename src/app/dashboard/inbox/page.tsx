@@ -301,23 +301,19 @@ function MessagePanel({
             >
               <div
                 className={cn(
-                  'max-w-[75%] rounded-lg px-3 py-2 flex flex-col shadow-sm',
+                  'max-w-[75%] rounded-lg px-3 py-2 flex flex-col shadow-sm relative',
                   m.sender === 'me'
                     ? 'bg-green-100'
                     : 'bg-background'
                 )}
               >
-                <div className="flex items-end">
-                    <span className="whitespace-pre-wrap break-words">{m.text}</span>
-                    <div className="flex-shrink-0 ml-2 self-end text-xs text-muted-foreground/70">
-                        <div className="flex items-center gap-1">
-                        <span>{format(new Date(m.time), 'p')}</span>
-                        {m.sender === 'me' && (
-                            <ReadStatus status={(m as any).status} />
-                        )}
-                        </div>
-                    </div>
-                </div>
+                  <span className="pr-12 whitespace-pre-wrap break-words">{m.text}</span>
+                  <div className="absolute bottom-1.5 right-2 flex items-center gap-1 text-xs text-muted-foreground/70 whitespace-nowrap">
+                    <span>{format(new Date(m.time), 'p')}</span>
+                    {m.sender === 'me' && (
+                        <ReadStatus status={(m as any).status} />
+                    )}
+                  </div>
               </div>
             </div>
           ))}

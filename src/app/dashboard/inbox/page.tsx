@@ -348,7 +348,7 @@ function ConversationRow({
       >
         <Checkbox checked={isSelected} className="h-4 w-4" />
       </div>
-
+      
       {/* AVATAR ZONE (LEFT) - Fixed width */}
       <div className="flex-shrink-0 pr-3">
         <Avatar className="h-10 w-10 border" data-ai-hint="person portrait">
@@ -371,7 +371,7 @@ function ConversationRow({
 
         {/* ROW 2: Message Preview */}
         <div className="mt-0.5 flex items-center justify-between">
-          <p className="truncate text-sm text-muted-foreground overflow-hidden whitespace-nowrap">
+          <p className="truncate text-sm text-muted-foreground">
             {c.lastMessage}
           </p>
         </div>
@@ -384,7 +384,7 @@ function ConversationRow({
             <div className="h-2 w-2 flex-shrink-0 rounded-full bg-primary" />
          )}
       </div>
-
+      
       {/* ACTIONS (Absolute position, appears on hover) */}
       <div className="absolute top-1 right-1">
         <DropdownMenu>

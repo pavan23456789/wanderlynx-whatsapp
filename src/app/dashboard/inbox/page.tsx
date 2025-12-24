@@ -328,7 +328,7 @@ function ConversationRow({
     <div
       data-conv-id={c.id}
       className={cn(
-        'group/row relative flex w-full cursor-pointer items-center border-b px-3 py-3 text-left transition-colors',
+        'group/row relative flex w-full cursor-pointer items-start border-b px-3 py-3 text-left transition-colors',
         isActive && !isSelected && 'bg-secondary',
         isSelected ? 'bg-primary/10' : 'hover:bg-secondary'
       )}
@@ -336,7 +336,7 @@ function ConversationRow({
     >
       <div
         className={cn(
-          'flex items-center justify-center self-start transition-all pr-3',
+          'flex items-center justify-center self-center transition-all pr-3',
           isSelected
             ? 'w-8 opacity-100'
             : 'w-0 opacity-0 group-hover/row:w-8 group-hover/row:opacity-100'
@@ -349,7 +349,7 @@ function ConversationRow({
         <Checkbox checked={isSelected} className="h-4 w-4" />
       </div>
       
-      {/* AVATAR ZONE (LEFT) - Fixed width */}
+      {/* AVATAR ZONE (LEFT) - Fixed width, shrink-0 */}
       <div className="flex-shrink-0 pr-3">
         <Avatar className="h-10 w-10 border" data-ai-hint="person portrait">
           <AvatarImage src={c.avatar} />
@@ -357,28 +357,29 @@ function ConversationRow({
         </Avatar>
       </div>
 
-      {/* CONTENT ZONE (CENTER) - Flexible, two-row structure */}
-      <div className="flex-1 min-w-0">
+      {/* CONTENT ZONE (CENTER) - flex-1 and min-w-0 to allow truncation */}
+      <div className="flex-1 min-w-0 flex flex-col">
         {/* ROW 1: Identity (Name + Timestamp) */}
         <div className="flex items-baseline justify-between">
           <p className={cn('truncate font-semibold', isUnread ? 'text-foreground' : 'text-muted-foreground')}>
             {c.name}
           </p>
-          <p className="ml-2 shrink-0 whitespace-nowrap text-xs text-muted-foreground/80">
-            {formatFuzzyDate(c.lastMessageTimestamp)}
-          </p>
+          {/* Timestamp moved to Status Zone */}
         </div>
 
         {/* ROW 2: Message Preview */}
-        <div className="mt-0.5 flex items-center justify-between">
+        <div className="mt-0.5">
           <p className="truncate text-sm text-muted-foreground">
             {c.lastMessage}
           </p>
         </div>
       </div>
-
-      {/* STATUS ZONE (RIGHT) - Fixed width */}
+      
+      {/* STATUS ZONE (RIGHT) - Fixed width, shrink-0 */}
       <div className="ml-3 flex flex-col items-end self-start flex-shrink-0">
+          <p className="shrink-0 whitespace-nowrap text-xs text-muted-foreground/80 mb-1.5">
+            {formatFuzzyDate(c.lastMessageTimestamp)}
+          </p>
          {c.pinned && <Pin className="h-3.5 w-3.5 text-muted-foreground/70 mb-1.5" />}
          {isUnread && (
             <div className="h-2 w-2 flex-shrink-0 rounded-full bg-primary" />

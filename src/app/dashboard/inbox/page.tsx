@@ -452,13 +452,13 @@ function ConversationRow({
           <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
             {c.unread}
           </div>
+        ) : c.pinned ? (
+          <Pin className="h-4 w-4 text-muted-foreground/70" />
         ) : lastMessageIsOutbound ? (
           <ReadStatus
             status={lastMessage.status}
             className="h-4 w-4 text-muted-foreground/70"
           />
-        ) : c.pinned ? (
-          <Pin className="h-4 w-4 text-muted-foreground/70" />
         ) : (
           <div className="h-5 w-5" /> // Placeholder for alignment
         )}
@@ -929,15 +929,16 @@ export default function InboxPage() {
       <ResizableHandle withHandle />
 
       <ResizablePanel defaultSize={75} className="min-w-0">
+        <div className="flex h-full flex-col min-w-0">
         {selectedConversation ? (
-          <div className="h-full flex flex-col min-w-0">
+          <>
             <MessagePanel
               conversation={selectedConversation}
               onAssign={handleAssign}
               disabled={!!isReadOnly}
             />
             <ReplyBox onSend={handleSend} disabled={!!isReadOnly} />
-          </div>
+          </>
         ) : (
           <div className="flex h-full flex-col items-center justify-center p-4 text-center bg-background">
             <div className="text-center">
@@ -949,6 +950,7 @@ export default function InboxPage() {
             </div>
           </div>
         )}
+        </div>
       </ResizablePanel>
     </ResizablePanelGroup>
   );

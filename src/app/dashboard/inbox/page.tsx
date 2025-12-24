@@ -287,7 +287,7 @@ function ConversationList({
             </div>
         </div>
       <ScrollArea className="flex-1 border-r">
-        <div className="flex flex-col">
+          <div className="flex min-h-full flex-col">
           {allFilteredConversations.map((c) => (
             <ConversationRow
               key={c.id}
@@ -311,7 +311,7 @@ function ConversationList({
  * DO NOT MODIFY without explicit approval.
  */
 function ConversationRow({
-  conversation,
+  conversation: c,
   selectedId,
   isSelected,
   onSelect,
@@ -325,68 +325,82 @@ function ConversationRow({
   onSelectId: (id: string, checked: boolean) => void;
   onTogglePin: (id: string) => void;
 }) {
-  const c = conversation;
-  const isUnread = (c.unread ?? 0) > 0;
   const isActive = selectedId === c.id;
+  const isUnread = (c.unread ?? 0) > 0;
+  const lastMessage = c.messages[c.messages.length - 1];
 
   return (
     <div
       data-conv-id={c.id}
       onClick={() => onSelect(c.id)}
       className={cn(
-        'group/row relative flex w-full items-center cursor-pointer border-b px-3 py-3 transition-colors',
+        'group/row relative flex w-full cursor-pointer border-b px-3 py-3 transition-colors',
         isActive && !isSelected && 'bg-secondary',
         isSelected ? 'bg-primary/10' : 'hover:bg-secondary'
       )}
     >
-      {/* SELECTION ZONE — FIXED WIDTH */}
-      <div className="flex w-8 items-center justify-center">
-        <Checkbox
-          checked={isSelected}
-          onClick={(e) => {
-            e.stopPropagation();
-            onSelectId(c.id, !isSelected);
-          }}
-          className={cn(
-            'h-4 w-4 transition-opacity',
-            isSelected ? 'opacity-100' : 'opacity-0 group-hover/row:opacity-100'
-          )}
-        />
-      </div>
-
-      {/* AVATAR ZONE */}
+      {/* --- AVATAR ZONE (fixed) --- */}
       <div className="flex-shrink-0 pr-3">
-        <Avatar className="h-10 w-10 border">
-          <AvatarImage src={c.avatar} />
-          <AvatarFallback>{c.name.charAt(0)}</AvatarFallback>
-        </Avatar>
+        <div className="flex w-12 flex-shrink-0 items-center justify-center">
+          <Checkbox
+            checked={isSelected}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelectId(c.id, !isSelected);
+            }}
+            className={cn(
+              'absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 transition-opacity',
+              isSelected
+                ? 'opacity-100'
+                : 'opacity-0 group-hover/row:opacity-100'
+            )}
+          />
+          <Avatar
+            className={cn(
+              'h-10 w-10 border transition-transform',
+              isSelected && 'scale-0'
+            )}
+          >
+            <AvatarImage src={c.avatar} />
+            <AvatarFallback>{c.name.charAt(0)}</AvatarFallback>
+          </Avatar>
+        </div>
       </div>
 
-      {/* CONTENT ZONE — STRICT TWO ROWS */}
-      <div className="flex min-w-0 flex-1 flex-col justify-center">
-        <p
-          className={cn(
-            'truncate font-semibold',
-            isUnread ? 'text-foreground' : 'text-muted-foreground'
-          )}
-        >
-          {c.name}
-        </p>
-        <p className="mt-0.5 truncate text-sm text-muted-foreground">
-          {c.lastMessage}
-        </p>
+      {/* --- CONTENT ZONE (flexible) --- */}
+      <div className="min-w-0 flex-1">
+        {/* Row 1: Name + Timestamp */}
+        <div className="flex items-center justify-between">
+          <p className="truncate font-semibold">{c.name}</p>
+          <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">
+            {formatFuzzyDate(c.lastMessageTimestamp)}
+          </span>
+        </div>
+
+        {/* Row 2: Preview + Status */}
+        <div className="flex items-center justify-between">
+          <div className="flex min-w-0 items-center gap-1">
+            {lastMessage?.type === 'outbound' && (
+              <ReadStatus status={lastMessage.status} />
+            )}
+            <p className="truncate text-sm text-muted-foreground">
+              {c.lastMessage}
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center">
+            {c.pinned && (
+              <Pin className="h-3.5 w-3.5 text-muted-foreground/70" />
+            )}
+            {isUnread && (
+              <div className="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                {c.unread}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* STATUS ZONE — FIXED WIDTH */}
-      <div className="ml-3 flex w-[48px] flex-shrink-0 flex-col items-end justify-center">
-        <p className="whitespace-nowrap text-xs text-muted-foreground/80">
-          {formatFuzzyDate(c.lastMessageTimestamp)}
-        </p>
-        {c.pinned && <Pin className="mt-1 h-3.5 w-3.5 text-muted-foreground/70" />}
-        {isUnread && <div className="mt-1 h-2 w-2 rounded-full bg-primary" />}
-      </div>
-
-      {/* ACTIONS */}
+      {/* --- ACTIONS (hidden on hover) --- */}
       <div className="absolute right-1 top-1">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -409,6 +423,7 @@ function ConversationRow({
     </div>
   );
 }
+
 
 function MessagePanel({
   conversation,

@@ -378,7 +378,6 @@ function ConversationRow({
   const lastMessage = c.messages[c.messages.length - 1];
   const lastMessageIsOutbound = lastMessage?.type === 'outbound';
 
-  // The conversation row is now a flex container
   return (
     <div
       data-conv-id={c.id}
@@ -954,3 +953,5 @@ export default function InboxPage() {
     </ResizablePanelGroup>
   );
 }
+
+    

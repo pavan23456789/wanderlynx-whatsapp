@@ -375,20 +375,21 @@ function ConversationRow({
   const c = conversation;
   const isUnread = (c.unread ?? 0) > 0;
   const isActive = selectedId === c.id;
-  const lastMessageIsOutbound = c.messages[c.messages.length - 1]?.type === 'outbound';
+  const lastMessage = c.messages[c.messages.length - 1];
+  const lastMessageIsOutbound = lastMessage?.type === 'outbound';
 
   return (
     <div
       data-conv-id={c.id}
       onClick={() => onSelect(c.id)}
       className={cn(
-        'flex w-full items-center border-b px-3 py-3 cursor-pointer',
+        'flex w-full cursor-pointer items-start border-b p-3',
         isActive && 'bg-secondary',
         isSelected && 'bg-primary/10'
       )}
     >
       {/* Zone 1: Selection & Avatar */}
-      <div className="flex items-center gap-3 pr-3 shrink-0">
+      <div className="flex items-center gap-3 pr-3 pt-1 shrink-0">
         <Checkbox
           checked={isSelected}
           onClick={(e) => {
@@ -416,7 +417,7 @@ function ConversationRow({
             <p className="truncate font-bold text-foreground">{c.lastMessage}</p>
           ) : (
             <>
-              {lastMessageIsOutbound && c.messages.length > 0 && <ReadStatus status={c.messages[c.messages.length - 1].status} className="mr-1 h-4 w-4 shrink-0"/>}
+              {lastMessageIsOutbound && <ReadStatus status={lastMessage.status} className="mr-1 h-4 w-4 shrink-0"/>}
               <p className="truncate">{c.lastMessage}</p>
             </>
           )}
@@ -424,10 +425,10 @@ function ConversationRow({
       </div>
       
        {/* Zone 3: Status (Pin & Unread Count) */}
-       <div className="w-10 shrink-0 flex flex-col items-end justify-center text-muted-foreground pl-2">
+       <div className="w-10 shrink-0 flex flex-col items-end justify-between text-muted-foreground pl-2 h-[42px]">
         <DropdownMenu>
             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full data-[state=open]:bg-secondary">
+                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full data-[state=open]:bg-secondary -mr-2">
                     <MoreVertical className="h-4 w-4" />
                 </Button>
             </DropdownMenuTrigger>
@@ -448,11 +449,13 @@ function ConversationRow({
         </DropdownMenu>
 
         {isUnread ? (
-            <div className="mt-1 h-5 w-5 flex items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">
+            <div className="h-5 w-5 flex items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">
               {c.unread}
             </div>
+        ) : c.pinned ? (
+             <Pin className="h-4 w-4 text-muted-foreground/70" />
         ) : (
-            <div className="mt-1 h-5 w-5" /> // Placeholder for alignment
+            <div className="h-5 w-5" /> // Placeholder for alignment
         )}
       </div>
 
@@ -524,7 +527,7 @@ function MessagePanel({
                     m.type === 'outbound' ? 'bg-green-100' : 'bg-background'
                   )}
                 >
-                  <span className="block whitespace-pre-wrap pr-16 break-words">
+                  <span className="block break-words pr-16">
                     {m.text}
                   </span>
                   <div className="absolute bottom-1 right-2 flex items-center gap-1 whitespace-nowrap text-xs text-muted-foreground/70">
@@ -763,11 +766,10 @@ export default function InboxPage() {
   };
 
   const handleTogglePin = (id: string) => {
-    const conv = conversations.find(c => c.id === id);
+    const conv = conversations.find((c) => c.id === id);
     if (!conv) return;
-    
     const newPinnedState = !conv.pinned;
-
+    
     setConversations(convs => {
         const newConvs = convs.map(c => 
             c.id === id ? { ...c, pinned: newPinnedState } : c

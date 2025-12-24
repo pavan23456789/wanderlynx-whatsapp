@@ -339,9 +339,8 @@ function ConversationRow({
         isSelected ? 'bg-primary/10' : 'hover:bg-secondary'
       )}
     >
-      {/* --- AVATAR ZONE (fixed) --- */}
       <div className="flex-shrink-0 pr-3">
-        <div className="flex w-12 flex-shrink-0 items-center justify-center">
+        <div className="relative flex w-12 items-center justify-center">
           <Checkbox
             checked={isSelected}
             onClick={(e) => {
@@ -349,11 +348,12 @@ function ConversationRow({
               onSelectId(c.id, !isSelected);
             }}
             className={cn(
-              'absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 transition-opacity',
+              'absolute left-0 top-1/2 -translate-y-1/2 h-4 w-4 transition-opacity',
               isSelected
                 ? 'opacity-100'
                 : 'opacity-0 group-hover/row:opacity-100'
             )}
+            aria-label={`Select conversation with ${c.name}`}
           />
           <Avatar
             className={cn(
@@ -366,19 +366,14 @@ function ConversationRow({
           </Avatar>
         </div>
       </div>
-
-      {/* --- CONTENT ZONE (flexible) --- */}
       <div className="min-w-0 flex-1">
-        {/* Row 1: Name + Timestamp */}
-        <div className="flex items-center justify-between">
+        <div className="flex justify-between">
           <p className="truncate font-semibold">{c.name}</p>
-          <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">
+          <div className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">
             {formatFuzzyDate(c.lastMessageTimestamp)}
-          </span>
+          </div>
         </div>
-
-        {/* Row 2: Preview + Status */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-start justify-between">
           <div className="flex min-w-0 items-center gap-1">
             {lastMessage?.type === 'outbound' && (
               <ReadStatus status={lastMessage.status} />
@@ -399,8 +394,6 @@ function ConversationRow({
           </div>
         </div>
       </div>
-
-      {/* --- ACTIONS (hidden on hover) --- */}
       <div className="absolute right-1 top-1">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -483,33 +476,24 @@ function MessagePanel({
                     m.type === 'outbound' ? 'justify-end' : 'justify-start'
                 )}
                 >
-                {/* This is the standard, robust chat bubble structure.
-                    1. The outer div is `relative` to create a positioning context for the timestamp.
-                    2. The text span has right padding (`pr-14`) to reserve horizontal space where text cannot flow.
-                    3. The timestamp div is `absolute` and positioned at the bottom-right corner of the bubble.
-                    This guarantees the timestamp is always visible in its reserved space and never overlaps
-                    the text, regardless of message length or window size. */}
                 <div
-  className={cn(
-    'relative max-w-[75%] rounded-lg px-3 py-2 shadow-sm',
-    m.type === 'outbound'
-      ? 'bg-green-100'
-      : 'bg-background'
-  )}
->
-  {/* TEXT — reserve space on the right for timestamp */}
-  <span className="block whitespace-pre-wrap break-words pr-14">
-    {m.text}
-  </span>
-
-  {/* TIMESTAMP — fixed position, never overlaps text */}
-  <div className="absolute bottom-1 right-2 flex items-center gap-1 whitespace-nowrap text-xs text-muted-foreground/70">
-    <span>{format(new Date(m.time), 'p')}</span>
-    {m.type === 'outbound' && (
-      <ReadStatus status={(m as any).status} />
-    )}
-  </div>
-</div>
+                  className={cn(
+                    'relative max-w-[75%] rounded-lg px-3 py-2 shadow-sm',
+                    m.type === 'outbound'
+                      ? 'bg-green-100'
+                      : 'bg-background'
+                  )}
+                >
+                  <span className="block whitespace-pre-wrap break-words pr-14">
+                    {m.text}
+                  </span>
+                  <div className="absolute bottom-1 right-2 flex items-center gap-1 whitespace-nowrap text-xs text-muted-foreground/70">
+                    <span>{format(new Date(m.time), 'p')}</span>
+                    {m.type === 'outbound' && (
+                      <ReadStatus status={(m as any).status} />
+                    )}
+                  </div>
+                </div>
                 </div>
             );
           })}
@@ -707,21 +691,21 @@ export default function InboxPage() {
   };
 
   const handleTogglePin = (id: string) => {
+    const conv = conversations.find(c => c.id === id);
+    const newPinnedState = !conv?.pinned;
+
     setConversations(convs => {
-      const conv = convs.find(c => c.id === id);
-      const newConvs = convs.map(c => c.id === id ? { ...c, pinned: !c.pinned } : c);
-      // Immediately re-sort after pinning/unpinning
+      const newConvs = convs.map(c => c.id === id ? { ...c, pinned: newPinnedState } : c);
       newConvs.sort((a, b) => {
         if (a.pinned && !b.pinned) return -1;
         if (!a.pinned && b.pinned) return 1;
-        // Pinned items are sorted by last message time amongst themselves
         if (a.pinned && b.pinned) return b.lastMessageTimestamp - a.lastMessageTimestamp;
-        // Unpinned items are sorted by last message time
         return b.lastMessageTimestamp - a.lastMessageTimestamp;
       });
-      toast({ title: 'Conversation Updated', description: `Conversation has been ${conv?.pinned ? 'unpinned' : 'pinned'}.` });
       return newConvs;
     });
+    
+    toast({ title: 'Conversation Updated', description: `Conversation has been ${newPinnedState ? 'pinned' : 'unpinned'}.` });
   };
 
   const handleBulkMarkRead = () => {

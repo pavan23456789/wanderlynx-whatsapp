@@ -334,7 +334,6 @@ function ConversationRow({
       )}
       onClick={() => onSelect(c.id)}
     >
-      {/* SELECTION ZONE (LEFT) - Appears on hover/selection */}
       <div
         className={cn(
           'flex items-center justify-center self-start transition-all pr-3',
@@ -350,7 +349,7 @@ function ConversationRow({
         <Checkbox checked={isSelected} className="h-4 w-4" />
       </div>
 
-      {/* AVATAR ZONE */}
+      {/* AVATAR ZONE (LEFT) - Fixed width */}
       <div className="flex-shrink-0 pr-3">
         <Avatar className="h-10 w-10 border" data-ai-hint="person portrait">
           <AvatarImage src={c.avatar} />
@@ -358,16 +357,11 @@ function ConversationRow({
         </Avatar>
       </div>
 
-      {/* CONTENT ZONE - min-w-0 is critical for child truncation */}
+      {/* CONTENT ZONE (CENTER) - Flexible, two-row structure */}
       <div className="flex-1 min-w-0">
         {/* ROW 1: Identity (Name + Timestamp) */}
         <div className="flex items-baseline justify-between">
-          <p
-            className={cn(
-              'truncate font-semibold',
-              isUnread ? 'text-foreground' : 'text-muted-foreground'
-            )}
-          >
+          <p className={cn('truncate font-semibold', isUnread ? 'text-foreground' : 'text-muted-foreground')}>
             {c.name}
           </p>
           <p className="ml-2 shrink-0 whitespace-nowrap text-xs text-muted-foreground/80">
@@ -377,13 +371,13 @@ function ConversationRow({
 
         {/* ROW 2: Message Preview */}
         <div className="mt-0.5 flex items-center justify-between">
-          <p className="truncate text-sm text-muted-foreground">
+          <p className="truncate text-sm text-muted-foreground overflow-hidden whitespace-nowrap">
             {c.lastMessage}
           </p>
         </div>
       </div>
 
-      {/* STATUS ZONE (RIGHT) */}
+      {/* STATUS ZONE (RIGHT) - Fixed width */}
       <div className="ml-3 flex flex-col items-end self-start flex-shrink-0">
          {c.pinned && <Pin className="h-3.5 w-3.5 text-muted-foreground/70 mb-1.5" />}
          {isUnread && (

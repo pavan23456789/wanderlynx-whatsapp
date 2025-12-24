@@ -305,6 +305,11 @@ function ConversationList({
   );
 }
 
+/**
+ * 🔒 LOCKED INBOX MODE (v1)
+ * ConversationRow is STRUCTURALLY FROZEN.
+ * DO NOT MODIFY without explicit approval.
+ */
 function ConversationRow({
   conversation,
   selectedId,
@@ -327,80 +332,75 @@ function ConversationRow({
   return (
     <div
       data-conv-id={c.id}
+      onClick={() => onSelect(c.id)}
       className={cn(
-        'group/row relative flex w-full cursor-pointer items-start border-b px-3 py-3 text-left transition-colors',
+        'group/row relative flex w-full items-center cursor-pointer border-b px-3 py-3 transition-colors',
         isActive && !isSelected && 'bg-secondary',
         isSelected ? 'bg-primary/10' : 'hover:bg-secondary'
       )}
-      onClick={() => onSelect(c.id)}
     >
-      <div
-        className={cn(
-          'flex items-center justify-center self-center transition-all pr-3',
-          isSelected
-            ? 'w-8 opacity-100'
-            : 'w-0 opacity-0 group-hover/row:w-8 group-hover/row:opacity-100'
-        )}
-        onClick={(e) => {
-          e.stopPropagation();
-          onSelectId(c.id, !isSelected);
-        }}
-      >
-        <Checkbox checked={isSelected} className="h-4 w-4" />
+      {/* SELECTION ZONE — FIXED WIDTH */}
+      <div className="flex w-8 items-center justify-center">
+        <Checkbox
+          checked={isSelected}
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelectId(c.id, !isSelected);
+          }}
+          className={cn(
+            'h-4 w-4 transition-opacity',
+            isSelected ? 'opacity-100' : 'opacity-0 group-hover/row:opacity-100'
+          )}
+        />
       </div>
-      
-      {/* AVATAR ZONE (LEFT) - Fixed width, shrink-0 */}
+
+      {/* AVATAR ZONE */}
       <div className="flex-shrink-0 pr-3">
-        <Avatar className="h-10 w-10 border" data-ai-hint="person portrait">
+        <Avatar className="h-10 w-10 border">
           <AvatarImage src={c.avatar} />
           <AvatarFallback>{c.name.charAt(0)}</AvatarFallback>
         </Avatar>
       </div>
 
-      {/* CONTENT ZONE (CENTER) - flex-1 and min-w-0 to allow truncation */}
-      <div className="flex-1 min-w-0 flex flex-col">
-        {/* ROW 1: Identity (Name + Timestamp) */}
-        <div className="flex items-baseline justify-between">
-          <p className={cn('truncate font-semibold', isUnread ? 'text-foreground' : 'text-muted-foreground')}>
-            {c.name}
-          </p>
-          {/* Timestamp moved to Status Zone */}
-        </div>
+      {/* CONTENT ZONE — STRICT TWO ROWS */}
+      <div className="flex min-w-0 flex-1 flex-col justify-center">
+        <p
+          className={cn(
+            'truncate font-semibold',
+            isUnread ? 'text-foreground' : 'text-muted-foreground'
+          )}
+        >
+          {c.name}
+        </p>
+        <p className="mt-0.5 truncate text-sm text-muted-foreground">
+          {c.lastMessage}
+        </p>
+      </div>
 
-        {/* ROW 2: Message Preview */}
-        <div className="mt-0.5">
-          <p className="truncate text-sm text-muted-foreground">
-            {c.lastMessage}
-          </p>
-        </div>
+      {/* STATUS ZONE — FIXED WIDTH */}
+      <div className="ml-3 flex w-[48px] flex-shrink-0 flex-col items-end justify-center">
+        <p className="whitespace-nowrap text-xs text-muted-foreground/80">
+          {formatFuzzyDate(c.lastMessageTimestamp)}
+        </p>
+        {c.pinned && <Pin className="mt-1 h-3.5 w-3.5 text-muted-foreground/70" />}
+        {isUnread && <div className="mt-1 h-2 w-2 rounded-full bg-primary" />}
       </div>
-      
-      {/* STATUS ZONE (RIGHT) - Fixed width, shrink-0 */}
-      <div className="ml-3 flex flex-col items-end self-start flex-shrink-0">
-          <p className="shrink-0 whitespace-nowrap text-xs text-muted-foreground/80 mb-1.5">
-            {formatFuzzyDate(c.lastMessageTimestamp)}
-          </p>
-         {c.pinned && <Pin className="h-3.5 w-3.5 text-muted-foreground/70 mb-1.5" />}
-         {isUnread && (
-            <div className="h-2 w-2 flex-shrink-0 rounded-full bg-primary" />
-         )}
-      </div>
-      
-      {/* ACTIONS (Absolute position, appears on hover) */}
-      <div className="absolute top-1 right-1">
+
+      {/* ACTIONS */}
+      <div className="absolute right-1 top-1">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 rounded-full opacity-0 group-hover/row:opacity-100 focus:opacity-100"
+              className="h-8 w-8 rounded-full opacity-0 group-hover/row:opacity-100"
               onClick={(e) => e.stopPropagation()}
             >
               <MoreVertical className="h-4 w-4 text-muted-foreground" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onTogglePin(c.id); }}>
+            <DropdownMenuItem onClick={() => onTogglePin(c.id)}>
               {c.pinned ? 'Unpin Conversation' : 'Pin Conversation'}
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -475,23 +475,26 @@ function MessagePanel({
                     This guarantees the timestamp is always visible in its reserved space and never overlaps
                     the text, regardless of message length or window size. */}
                 <div
-                    className={cn(
-                    'max-w-[75%] rounded-lg px-3 py-2 shadow-sm relative',
-                    m.type === 'outbound'
-                        ? 'bg-green-100'
-                        : 'bg-background'
-                    )}
-                >
-                    <span className="whitespace-pre-wrap break-words pr-14">
-                      {m.text}
-                    </span>
-                    <div className="absolute bottom-1 right-2 flex-shrink-0 whitespace-nowrap text-xs text-muted-foreground/70">
-                        <span>{format(new Date(m.time), 'p')}</span>
-                        {m.type === 'outbound' && (
-                        <ReadStatus status={(m as any).status} />
-                        )}
-                    </div>
-                </div>
+  className={cn(
+    'relative max-w-[75%] rounded-lg px-3 py-2 shadow-sm',
+    m.type === 'outbound'
+      ? 'bg-green-100'
+      : 'bg-background'
+  )}
+>
+  {/* TEXT — reserve space on the right for timestamp */}
+  <span className="block whitespace-pre-wrap break-words pr-14">
+    {m.text}
+  </span>
+
+  {/* TIMESTAMP — fixed position, never overlaps text */}
+  <div className="absolute bottom-1 right-2 flex items-center gap-1 whitespace-nowrap text-xs text-muted-foreground/70">
+    <span>{format(new Date(m.time), 'p')}</span>
+    {m.type === 'outbound' && (
+      <ReadStatus status={(m as any).status} />
+    )}
+  </div>
+</div>
                 </div>
             );
           })}
@@ -825,9 +828,9 @@ export default function InboxPage() {
             <MessagePanel
               conversation={selectedConversation}
               onAssign={handleAssign}
-              disabled={isReadOnly}
+              disabled={!!isReadOnly}
             />
-            <ReplyBox onSend={handleSend} disabled={isReadOnly} />
+            <ReplyBox onSend={handleSend} disabled={!!isReadOnly} />
           </div>
         ) : (
           <div className="flex h-full flex-col items-center justify-center p-4 text-center bg-background">

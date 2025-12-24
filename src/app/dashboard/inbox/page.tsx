@@ -378,6 +378,7 @@ function ConversationRow({
   const lastMessage = c.messages[c.messages.length - 1];
   const lastMessageIsOutbound = lastMessage?.type === 'outbound';
 
+  // The conversation row is now a flex container
   return (
     <div
       data-conv-id={c.id}
@@ -388,8 +389,8 @@ function ConversationRow({
         isSelected && 'bg-primary/10'
       )}
     >
-      {/* Zone 1: Selection & Avatar */}
-      <div className="flex items-center gap-3 pr-3 pt-1 shrink-0">
+      {/* Zone 1: Selection & Avatar - This remains a fixed-width container */}
+      <div className="flex shrink-0 items-center gap-3 pr-3 pt-1">
         <Checkbox
           checked={isSelected}
           onClick={(e) => {
@@ -404,11 +405,11 @@ function ConversationRow({
         </Avatar>
       </div>
 
-      {/* Zone 2: Content (Name & Preview) */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <div className="flex justify-between items-center">
+      {/* Zone 2: Content - This container is now flexible and handles truncation */}
+      <div className="flex-1 min-w-0">
+        <div className="flex justify-between">
           <p className="truncate font-semibold">{c.name}</p>
-          <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0 pl-2">
+          <span className="shrink-0 whitespace-nowrap pl-2 text-xs text-muted-foreground">
             {formatFuzzyDate(c.lastMessageTimestamp)}
           </span>
         </div>
@@ -424,7 +425,7 @@ function ConversationRow({
         </div>
       </div>
       
-       {/* Zone 3: Status (Pin & Unread Count) */}
+       {/* Zone 3: Status (Pin & Unread Count) - This container is fixed-width */}
        <div className="w-10 shrink-0 flex flex-col items-end justify-between text-muted-foreground pl-2 h-[42px]">
         <DropdownMenu>
             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
@@ -449,13 +450,18 @@ function ConversationRow({
         </DropdownMenu>
 
         {isUnread ? (
-            <div className="h-5 w-5 flex items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">
-              {c.unread}
-            </div>
+          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+            {c.unread}
+          </div>
+        ) : lastMessageIsOutbound ? (
+          <ReadStatus
+            status={lastMessage.status}
+            className="h-4 w-4 text-muted-foreground/70"
+          />
         ) : c.pinned ? (
-             <Pin className="h-4 w-4 text-muted-foreground/70" />
+          <Pin className="h-4 w-4 text-muted-foreground/70" />
         ) : (
-            <div className="h-5 w-5" /> // Placeholder for alignment
+          <div className="h-5 w-5" /> // Placeholder for alignment
         )}
       </div>
 
@@ -484,7 +490,7 @@ function MessagePanel({
   }, [conversation.messages]);
 
   return (
-    <div className="h-full flex flex-col bg-slate-50">
+    <div className="h-full flex flex-col bg-slate-50 min-w-0">
       <div className="flex items-center gap-3 border-b bg-background p-2">
         <Avatar className="h-9 w-9 border" data-ai-hint="person portrait">
           <AvatarImage src={conversation.avatar} />
@@ -768,6 +774,7 @@ export default function InboxPage() {
   const handleTogglePin = (id: string) => {
     const conv = conversations.find((c) => c.id === id);
     if (!conv) return;
+
     const newPinnedState = !conv.pinned;
     
     setConversations(convs => {
@@ -922,9 +929,9 @@ export default function InboxPage() {
 
       <ResizableHandle withHandle />
 
-      <ResizablePanel defaultSize={75}>
+      <ResizablePanel defaultSize={75} className="min-w-0">
         {selectedConversation ? (
-          <div className="h-full flex flex-col">
+          <div className="h-full flex flex-col min-w-0">
             <MessagePanel
               conversation={selectedConversation}
               onAssign={handleAssign}

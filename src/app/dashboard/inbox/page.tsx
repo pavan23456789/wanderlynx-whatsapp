@@ -58,6 +58,15 @@ interface OutboundMessage extends Message {
   status?: 'sent' | 'delivered' | 'read';
 }
 
+function limitToThreeWords(text: string): string {
+    const words = text.split(' ');
+    if (words.length > 3) {
+        return words.slice(0, 3).join(' ') + '...';
+    }
+    return text;
+}
+
+
 function TemplateDialog({
   open,
   onOpenChange,
@@ -266,7 +275,9 @@ function ConversationRow({
         </div>
         <div className="flex items-center text-sm text-muted-foreground">
           {isUnread ? (
-            <p className="font-bold text-foreground line-clamp-2 break-words">{c.lastMessage}</p>
+            <p className="font-bold text-foreground break-words">
+                {limitToThreeWords(c.lastMessage)}
+            </p>
           ) : (
             <>
               {lastMessageIsOutbound && (
@@ -275,7 +286,9 @@ function ConversationRow({
                   className="mr-1 h-4 w-4 shrink-0"
                 />
               )}
-              <p className="line-clamp-2 break-words">{c.lastMessage}</p>
+              <p className="break-words">
+                {limitToThreeWords(c.lastMessage)}
+              </p>
             </>
           )}
         </div>
@@ -361,11 +374,11 @@ function MessagePanel({
               >
                 <div
                   className={cn(
-                    'relative max-w-[85%] rounded-lg px-3 py-2 shadow-sm',
+                    'relative max-w-full rounded-lg px-3 py-2 shadow-sm',
                     m.type === 'outbound' ? 'bg-green-100' : 'bg-background'
                   )}
                 >
-                  <span className="block break-words pr-16 text-sm md:text-base">
+                  <span className="block break-all whitespace-pre-wrap pr-16 text-sm md:text-base overflow-hidden">
                     {m.text}
                   </span>
                   <div className="absolute bottom-1 right-2 flex items-center gap-1 whitespace-nowrap text-[10px] text-muted-foreground/70">
@@ -671,4 +684,3 @@ export default function InboxPage() {
     </>
   );
 }
-    

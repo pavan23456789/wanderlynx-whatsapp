@@ -9,8 +9,15 @@ import {
   Paperclip,
   Mic,
   FileText,
+  Search,
+  UserPlus,
+  MoreVertical,
+  Pin,
+  PinOff,
+  Mail,
+  Users,
 } from 'lucide-react';
-import { format, isToday, isYesterday } from 'date-fns';
+import { format, isToday, isYesterday, differenceInHours } from 'date-fns';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -50,6 +57,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { Skeleton } from '@/components/ui/skeleton';
 
 // --- HELPER TYPES ---
 interface OutboundMessage extends Message {
@@ -184,8 +197,8 @@ function TemplateDialog({
 
 // --- COMPONENTS ---
 
-const formatFuzzyDate = (date: Date | number) => {
-  const d = new Date(date);
+const formatFuzzyDate = (timestamp: number) => {
+  const d = new Date(timestamp);
   if (isToday(d)) return format(d, 'p');
   if (isYesterday(d)) return 'Yesterday';
   return format(d, 'MM/dd/yy');
@@ -238,12 +251,16 @@ function ConversationRow({
   const c = conversation;
   const isUnread = (c.unread ?? 0) > 0;
   const lastMessage = c.messages[c.messages.length - 1];
+
+  let previewText = c.lastMessage;
+  if (c.lastMessage.length > 10) {
+    previewText = c.lastMessage.slice(0, 10) + '…';
+  }
+
   const lastMessageIsOutbound = lastMessage?.type === 'outbound';
   const outboundStatus = lastMessageIsOutbound
     ? (lastMessage as OutboundMessage).status
     : undefined;
-  
-  const previewText = c.lastMessage.length > 10 ? c.lastMessage.slice(0, 10) + "…" : c.lastMessage;
 
   return (
     <div
@@ -273,9 +290,7 @@ function ConversationRow({
         </div>
         <div className="flex items-center text-sm text-muted-foreground">
           {isUnread ? (
-            <p className="font-bold text-foreground">
-              {previewText}
-            </p>
+            <p className="font-bold text-foreground">{previewText}</p>
           ) : (
             <>
               {lastMessageIsOutbound && (
@@ -284,13 +299,13 @@ function ConversationRow({
                   className="mr-1 h-4 w-4 shrink-0"
                 />
               )}
-              <p className="truncate">{previewText}</p>
+              <p>{previewText}</p>
             </>
           )}
         </div>
       </div>
 
-      <div className="w-6 shrink-0 flex flex-col items-end justify-between text-muted-foreground pl-2 h-[42px]">
+      <div className="flex h-[42px] w-6 shrink-0 flex-col items-end justify-between pl-2 text-muted-foreground">
         {isUnread && (
           <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
             {c.unread}
@@ -301,11 +316,7 @@ function ConversationRow({
   );
 }
 
-function MessagePanel({
-  conversation,
-}: {
-  conversation: Conversation;
-}) {
+function MessagePanel({ conversation, currentUser }: { conversation: Conversation; currentUser: User | null }) {
   const scrollAreaRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -316,6 +327,10 @@ function MessagePanel({
       });
     }
   }, [conversation.messages]);
+
+  const assignedAgent = mockAgents.find(
+    (a) => a.id === conversation.assignedTo
+  );
 
   return (
     <div className="flex h-full min-w-0 flex-col overflow-hidden bg-slate-50">
@@ -333,17 +348,14 @@ function MessagePanel({
         <div className="flex items-center gap-1">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 rounded-full"
-              >
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
+                <MoreVertical className="h-5 w-5" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
               <DropdownMenuItem>Contact info</DropdownMenuItem>
-              <DropdownMenuItem>Select messages</DropdownMenuItem>
+              <DropdownMenuItem>Search</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem>Mute notifications</DropdownMenuItem>
               <DropdownMenuItem>Clear messages</DropdownMenuItem>
@@ -357,8 +369,9 @@ function MessagePanel({
       <ScrollArea className="w-full flex-1" viewportRef={scrollAreaRef}>
         <div className="space-y-1 p-4 md:p-6">
           {conversation.messages.map((m) => {
+            const agent = m.agentId ? mockAgents.find(a => a.id === m.agentId) : null;
             if (m.type === 'internal') {
-              return <InternalNote key={m.id} message={m} />;
+              return <InternalNote key={m.id} message={m} agent={agent} />;
             }
             return (
               <div
@@ -370,10 +383,15 @@ function MessagePanel({
               >
                 <div
                   className={cn(
-                    'relative max-w-full rounded-lg px-3 py-2 shadow-sm',
+                    'relative max-w-[75%] rounded-lg px-3 py-2 shadow-sm',
                     m.type === 'outbound' ? 'bg-green-100' : 'bg-background'
                   )}
                 >
+                  {m.type === 'outbound' && agent && (
+                     <div className="text-xs font-semibold text-gray-600 mb-1">
+                        {agent.name} &bull; {agent.role === 'Super Admin' ? 'Admin' : 'Support'}
+                     </div>
+                  )}
                   <span className="block max-w-full overflow-hidden whitespace-pre-wrap break-all pr-16 text-sm md:text-base">
                     {m.text}
                   </span>
@@ -395,17 +413,16 @@ function MessagePanel({
   );
 }
 
-function InternalNote({ message }: { message: Message }) {
-  const agent = mockAgents.find((a) => a.id === message.agentId);
+function InternalNote({ message, agent }: { message: Message; agent: User | null | undefined }) {
   return (
     <div className="my-4 flex items-center justify-center">
-      <div className="w-full max-w-md rounded-xl bg-secondary/70 p-2 text-center text-xs text-muted-foreground">
-        <div className="mb-1 flex items-center justify-center gap-2 font-semibold text-gray-600">
+      <div className="w-full max-w-md rounded-xl bg-yellow-100 p-3 text-center text-xs text-yellow-900">
+        <div className="mb-1 flex items-center justify-center gap-2 font-semibold">
           <FileText className="h-3 w-3" />
-          Internal Note by {agent?.name || 'an agent'}
+          Internal note — {agent?.name || 'an agent'}
         </div>
-        <p className="italic">{message.text}</p>
-        <p className="mt-1 text-gray-400" suppressHydrationWarning>
+        <p className="italic whitespace-pre-wrap break-all">{message.text}</p>
+        <p className="mt-1 text-gray-500" suppressHydrationWarning>
           {format(new Date(message.time), 'Pp')}
         </p>
       </div>
@@ -458,11 +475,7 @@ function ReplyBox({
   return (
     <div className="border-t bg-secondary/70 p-3">
       <div className="flex items-center gap-3">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-10 w-10 rounded-full"
-        >
+        <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full">
           <Paperclip className="h-5 w-5 text-muted-foreground" />
         </Button>
         <Input
@@ -501,13 +514,9 @@ function ReplyBox({
 export default function InboxPage() {
   const [currentUser, setCurrentUser] = React.useState<User | null>(null);
   const [isTemplateDialogOpen, setTemplateDialogOpen] = React.useState(false);
-
-  React.useEffect(() => {
-    setCurrentUser(getCurrentUser());
-  }, []);
-
   const [conversations, setConversations] = React.useState<Conversation[]>(
     () => {
+      // Sort conversations by pinned status, then by most recent message
       return [...initialConversations].sort((a, b) => {
         if (a.pinned && !b.pinned) return -1;
         if (!a.pinned && b.pinned) return 1;
@@ -515,15 +524,28 @@ export default function InboxPage() {
       });
     }
   );
+  
+  React.useEffect(() => {
+    setCurrentUser(getCurrentUser());
+  }, []);
 
   const [selectedId, setSelectedId] = React.useState<string | null>(
-    conversations[0]?.id || null
+    conversations.find(c => c.pinned)?.id || conversations[0]?.id || null
   );
 
   const selectedConversation = React.useMemo(
     () => conversations.find((c) => c.id === selectedId),
     [selectedId, conversations]
   );
+  
+  const isWindowOpen = React.useMemo(() => {
+    if (!selectedConversation?.lastCustomerMessageAt) return false;
+    const hoursSinceLastMessage = differenceInHours(
+      new Date(),
+      new Date(selectedConversation.lastCustomerMessageAt)
+    );
+    return hoursSinceLastMessage < 24;
+  }, [selectedConversation]);
 
   const handleSendTemplate = (
     template: TemplateType,
@@ -541,8 +563,9 @@ export default function InboxPage() {
 
     const newTimestamp = new Date().getTime();
     let newMessage: Message;
+    const isInternalNote = text.startsWith('/note ');
 
-    if (text.startsWith('/note ')) {
+    if (isInternalNote) {
       newMessage = {
         id: `msg_${newTimestamp}`,
         type: 'internal',
@@ -557,28 +580,26 @@ export default function InboxPage() {
         text: text,
         time: new Date(newTimestamp).toISOString(),
         status: 'sent',
+        agentId: currentUser.id, // Associate agent with outbound message
       } as OutboundMessage;
     }
 
     setConversations((convs) => {
       const newConvs = convs.map((c) => {
         if (c.id === selectedId) {
-          const isInternal = newMessage.type === 'internal';
           return {
             ...c,
             messages: [...c.messages, newMessage],
-            lastMessage: isInternal ? c.lastMessage : text, // Keep old last msg on internal note
+            // Only update preview if it's not an internal note
+            lastMessage: isInternalNote ? c.lastMessage : text,
             lastMessageTimestamp: newTimestamp,
-            lastAgentMessageAt: isInternal
-              ? c.lastAgentMessageAt
-              : newTimestamp,
-            // When we send a message, the 24hr window re-opens
-            isWindowOpen: true,
+            lastAgentMessageAt: newTimestamp,
           };
         }
         return c;
       });
 
+      // Re-sort conversations after sending a message
       return newConvs.sort((a, b) => {
         if (a.pinned && !b.pinned) return -1;
         if (!a.pinned && b.pinned) return 1;
@@ -626,11 +647,13 @@ export default function InboxPage() {
     );
   };
 
-  const isReplyDisabled = !selectedConversation?.isWindowOpen;
+  if (!currentUser) {
+    return <div className="flex h-full items-center justify-center"><Skeleton className="h-8 w-48" /></div>
+  }
 
   return (
     <>
-      <div className="flex h-full max-h-[calc(100vh-theme(spacing.14))] items-stretch bg-background md:max-h-full">
+      <div className="flex h-full max-h-[calc(100vh-theme(spacing.14))] min-w-0 items-stretch bg-background md:max-h-full">
         <div className="h-full w-full max-w-sm flex-shrink-0 bg-background">
           <ConversationList
             conversations={conversations}
@@ -641,10 +664,10 @@ export default function InboxPage() {
         <div className="flex min-w-0 flex-1 flex-col h-full">
           {selectedConversation ? (
             <>
-              <MessagePanel conversation={selectedConversation} />
+              <MessagePanel conversation={selectedConversation} currentUser={currentUser} />
               <ReplyBox
                 onSend={handleSend}
-                disabled={isReplyDisabled}
+                disabled={!isWindowOpen}
                 onOpenTemplateDialog={() => setTemplateDialogOpen(true)}
               />
             </>

@@ -275,7 +275,7 @@ function ConversationRow({
         </div>
         <div className="flex items-center text-sm text-muted-foreground">
           {isUnread ? (
-            <p className="font-bold text-foreground break-words">
+            <p className="font-bold text-foreground">
                 {limitToThreeWords(c.lastMessage)}
             </p>
           ) : (
@@ -286,7 +286,7 @@ function ConversationRow({
                   className="mr-1 h-4 w-4 shrink-0"
                 />
               )}
-              <p className="break-words">
+              <p>
                 {limitToThreeWords(c.lastMessage)}
               </p>
             </>
@@ -378,7 +378,7 @@ function MessagePanel({
                     m.type === 'outbound' ? 'bg-green-100' : 'bg-background'
                   )}
                 >
-                  <span className="block break-all whitespace-pre-wrap pr-16 text-sm md:text-base overflow-hidden">
+                  <span className="block max-w-full overflow-hidden whitespace-pre-wrap break-all pr-16 text-sm md:text-base">
                     {m.text}
                   </span>
                   <div className="absolute bottom-1 right-2 flex items-center gap-1 whitespace-nowrap text-[10px] text-muted-foreground/70">

@@ -9,23 +9,11 @@ import {
   Paperclip,
   Mic,
   FileText,
-  Search,
-  MoreHorizontal,
-  UserPlus,
-  Pin,
-  PinOff,
 } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from '@/components/ui/dropdown-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
@@ -37,8 +25,6 @@ import {
 } from '@/lib/mock/mockInbox';
 import { mockAgents, type Agent } from '@/lib/mock/mockAgents';
 import { getCurrentUser, User } from '@/lib/auth';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 
 
@@ -126,7 +112,6 @@ function ConversationList({
     <div className="h-full flex flex-col bg-background min-w-0 overflow-hidden">
       <div className="flex-shrink-0 p-3 border-b border-r">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search..."
             className="h-9 rounded-full bg-secondary pl-9"
@@ -206,7 +191,7 @@ function ConversationRow({
                   className="mr-1 h-4 w-4 shrink-0"
                 />
               )}
-              <p className="line-clamp-2">{c.lastMessage}</p>
+              <p className="line-clamp-2 break-all">{c.lastMessage}</p>
             </>
           )}
         </div>

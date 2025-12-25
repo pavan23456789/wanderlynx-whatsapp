@@ -9,8 +9,6 @@ import {
   Paperclip,
   Mic,
   FileText,
-  Search,
-  MoreHorizontal,
 } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
 
@@ -66,6 +64,7 @@ function limitToThreeWords(text: string): string {
   }
   return text;
 }
+
 
 function TemplateDialog({
   open,
@@ -215,10 +214,9 @@ function ConversationList({
     <div className="flex h-full flex-col border-r bg-background">
       <div className="shrink-0 border-b p-3">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search or start new chat"
-            className="h-10 rounded-full pl-10"
+            className="h-10 rounded-full pl-4"
           />
         </div>
       </div>
@@ -254,6 +252,8 @@ function ConversationRow({
   const outboundStatus = lastMessageIsOutbound
     ? (lastMessage as OutboundMessage).status
     : undefined;
+  
+  const previewText = limitToThreeWords(c.lastMessage);
 
   return (
     <div
@@ -284,7 +284,7 @@ function ConversationRow({
         <div className="flex items-center text-sm text-muted-foreground">
           {isUnread ? (
             <p className="font-bold text-foreground">
-              {limitToThreeWords(c.lastMessage)}
+              {previewText}
             </p>
           ) : (
             <>
@@ -294,7 +294,7 @@ function ConversationRow({
                   className="mr-1 h-4 w-4 shrink-0"
                 />
               )}
-              <p className="truncate">{limitToThreeWords(c.lastMessage)}</p>
+              <p className="truncate">{previewText}</p>
             </>
           )}
         </div>
@@ -341,9 +341,6 @@ function MessagePanel({
           </p>
         </div>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
-            <Search className="h-5 w-5 text-muted-foreground" />
-          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -351,7 +348,6 @@ function MessagePanel({
                 size="icon"
                 className="h-9 w-9 rounded-full"
               >
-                <MoreHorizontal className="h-5 w-5 text-muted-foreground" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">

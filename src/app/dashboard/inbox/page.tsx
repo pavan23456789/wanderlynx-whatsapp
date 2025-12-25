@@ -56,16 +56,6 @@ interface OutboundMessage extends Message {
   status?: 'sent' | 'delivered' | 'read';
 }
 
-function limitToThreeWords(text: string): string {
-  if (!text) return '';
-  const words = text.split(' ');
-  if (words.length > 3) {
-    return words.slice(0, 3).join(' ') + '...';
-  }
-  return text;
-}
-
-
 function TemplateDialog({
   open,
   onOpenChange,
@@ -221,7 +211,7 @@ function ConversationList({
         </div>
       </div>
       <ScrollArea className="flex-1">
-        <div className="flex w-full min-h-full flex-col">
+        <div className="flex min-h-full w-full flex-col">
           {conversations.map((c) => (
             <ConversationRow
               key={c.id}
@@ -253,7 +243,7 @@ function ConversationRow({
     ? (lastMessage as OutboundMessage).status
     : undefined;
   
-  const previewText = limitToThreeWords(c.lastMessage);
+  const previewText = c.lastMessage.length > 10 ? c.lastMessage.slice(0, 10) + "…" : c.lastMessage;
 
   return (
     <div
@@ -271,7 +261,7 @@ function ConversationRow({
         </Avatar>
       </div>
 
-      <div className="flex-1 min-w-0">
+      <div className="min-w-0 flex-1">
         <div className="flex justify-between">
           <p className="truncate font-semibold">{c.name}</p>
           <span
@@ -334,9 +324,9 @@ function MessagePanel({
           <AvatarImage src={conversation.avatar} />
           <AvatarFallback>{conversation.name.charAt(0)}</AvatarFallback>
         </Avatar>
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold truncate">{conversation.name}</p>
-          <p className="text-sm text-muted-foreground truncate">
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-semibold">{conversation.name}</p>
+          <p className="truncate text-sm text-muted-foreground">
             {conversation.phone}
           </p>
         </div>
@@ -364,7 +354,7 @@ function MessagePanel({
           </DropdownMenu>
         </div>
       </div>
-      <ScrollArea className="flex-1 w-full" viewportRef={scrollAreaRef}>
+      <ScrollArea className="w-full flex-1" viewportRef={scrollAreaRef}>
         <div className="space-y-1 p-4 md:p-6">
           {conversation.messages.map((m) => {
             if (m.type === 'internal') {
@@ -408,9 +398,9 @@ function MessagePanel({
 function InternalNote({ message }: { message: Message }) {
   const agent = mockAgents.find((a) => a.id === message.agentId);
   return (
-    <div className="flex items-center justify-center my-4">
-      <div className="max-w-md w-full text-center text-xs text-muted-foreground bg-secondary/70 p-2 rounded-xl">
-        <div className="font-semibold text-gray-600 mb-1 flex items-center justify-center gap-2">
+    <div className="my-4 flex items-center justify-center">
+      <div className="w-full max-w-md rounded-xl bg-secondary/70 p-2 text-center text-xs text-muted-foreground">
+        <div className="mb-1 flex items-center justify-center gap-2 font-semibold text-gray-600">
           <FileText className="h-3 w-3" />
           Internal Note by {agent?.name || 'an agent'}
         </div>
@@ -431,14 +421,14 @@ const ReadStatus = ({
   className?: string;
 }) => {
   if (!status || status === 'sent') {
-    return <Check className={cn('h-4 w-4 inline', className)} />;
+    return <Check className={cn('inline h-4 w-4', className)} />;
   }
   if (status === 'delivered') {
-    return <CheckCheck className={cn('h-4 w-4 inline', className)} />;
+    return <CheckCheck className={cn('inline h-4 w-4', className)} />;
   }
   if (status === 'read') {
     return (
-      <CheckCheck className={cn('h-4 w-4 inline text-blue-500', className)} />
+      <CheckCheck className={cn('inline h-4 w-4 text-blue-500', className)} />
     );
   }
   return null;
@@ -648,7 +638,7 @@ export default function InboxPage() {
             onSelect={handleSelectConversation}
           />
         </div>
-        <div className="flex-1 min-w-0 h-full flex flex-col">
+        <div className="flex min-w-0 flex-1 flex-col h-full">
           {selectedConversation ? (
             <>
               <MessagePanel conversation={selectedConversation} />
@@ -659,7 +649,7 @@ export default function InboxPage() {
               />
             </>
           ) : (
-            <div className="flex h-full flex-col items-center justify-center p-4 text-center bg-background">
+            <div className="flex h-full flex-col items-center justify-center bg-background p-4 text-center">
               <div className="text-center">
                 <MessageSquare className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
                 <h3 className="text-xl font-semibold">

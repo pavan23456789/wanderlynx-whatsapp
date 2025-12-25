@@ -26,12 +26,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from '@/components/ui/resizable';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -87,21 +83,10 @@ function AssignmentPopover({
             <span className="hidden sm:inline">Assign</span>
           </Button>
         ) : (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 rounded-full flex-shrink-0"
-            disabled={disabled}
-          >
-            {assignedAgent ? (
-              <Avatar className="h-7 w-7" data-ai-hint="person portrait">
-                <AvatarImage src={assignedAgent.avatar} />
-                <AvatarFallback>{assignedAgent.name.charAt(0)}</AvatarFallback>
-              </Avatar>
-            ) : (
-              <UserPlus className="h-4 w-4 text-muted-foreground" />
-            )}
-          </Button>
+          <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+            <UserPlus className="mr-2 h-4 w-4" />
+            <span>Assign</span>
+          </DropdownMenuItem>
         )}
       </PopoverTrigger>
       <PopoverContent className="w-64 p-0">
@@ -253,7 +238,6 @@ function ConversationList({
   }, [selectedId, allFilteredConversations, onSelect]);
 
   return (
-    // FIX: min-w-0 ensures the container doesn't fight the resize panel
     <div className="h-full flex flex-col bg-background min-w-0 overflow-hidden">
       <div className="flex-shrink-0 p-3 border-b border-r">
         {selectedIds.length > 0 ? (
@@ -269,7 +253,6 @@ function ConversationList({
                 {selectedIds.length} <span className="hidden sm:inline">selected</span>
               </label>
             </div>
-            {/* FIX: overflow-x-auto allows buttons to scroll if panel is too small, preventing stuck handle */}
             <div className="flex items-center gap-1 overflow-x-auto no-scrollbar mask-fade">
               <Button
                 variant="ghost"
@@ -508,6 +491,8 @@ function MessagePanel({
       });
     }
   }, [conversation.messages]);
+  
+  const assignedAgent = mockAgents.find((a) => a.id === conversation.assignedTo);
 
   return (
     <div className="h-full flex flex-col bg-slate-50 min-w-0 overflow-hidden">
@@ -520,18 +505,36 @@ function MessagePanel({
           <p className="font-semibold truncate">{conversation.name}</p>
           <p className="text-sm text-muted-foreground truncate">{conversation.phone}</p>
         </div>
-        <AssignmentPopover
-          agents={mockAgents}
-          assignedTo={conversation.assignedTo}
-          onAssign={onAssign}
-          disabled={disabled}
-        />
-        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full shrink-0">
-          <Search className="h-5 w-5 text-muted-foreground" />
-        </Button>
-        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full shrink-0">
-          <MoreVertical className="h-5 w-5 text-muted-foreground" />
-        </Button>
+        
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+             <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full shrink-0">
+              <MoreVertical className="h-5 w-5 text-muted-foreground" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem>
+              <Search className="mr-2 h-4 w-4" />
+              <span>Search in Conversation</span>
+            </DropdownMenuItem>
+            
+            <AssignmentPopover
+              agents={mockAgents}
+              assignedTo={conversation.assignedTo}
+              onAssign={onAssign}
+              disabled={disabled}
+            />
+
+            <DropdownMenuSeparator />
+            <DropdownMenuItem>
+              <span>View Contact</span>
+            </DropdownMenuItem>
+             <DropdownMenuItem className="text-destructive">
+              <span>Delete Conversation</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
       </div>
       <ScrollArea className="flex-1 w-full" viewportRef={scrollAreaRef}>
         <div className="p-4 md:p-6 space-y-1 w-full">
@@ -675,7 +678,7 @@ function ReplyBox({
   );
 }
 
-function InboxPage() {
+export default function InboxPage() {
   const [currentUser, setCurrentUser] = React.useState<User | null>(null);
 
   React.useEffect(() => {
@@ -806,27 +809,24 @@ function InboxPage() {
   };
 
   const handleTogglePin = (id: string) => {
-    const conv = conversations.find((c) => c.id === id);
+    const conv = conversations.find(c => c.id === id);
     if (!conv) return;
-
+  
     const newPinnedState = !conv.pinned;
-
-    setConversations((convs) => {
-      const newConvs = convs.map((c) =>
-        c.id === id ? { ...c, pinned: newPinnedState } : c
-      );
-      return newConvs.sort((a, b) => {
-        if (a.pinned && !b.pinned) return -1;
-        if (!a.pinned && b.pinned) return 1;
-        return b.lastMessageTimestamp - a.lastMessageTimestamp;
-      });
-    });
-
+    
+    setConversations(currentConvs => 
+      currentConvs
+        .map(c => (c.id === id ? { ...c, pinned: newPinnedState } : c))
+        .sort((a, b) => {
+          if (a.pinned && !b.pinned) return -1;
+          if (!a.pinned && b.pinned) return 1;
+          return b.lastMessageTimestamp - a.lastMessageTimestamp;
+        })
+    );
+    
     toast({
       title: 'Conversation Updated',
-      description: `Conversation has been ${
-        newPinnedState ? 'pinned' : 'unpinned'
-      }.`,
+      description: `Conversation has been ${newPinnedState ? 'pinned' : 'unpinned'}.`,
     });
   };
 
@@ -939,34 +939,23 @@ function InboxPage() {
     selectedConversation.assignedTo !== currentUser?.id;
 
   return (
-    <ResizablePanelGroup
-      direction="horizontal"
-      className="h-full max-h-[calc(100vh-theme(spacing.14))] items-stretch bg-background md:max-h-full"
-    >
-      <ResizablePanel
-        defaultSize={25}
-        minSize={20}
-        maxSize={50}
-        collapsible={true} /* Added collapsible for smoother UX if dragged too small */
-      >
-        <ConversationList
-          conversations={conversations}
-          selectedId={selectedId}
-          onSelect={handleSelectConversation}
-          currentUser={currentUser}
-          selectedIds={selectedIds}
-          onSelectId={handleSelectId}
-          onBulkAssign={handleBulkAssign}
-          onBulkPin={handleBulkPin}
-          onBulkMarkRead={handleBulkMarkRead}
-          onTogglePin={handleTogglePin}
+    <div className="flex h-full max-h-[calc(100vh-theme(spacing.14))] items-stretch bg-background md:max-h-full">
+      <div className="flex-shrink-0 w-96 bg-background h-full">
+         <ConversationList
+            conversations={conversations}
+            selectedId={selectedId}
+            onSelect={handleSelectConversation}
+            currentUser={currentUser}
+            selectedIds={selectedIds}
+            onSelectId={handleSelectId}
+            onBulkAssign={handleBulkAssign}
+            onBulkPin={handleBulkPin}
+            onBulkMarkRead={handleBulkMarkRead}
+            onTogglePin={handleTogglePin}
         />
-      </ResizablePanel>
-
-      <ResizableHandle withHandle />
-
-      <ResizablePanel defaultSize={75} minSize={30} className="min-w-0">
-        <div className="flex h-full flex-col min-w-0">
+      </div>
+      <div className="flex-1 min-w-0 h-full">
+         <div className="flex h-full flex-col min-w-0">
           {selectedConversation ? (
             <>
               <MessagePanel
@@ -990,11 +979,7 @@ function InboxPage() {
             </div>
           )}
         </div>
-      </ResizablePanel>
-    </ResizablePanelGroup>
+      </div>
+    </div>
   );
 }
-
-export default InboxPage;
-
-    

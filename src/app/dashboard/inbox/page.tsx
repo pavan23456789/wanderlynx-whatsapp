@@ -9,6 +9,13 @@ import {
   Paperclip,
   Mic,
   FileText,
+  Search,
+  UserPlus,
+  MoreVertical,
+  Pin,
+  PinOff,
+  Mail,
+  Users,
 } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
 
@@ -25,8 +32,27 @@ import {
 } from '@/lib/mock/mockInbox';
 import { mockAgents, type Agent } from '@/lib/mock/mockAgents';
 import { getCurrentUser, User } from '@/lib/auth';
-import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+  Command,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 
 // --- HELPER TYPES ---
 interface OutboundMessage extends Message {
@@ -109,11 +135,12 @@ function ConversationList({
   }, [selectedId, filteredConversations, onSelect]);
 
   return (
-    <div className="h-full flex flex-col bg-background min-w-0 overflow-hidden">
-      <div className="flex-shrink-0 p-3 border-b border-r">
+    <div className="h-full flex flex-col bg-background border-r">
+      <div className="flex-shrink-0 p-3 border-b">
         <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search..."
+            placeholder="Search or start new chat..."
             className="h-9 rounded-full bg-secondary pl-9"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -121,7 +148,7 @@ function ConversationList({
           />
         </div>
       </div>
-      <ScrollArea className="flex-1 border-r w-full">
+      <ScrollArea className="flex-1 w-full">
         <div className="flex min-h-full flex-col w-full">
           {filteredConversations.map((c) => (
             <ConversationRow
@@ -182,7 +209,7 @@ function ConversationRow({
         </div>
         <div className="flex items-center text-sm text-muted-foreground">
           {isUnread ? (
-            <p className="font-bold text-foreground line-clamp-2">{c.lastMessage}</p>
+            <p className="font-bold text-foreground line-clamp-2 break-words">{c.lastMessage}</p>
           ) : (
             <>
               {lastMessageIsOutbound && (
@@ -191,7 +218,7 @@ function ConversationRow({
                   className="mr-1 h-4 w-4 shrink-0"
                 />
               )}
-              <p className="line-clamp-2 break-all">{c.lastMessage}</p>
+              <p className="line-clamp-2 break-words">{c.lastMessage}</p>
             </>
           )}
         </div>
@@ -210,10 +237,13 @@ function ConversationRow({
 
 function MessagePanel({
   conversation,
+  onAssign,
 }: {
   conversation: Conversation;
+  onAssign: (agentId: string | null) => void;
 }) {
   const scrollAreaRef = React.useRef<HTMLDivElement>(null);
+  const currentUser = getCurrentUser();
 
   React.useEffect(() => {
     if (scrollAreaRef.current) {
@@ -223,6 +253,10 @@ function MessagePanel({
       });
     }
   }, [conversation.messages]);
+
+  const assignedAgent = mockAgents.find(
+    (a) => a.id === conversation.assignedTo
+  );
 
   return (
     <div className="h-full flex flex-col bg-slate-50 min-w-0 overflow-hidden">
@@ -234,6 +268,34 @@ function MessagePanel({
         <div className="flex-1 min-w-0">
           <p className="font-semibold truncate">{conversation.name}</p>
           <p className="text-sm text-muted-foreground truncate">{conversation.phone}</p>
+        </div>
+        <div className="flex items-center gap-2">
+         <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                <MoreVertical className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem>
+                <Search className="mr-2 h-4 w-4" />
+                <span>Search</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <Mail className="mr-2 h-4 w-4" />
+                <span>Mark as Unread</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem disabled>
+                <UserPlus className="mr-2 h-4 w-4" />
+                <span>Assign to...</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled>
+                <Pin className="mr-2 h-4 w-4" />
+                <span>Pin Conversation</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
       <ScrollArea className="flex-1 w-full" viewportRef={scrollAreaRef}>
@@ -276,6 +338,7 @@ function MessagePanel({
     </div>
   );
 }
+
 
 function InternalNote({ message }: { message: Message }) {
   const agent = mockAgents.find((a) => a.id === message.agentId);
@@ -345,7 +408,7 @@ function ReplyBox({
         <Input
           placeholder={
             disabled
-              ? 'Assigned to another agent'
+              ? 'This conversation is closed'
               : 'Type a message or /note for an internal note...'
           }
           className="rounded-full h-11 flex-1"
@@ -398,11 +461,24 @@ export default function InboxPage() {
   const [selectedId, setSelectedId] = React.useState<string | null>(
     conversations[0]?.id || null
   );
-  
+
   const selectedConversation = React.useMemo(
     () => conversations.find((c) => c.id === selectedId),
     [selectedId, conversations]
   );
+
+  const handleAssignAgent = (agentId: string | null) => {
+    if (!selectedId) return;
+
+    setConversations((prev) =>
+      prev.map((c) => {
+        if (c.id === selectedId) {
+          return { ...c, assignedTo: agentId };
+        }
+        return c;
+      })
+    );
+  };
 
   const handleSend = (text: string) => {
     if (!selectedId || !currentUser) return;
@@ -496,9 +572,7 @@ export default function InboxPage() {
     );
   };
 
-  const isReadOnly =
-    selectedConversation?.assignedTo &&
-    selectedConversation.assignedTo !== currentUser?.id;
+  const isReplyDisabled = !selectedConversation?.isWindowOpen;
 
   return (
     <div className="flex h-full max-h-[calc(100vh-theme(spacing.14))] items-stretch bg-background md:max-h-full">
@@ -509,14 +583,14 @@ export default function InboxPage() {
             onSelect={handleSelectConversation}
         />
       </div>
-      <div className="flex-1 min-w-0 h-full">
-         <div className="flex h-full flex-col min-w-0">
+      <div className="flex-1 min-w-0 h-full flex flex-col">
           {selectedConversation ? (
             <>
               <MessagePanel
                 conversation={selectedConversation}
+                onAssign={handleAssignAgent}
               />
-              <ReplyBox onSend={handleSend} disabled={!!isReadOnly} />
+              <ReplyBox onSend={handleSend} disabled={isReplyDisabled} />
             </>
           ) : (
             <div className="flex h-full flex-col items-center justify-center p-4 text-center bg-background">
@@ -531,7 +605,6 @@ export default function InboxPage() {
               </div>
             </div>
           )}
-        </div>
       </div>
     </div>
   );

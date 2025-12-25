@@ -9,13 +9,8 @@ import {
   Paperclip,
   Mic,
   FileText,
-  Search,
-  UserPlus,
   MoreVertical,
-  Pin,
-  PinOff,
-  Mail,
-  Users,
+  Archive,
 } from 'lucide-react';
 import { format, isToday, isYesterday, differenceInHours } from 'date-fns';
 
@@ -57,11 +52,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
 
 // --- HELPER TYPES ---
@@ -250,17 +240,15 @@ function ConversationRow({
 }) {
   const c = conversation;
   const isUnread = (c.unread ?? 0) > 0;
-  const lastMessage = c.messages[c.messages.length - 1];
-
+  
   let previewText = c.lastMessage;
-  if (c.lastMessage.length > 10) {
-    previewText = c.lastMessage.slice(0, 10) + '…';
+  if (previewText.length > 10) {
+      previewText = previewText.slice(0, 10) + "…";
   }
 
-  const lastMessageIsOutbound = lastMessage?.type === 'outbound';
-  const outboundStatus = lastMessageIsOutbound
-    ? (lastMessage as OutboundMessage).status
-    : undefined;
+  const lastMessageIsOutbound = c.messages[c.messages.length - 1]?.type === 'outbound';
+  const outboundStatus = lastMessageIsOutbound ? (c.messages[c.messages.length - 1] as OutboundMessage).status : undefined;
+
 
   return (
     <div
@@ -299,7 +287,7 @@ function ConversationRow({
                   className="mr-1 h-4 w-4 shrink-0"
                 />
               )}
-              <p>{previewText}</p>
+              <p className="break-all">{previewText}</p>
             </>
           )}
         </div>
@@ -316,7 +304,15 @@ function ConversationRow({
   );
 }
 
-function MessagePanel({ conversation, currentUser }: { conversation: Conversation; currentUser: User | null }) {
+function MessagePanel({
+  conversation,
+  currentUser,
+  onArchive,
+}: {
+  conversation: Conversation;
+  currentUser: User | null;
+  onArchive: (id: string) => void;
+}) {
   const scrollAreaRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -327,10 +323,6 @@ function MessagePanel({ conversation, currentUser }: { conversation: Conversatio
       });
     }
   }, [conversation.messages]);
-
-  const assignedAgent = mockAgents.find(
-    (a) => a.id === conversation.assignedTo
-  );
 
   return (
     <div className="flex h-full min-w-0 flex-col overflow-hidden bg-slate-50">
@@ -358,9 +350,12 @@ function MessagePanel({ conversation, currentUser }: { conversation: Conversatio
               <DropdownMenuItem>Search</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem>Mute notifications</DropdownMenuItem>
-              <DropdownMenuItem>Clear messages</DropdownMenuItem>
-              <DropdownMenuItem className="text-destructive">
-                Delete chat
+              <DropdownMenuItem
+                onSelect={() => onArchive(conversation.id)}
+                className="text-yellow-600 focus:text-yellow-600 focus:bg-yellow-50"
+              >
+                <Archive className="mr-2 h-4 w-4" />
+                <span>Archive chat</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -590,7 +585,6 @@ export default function InboxPage() {
           return {
             ...c,
             messages: [...c.messages, newMessage],
-            // Only update preview if it's not an internal note
             lastMessage: isInternalNote ? c.lastMessage : text,
             lastMessageTimestamp: newTimestamp,
             lastAgentMessageAt: newTimestamp,
@@ -607,7 +601,6 @@ export default function InboxPage() {
       });
     });
 
-    // Mock status updates only for actual messages
     if (newMessage.type === 'outbound') {
       setTimeout(() => {
         setConversations((convs) =>
@@ -646,6 +639,14 @@ export default function InboxPage() {
       convs.map((c) => (c.id === id ? { ...c, unread: 0 } : c))
     );
   };
+  
+  const handleArchive = (id: string) => {
+      setConversations(convs => convs.filter(c => c.id !== id));
+      if (selectedId === id) {
+          const nextConversation = conversations.find(c => c.id !== id);
+          setSelectedId(nextConversation?.id || null);
+      }
+  };
 
   if (!currentUser) {
     return <div className="flex h-full items-center justify-center"><Skeleton className="h-8 w-48" /></div>
@@ -664,7 +665,11 @@ export default function InboxPage() {
         <div className="flex min-w-0 flex-1 flex-col h-full">
           {selectedConversation ? (
             <>
-              <MessagePanel conversation={selectedConversation} currentUser={currentUser} />
+              <MessagePanel
+                conversation={selectedConversation}
+                currentUser={currentUser}
+                onArchive={handleArchive}
+              />
               <ReplyBox
                 onSend={handleSend}
                 disabled={!isWindowOpen}

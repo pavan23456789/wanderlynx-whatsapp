@@ -3,13 +3,17 @@
 import * as React from 'react';
 import {
   Send,
-  Search,
   MessageSquare,
   Check,
   CheckCheck,
   Paperclip,
   Mic,
   FileText,
+  Search,
+  MoreHorizontal,
+  UserPlus,
+  Pin,
+  PinOff,
 } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
 
@@ -34,6 +38,9 @@ import {
 import { mockAgents, type Agent } from '@/lib/mock/mockAgents';
 import { getCurrentUser, User } from '@/lib/auth';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+
 
 // --- HELPER TYPES ---
 interface OutboundMessage extends Message {

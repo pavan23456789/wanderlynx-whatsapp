@@ -286,7 +286,7 @@ function ConversationRow({
                   className="mr-1 h-4 w-4 shrink-0"
                 />
               )}
-              <p>
+              <p className="truncate">
                 {limitToThreeWords(c.lastMessage)}
               </p>
             </>
@@ -547,7 +547,6 @@ export default function InboxPage() {
 
     const newTimestamp = new Date().getTime();
     let newMessage: Message;
-    let newLastMessage = text;
 
     if (text.startsWith('/note ')) {
       newMessage = {
@@ -557,7 +556,6 @@ export default function InboxPage() {
         text: text.substring(6), // Remove '/note '
         time: new Date(newTimestamp).toISOString(),
       };
-      newLastMessage = 'Internal note added'; // Don't show note content in convo list
     } else {
       newMessage = {
         id: `msg_${newTimestamp}`,
@@ -575,7 +573,7 @@ export default function InboxPage() {
           return {
             ...c,
             messages: [...c.messages, newMessage],
-            lastMessage: isInternal ? c.lastMessage : newLastMessage, // Keep old last msg on internal note
+            lastMessage: isInternal ? c.lastMessage : text, // Keep old last msg on internal note
             lastMessageTimestamp: newTimestamp,
             lastAgentMessageAt: isInternal
               ? c.lastAgentMessageAt

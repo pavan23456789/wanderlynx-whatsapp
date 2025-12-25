@@ -775,21 +775,21 @@ export default function InboxPage() {
     if (!conv) return;
 
     const newPinnedState = !conv.pinned;
-    
+
     setConversations(convs => {
-        const newConvs = convs.map(c => 
-            c.id === id ? { ...c, pinned: newPinnedState } : c
-        );
-        return newConvs.sort((a, b) => {
-            if (a.pinned && !b.pinned) return -1;
-            if (!a.pinned && b.pinned) return 1;
-            return b.lastMessageTimestamp - a.lastMessageTimestamp;
-        });
+      const newConvs = convs.map(c =>
+        c.id === id ? { ...c, pinned: newPinnedState } : c
+      );
+      return newConvs.sort((a, b) => {
+        if (a.pinned && !b.pinned) return -1;
+        if (!a.pinned && b.pinned) return 1;
+        return b.lastMessageTimestamp - a.lastMessageTimestamp;
+      });
     });
 
     toast({
-        title: 'Conversation Updated',
-        description: `Conversation has been ${newPinnedState ? 'pinned' : 'unpinned'}.`,
+      title: 'Conversation Updated',
+      description: `Conversation has been ${newPinnedState ? 'pinned' : 'unpinned'}.`,
     });
   };
 

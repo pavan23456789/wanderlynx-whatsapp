@@ -59,13 +59,13 @@ interface OutboundMessage extends Message {
 }
 
 function limitToThreeWords(text: string): string {
-    const words = text.split(' ');
-    if (words.length > 3) {
-        return words.slice(0, 3).join(' ') + '...';
-    }
-    return text;
+  if (!text) return '';
+  const words = text.split(' ');
+  if (words.length > 3) {
+    return words.slice(0, 3).join(' ') + '...';
+  }
+  return text;
 }
-
 
 function TemplateDialog({
   open,
@@ -74,11 +74,13 @@ function TemplateDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSendTemplate: (template: TemplateType, variables: Record<string, string>) => void;
+  onSendTemplate: (
+    template: TemplateType,
+    variables: Record<string, string>
+  ) => void;
 }) {
-  const [selectedTemplate, setSelectedTemplate] = React.useState<TemplateType | null>(
-    null
-  );
+  const [selectedTemplate, setSelectedTemplate] =
+    React.useState<TemplateType | null>(null);
   const [variables, setVariables] = React.useState<Record<string, string>>({});
 
   const variablePlaceholders = React.useMemo(() => {
@@ -120,7 +122,9 @@ function TemplateDialog({
             <Label htmlFor="template">Message Template</Label>
             <Select
               onValueChange={(val) =>
-                setSelectedTemplate(mockTemplates.find((t) => t.id === val) || null)
+                setSelectedTemplate(
+                  mockTemplates.find((t) => t.id === val) || null
+                )
               }
             >
               <SelectTrigger className="rounded-xl">
@@ -157,7 +161,9 @@ function TemplateDialog({
                       <Input
                         id={`var-${key}`}
                         value={variables[key] || ''}
-                        onChange={(e) => handleVariableChange(key, e.target.value)}
+                        onChange={(e) =>
+                          handleVariableChange(key, e.target.value)
+                        }
                         className="rounded-xl"
                         placeholder={`Enter value for variable ${key}`}
                         suppressHydrationWarning={true}
@@ -187,7 +193,6 @@ function TemplateDialog({
   );
 }
 
-
 // --- COMPONENTS ---
 
 const formatFuzzyDate = (date: Date | number) => {
@@ -211,7 +216,10 @@ function ConversationList({
       <div className="shrink-0 border-b p-3">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="Search or start new chat" className="h-10 rounded-full pl-10" />
+          <Input
+            placeholder="Search or start new chat"
+            className="h-10 rounded-full pl-10"
+          />
         </div>
       </div>
       <ScrollArea className="flex-1">
@@ -276,7 +284,7 @@ function ConversationRow({
         <div className="flex items-center text-sm text-muted-foreground">
           {isUnread ? (
             <p className="font-bold text-foreground">
-                {limitToThreeWords(c.lastMessage)}
+              {limitToThreeWords(c.lastMessage)}
             </p>
           ) : (
             <>
@@ -286,9 +294,7 @@ function ConversationRow({
                   className="mr-1 h-4 w-4 shrink-0"
                 />
               )}
-              <p className="truncate">
-                {limitToThreeWords(c.lastMessage)}
-              </p>
+              <p className="truncate">{limitToThreeWords(c.lastMessage)}</p>
             </>
           )}
         </div>
@@ -307,10 +313,8 @@ function ConversationRow({
 
 function MessagePanel({
   conversation,
-  onOpenTemplateDialog,
 }: {
   conversation: Conversation;
-  onOpenTemplateDialog: () => void;
 }) {
   const scrollAreaRef = React.useRef<HTMLDivElement>(null);
 
@@ -332,15 +336,21 @@ function MessagePanel({
         </Avatar>
         <div className="flex-1 min-w-0">
           <p className="font-semibold truncate">{conversation.name}</p>
-          <p className="text-sm text-muted-foreground truncate">{conversation.phone}</p>
+          <p className="text-sm text-muted-foreground truncate">
+            {conversation.phone}
+          </p>
         </div>
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
             <Search className="h-5 w-5 text-muted-foreground" />
           </Button>
-           <DropdownMenu>
+          <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-full"
+              >
                 <MoreHorizontal className="h-5 w-5 text-muted-foreground" />
               </Button>
             </DropdownMenuTrigger>
@@ -398,7 +408,6 @@ function MessagePanel({
     </div>
   );
 }
-
 
 function InternalNote({ message }: { message: Message }) {
   const agent = mockAgents.find((a) => a.id === message.agentId);
@@ -507,7 +516,6 @@ export default function InboxPage() {
   const [currentUser, setCurrentUser] = React.useState<User | null>(null);
   const [isTemplateDialogOpen, setTemplateDialogOpen] = React.useState(false);
 
-
   React.useEffect(() => {
     setCurrentUser(getCurrentUser());
   }, []);
@@ -530,7 +538,7 @@ export default function InboxPage() {
     () => conversations.find((c) => c.id === selectedId),
     [selectedId, conversations]
   );
-  
+
   const handleSendTemplate = (
     template: TemplateType,
     variables: Record<string, string>
@@ -614,9 +622,7 @@ export default function InboxPage() {
           convs.map((c) => {
             if (c.id === selectedId) {
               const updatedMessages = c.messages.map((m) =>
-                m.id === newMessage.id
-                  ? { ...m, status: 'read' as const }
-                  : m
+                m.id === newMessage.id ? { ...m, status: 'read' as const } : m
               );
               return { ...c, messages: updatedMessages };
             }
@@ -638,23 +644,20 @@ export default function InboxPage() {
 
   return (
     <>
-    <div className="flex h-full max-h-[calc(100vh-theme(spacing.14))] items-stretch bg-background md:max-h-full">
-      <div className="h-full w-full max-w-sm flex-shrink-0 bg-background">
-         <ConversationList
+      <div className="flex h-full max-h-[calc(100vh-theme(spacing.14))] items-stretch bg-background md:max-h-full">
+        <div className="h-full w-full max-w-sm flex-shrink-0 bg-background">
+          <ConversationList
             conversations={conversations}
             selectedId={selectedId}
             onSelect={handleSelectConversation}
-        />
-      </div>
-      <div className="flex-1 min-w-0 h-full flex flex-col">
+          />
+        </div>
+        <div className="flex-1 min-w-0 h-full flex flex-col">
           {selectedConversation ? (
             <>
-              <MessagePanel
-                conversation={selectedConversation}
-                onOpenTemplateDialog={() => setTemplateDialogOpen(true)}
-              />
-              <ReplyBox 
-                onSend={handleSend} 
+              <MessagePanel conversation={selectedConversation} />
+              <ReplyBox
+                onSend={handleSend}
                 disabled={isReplyDisabled}
                 onOpenTemplateDialog={() => setTemplateDialogOpen(true)}
               />
@@ -672,9 +675,9 @@ export default function InboxPage() {
               </div>
             </div>
           )}
+        </div>
       </div>
-    </div>
-    <TemplateDialog 
+      <TemplateDialog
         open={isTemplateDialogOpen}
         onOpenChange={setTemplateDialogOpen}
         onSendTemplate={handleSendTemplate}

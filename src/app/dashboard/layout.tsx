@@ -11,10 +11,10 @@ import {
   Send,
   Settings,
   LogOut,
-  ShieldCheck,
   History,
   Menu,
 } from 'lucide-react';
+
 import {
   SidebarProvider,
   Sidebar,
@@ -30,6 +30,7 @@ import {
   SidebarGroup,
   SidebarGroupLabel,
 } from '@/components/ui/sidebar';
+
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { TravonexLogo } from '@/components/icons';
 import { Button } from '@/components/ui/button';
@@ -45,9 +46,9 @@ const menuItems = [
 ];
 
 const adminMenuItems = [
-    { href: '/dashboard/logs', label: 'Event Logs', icon: History, roles: ['Super Admin'] },
-    { href: '/dashboard/settings', label: 'Settings', icon: Settings, roles: ['Super Admin', 'Internal Staff'] },
-]
+  { href: '/dashboard/logs', label: 'Event Logs', icon: History, roles: ['Super Admin'] },
+  { href: '/dashboard/settings', label: 'Settings', icon: Settings, roles: ['Super Admin', 'Internal Staff'] },
+];
 
 export default function DashboardLayout({
   children,
@@ -73,101 +74,124 @@ export default function DashboardLayout({
     logout();
     router.push('/login');
   };
-  
+
   if (isLoading) {
     return (
-        <div className="flex h-screen w-full items-center justify-center bg-background">
-            <div className="text-2xl font-semibold animate-pulse">Loading Platform...</div>
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+        <div className="text-2xl font-semibold animate-pulse">
+          Loading Platform...
         </div>
+      </div>
     );
   }
 
-  if (!user) {
-    return null; // Should be redirected by the effect
-  }
+  if (!user) return null;
 
-  const accessibleMenuItems = menuItems.filter(item => user && item.roles.includes(user.role));
-  const accessibleAdminItems = adminMenuItems.filter(item => user && item.roles.includes(user.role));
-
+  const accessibleMenuItems = menuItems.filter(item =>
+    item.roles.includes(user.role)
+  );
+  const accessibleAdminItems = adminMenuItems.filter(item =>
+    item.roles.includes(user.role)
+  );
 
   return (
     <SidebarProvider>
-      <Sidebar>
-        <SidebarHeader>
-          <div className="flex items-center gap-3">
-            <TravonexLogo className="size-8 text-primary" />
-            <span className="text-lg font-semibold">Wanderlynx</span>
-          </div>
-        </SidebarHeader>
-        <SidebarContent>
-          <SidebarMenu>
-            {accessibleMenuItems.map((item) => (
-              <SidebarMenuItem key={item.href}>
-                <Link href={item.href}>
-                  <SidebarMenuButton
-                    isActive={pathname === item.href}
-                    tooltip={{ children: item.label }}
-                  >
-                    <item.icon />
-                    <span>{item.label}</span>
-                     {item.badge && <SidebarMenuBadge>{item.badge}</SidebarMenuBadge>}
-                  </SidebarMenuButton>
-                </Link>
-              </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
+      {/* 🔑 THIS WRAPPER FIXES ALL SHRINKING ISSUES */}
+      <div className="flex h-screen w-full min-w-0 overflow-hidden">
 
-          <SidebarGroup className="mt-auto">
-            <SidebarGroupLabel>Admin</SidebarGroupLabel>
+        {/* SIDEBAR (fixed width, never shrinks) */}
+        <Sidebar className="shrink-0">
+          <SidebarHeader>
+            <div className="flex items-center gap-3">
+              <TravonexLogo className="size-8 text-primary" />
+              <span className="text-lg font-semibold">Wanderlynx</span>
+            </div>
+          </SidebarHeader>
+
+          <SidebarContent>
             <SidebarMenu>
-                 {accessibleAdminItems.map((item) => (
-                    <SidebarMenuItem key={item.href}>
-                        <Link href={item.href}>
-                        <SidebarMenuButton
-                            isActive={pathname === item.href}
-                            tooltip={{ children: item.label }}
-                        >
-                            <item.icon />
-                            <span>{item.label}</span>
-                        </SidebarMenuButton>
-                        </Link>
-                    </SidebarMenuItem>
-                ))}
+              {accessibleMenuItems.map((item) => (
+                <SidebarMenuItem key={item.href}>
+                  <Link href={item.href}>
+                    <SidebarMenuButton
+                      isActive={pathname === item.href}
+                      tooltip={{ children: item.label }}
+                    >
+                      <item.icon />
+                      <span>{item.label}</span>
+                      {item.badge && (
+                        <SidebarMenuBadge>{item.badge}</SidebarMenuBadge>
+                      )}
+                    </SidebarMenuButton>
+                  </Link>
+                </SidebarMenuItem>
+              ))}
             </SidebarMenu>
-          </SidebarGroup>
 
-        </SidebarContent>
-        <SidebarFooter>
-          <Separator className="mb-2" />
-          <div className="flex items-center gap-3 rounded-2xl p-2 bg-secondary/50">
-            <Avatar className="h-11 w-11 border">
-              <AvatarImage src={user.avatar} alt={user.name} data-ai-hint="person portrait" />
-              <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
-            </Avatar>
-            <div className="flex-1 overflow-hidden">
-              <p className="truncate font-semibold">{user.name}</p>
-              <p className="truncate text-sm text-muted-foreground">
-                {user.role}
-              </p>
+            <SidebarGroup className="mt-auto">
+              <SidebarGroupLabel>Admin</SidebarGroupLabel>
+              <SidebarMenu>
+                {accessibleAdminItems.map((item) => (
+                  <SidebarMenuItem key={item.href}>
+                    <Link href={item.href}>
+                      <SidebarMenuButton
+                        isActive={pathname === item.href}
+                        tooltip={{ children: item.label }}
+                      >
+                        <item.icon />
+                        <span>{item.label}</span>
+                      </SidebarMenuButton>
+                    </Link>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroup>
+          </SidebarContent>
+
+          <SidebarFooter>
+            <Separator className="mb-2" />
+            <div className="flex items-center gap-3 rounded-2xl p-2 bg-secondary/50">
+              <Avatar className="h-11 w-11 border">
+                <AvatarImage src={user.avatar} alt={user.name} />
+                <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+              </Avatar>
+              <div className="flex-1 overflow-hidden">
+                <p className="truncate font-semibold">{user.name}</p>
+                <p className="truncate text-sm text-muted-foreground">
+                  {user.role}
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleLogout}
+                className="ml-auto rounded-full size-9"
+              >
+                <LogOut className="size-5" />
+              </Button>
             </div>
-            <Button variant="ghost" size="icon" onClick={handleLogout} className="ml-auto rounded-full size-9" suppressHydrationWarning={true}>
-              <LogOut className="size-5" />
-            </Button>
-          </div>
-        </SidebarFooter>
-      </Sidebar>
-      <SidebarInset>
-        <header className="sticky top-0 z-10 flex h-14 items-center justify-between gap-4 border-b bg-background/80 px-4 backdrop-blur-sm md:hidden">
+          </SidebarFooter>
+        </Sidebar>
+
+        {/* MAIN CONTENT (can shrink safely now) */}
+        <SidebarInset className="flex-1 min-w-0 overflow-hidden">
+          <header className="sticky top-0 z-10 flex h-14 items-center justify-between gap-4 border-b bg-background/80 px-4 backdrop-blur-sm md:hidden">
             <div className="flex items-center gap-2">
-                <TravonexLogo className="size-7 text-primary" />
-                <span className="text-md font-semibold">Wanderlynx</span>
+              <TravonexLogo className="size-7 text-primary" />
+              <span className="text-md font-semibold">Wanderlynx</span>
             </div>
-            <SidebarTrigger variant="outline" size="icon" className="h-9 w-9">
+            <SidebarTrigger
+              variant="outline"
+              size="icon"
+              className="h-9 w-9"
+            >
               <Menu className="size-5" />
             </SidebarTrigger>
-        </header>
-        {children}
-      </SidebarInset>
+          </header>
+
+          {children}
+        </SidebarInset>
+      </div>
     </SidebarProvider>
   );
 }

@@ -50,9 +50,13 @@ import { mockAgents, type Agent } from '@/lib/mock/mockAgents';
 import { getCurrentUser, User } from '@/lib/auth';
 import { Checkbox } from '@/components/ui/checkbox';
 
-// INBOX v1 LOCKED
-// Conversation assignment approved by founder
-// Do NOT extend UI beyond this scope
+// --- HELPER TYPES ---
+interface OutboundMessage extends Message {
+  status?: 'sent' | 'delivered' | 'read';
+}
+
+// --- COMPONENTS ---
+
 function AssignmentPopover({
   agents,
   assignedTo,
@@ -76,11 +80,11 @@ function AssignmentPopover({
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 gap-2"
+            className="h-8 gap-2 px-2"
             disabled={disabled}
           >
-            <UserPlus className="h-4 w-4" />
-            <span>Assign</span>
+            <UserPlus className="h-4 w-4 shrink-0" />
+            <span className="hidden sm:inline">Assign</span>
           </Button>
         ) : (
           <Button
@@ -176,24 +180,24 @@ function ConversationList({
   const [search, setSearch] = React.useState('');
   const [filter, setFilter] = React.useState('all');
 
-  const filtered = conversations
-    .filter((c) => {
-      if (search.trim() === '') return true;
-      const searchTerm = search.toLowerCase();
-      const inName = c.name.toLowerCase().includes(searchTerm);
-      const inPhone = c.phone.toLowerCase().includes(searchTerm);
-      const inMessages = c.messages.some((m) =>
-        m.text.toLowerCase().includes(searchTerm)
-      );
-      return inName || inPhone || inMessages;
-    })
-    .filter((c) => {
-      if (filter === 'unread') return (c.unread ?? 0) > 0;
-      if (filter === 'me') return c.assignedTo === currentUser?.id;
-      return true;
-    });
-
-  const allFilteredConversations = filtered;
+  const allFilteredConversations = React.useMemo(() => {
+    return conversations
+      .filter((c) => {
+        if (search.trim() === '') return true;
+        const searchTerm = search.toLowerCase();
+        const inName = c.name.toLowerCase().includes(searchTerm);
+        const inPhone = c.phone.toLowerCase().includes(searchTerm);
+        const inMessages = c.messages.some((m) =>
+          m.text.toLowerCase().includes(searchTerm)
+        );
+        return inName || inPhone || inMessages;
+      })
+      .filter((c) => {
+        if (filter === 'unread') return (c.unread ?? 0) > 0;
+        if (filter === 'me') return c.assignedTo === currentUser?.id;
+        return true;
+      });
+  }, [conversations, search, filter, currentUser]);
 
   const handleSelectAll = (checked: boolean) => {
     allFilteredConversations.forEach((c) => onSelectId(c.id, checked));
@@ -205,6 +209,13 @@ function ConversationList({
 
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault();
 
@@ -227,7 +238,6 @@ function ConversationList({
         const nextConv = allFilteredConversations[nextIdx];
         if (nextConv) {
           onSelect(nextConv.id);
-          // Optional: scroll into view
           const element = document.querySelector(
             `[data-conv-id="${nextConv.id}"]`
           );
@@ -243,30 +253,32 @@ function ConversationList({
   }, [selectedId, allFilteredConversations, onSelect]);
 
   return (
-    <div className="h-full flex flex-col bg-background">
+    // FIX: min-w-0 ensures the container doesn't fight the resize panel
+    <div className="h-full flex flex-col bg-background min-w-0 overflow-hidden">
       <div className="flex-shrink-0 p-3 border-b border-r">
         {selectedIds.length > 0 ? (
           <div className="h-9 flex items-center justify-between">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <Checkbox
                 id="select-all"
                 checked={isAllSelected}
                 onCheckedChange={(checked) => handleSelectAll(Boolean(checked))}
                 aria-label="Select all"
               />
-              <label htmlFor="select-all" className="text-sm font-medium">
-                {selectedIds.length} selected
+              <label htmlFor="select-all" className="text-sm font-medium whitespace-nowrap">
+                {selectedIds.length} <span className="hidden sm:inline">selected</span>
               </label>
             </div>
-            <div className="flex items-center gap-1">
+            {/* FIX: overflow-x-auto allows buttons to scroll if panel is too small, preventing stuck handle */}
+            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar mask-fade">
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-8 gap-2"
+                className="h-8 gap-2 px-2"
                 onClick={onBulkMarkRead}
               >
-                <Mail className="h-4 w-4" />
-                <span>Read</span>
+                <Mail className="h-4 w-4 shrink-0" />
+                <span className="hidden sm:inline">Read</span>
               </Button>
               <AssignmentPopover
                 agents={mockAgents}
@@ -276,20 +288,20 @@ function ConversationList({
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-8 gap-2"
+                className="h-8 gap-2 px-2"
                 onClick={() => onBulkPin(true)}
               >
-                <Pin className="h-4 w-4" />
-                <span>Pin</span>
+                <Pin className="h-4 w-4 shrink-0" />
+                <span className="hidden sm:inline">Pin</span>
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-8 gap-2"
+                className="h-8 gap-2 px-2"
                 onClick={() => onBulkPin(false)}
               >
-                <PinOff className="h-4 w-4" />
-                <span>Unpin</span>
+                <PinOff className="h-4 w-4 shrink-0" />
+                <span className="hidden sm:inline">Unpin</span>
               </Button>
             </div>
           </div>
@@ -305,12 +317,12 @@ function ConversationList({
             />
           </div>
         )}
-        <div className="mt-3 flex gap-2">
+        <div className="mt-3 flex gap-2 overflow-x-auto no-scrollbar">
           <Button
             variant={filter === 'all' ? 'secondary' : 'ghost'}
             size="sm"
             onClick={() => setFilter('all')}
-            className="rounded-full h-8 flex-1"
+            className="rounded-full h-8 flex-1 min-w-[60px]"
           >
             All
           </Button>
@@ -318,7 +330,7 @@ function ConversationList({
             variant={filter === 'unread' ? 'secondary' : 'ghost'}
             size="sm"
             onClick={() => setFilter('unread')}
-            className="rounded-full h-8 flex-1"
+            className="rounded-full h-8 flex-1 min-w-[70px]"
           >
             Unread
           </Button>
@@ -326,14 +338,14 @@ function ConversationList({
             variant={filter === 'me' ? 'secondary' : 'ghost'}
             size="sm"
             onClick={() => setFilter('me')}
-            className="rounded-full h-8 flex-1"
+            className="rounded-full h-8 flex-1 min-w-[100px] whitespace-nowrap"
           >
             Assigned to me
           </Button>
         </div>
       </div>
-      <ScrollArea className="flex-1 border-r">
-        <div className="flex min-h-full flex-col">
+      <ScrollArea className="flex-1 border-r w-full">
+        <div className="flex min-h-full flex-col w-full">
           {allFilteredConversations.map((c) => (
             <ConversationRow
               key={c.id}
@@ -351,12 +363,6 @@ function ConversationList({
   );
 }
 
-/**
- * 🔒 TRAVONEX INBOX — CONVERSATION LIST HARD LOCK
- * This component's structure is FROZEN. DO NOT MODIFY without explicit approval.
- * This is a structural correctness and robustness enforcement implementation.
- * No redesigns. No visual tweaks. Structure only.
- */
 function ConversationRow({
   conversation,
   selectedId,
@@ -377,6 +383,9 @@ function ConversationRow({
   const isActive = selectedId === c.id;
   const lastMessage = c.messages[c.messages.length - 1];
   const lastMessageIsOutbound = lastMessage?.type === 'outbound';
+  const outboundStatus = lastMessageIsOutbound
+    ? (lastMessage as OutboundMessage).status
+    : undefined;
 
   return (
     <div
@@ -388,7 +397,6 @@ function ConversationRow({
         isSelected && 'bg-primary/10'
       )}
     >
-      {/* Zone 1: Selection & Avatar - This remains a fixed-width container */}
       <div className="flex shrink-0 items-center gap-3 pr-3 pt-1">
         <Checkbox
           checked={isSelected}
@@ -404,11 +412,13 @@ function ConversationRow({
         </Avatar>
       </div>
 
-      {/* Zone 2: Content - This container is now flexible and handles truncation */}
       <div className="flex-1 min-w-0">
         <div className="flex justify-between">
           <p className="truncate font-semibold">{c.name}</p>
-          <span className="shrink-0 whitespace-nowrap pl-2 text-xs text-muted-foreground">
+          <span
+            className="shrink-0 whitespace-nowrap pl-2 text-xs text-muted-foreground"
+            suppressHydrationWarning
+          >
             {formatFuzzyDate(c.lastMessageTimestamp)}
           </span>
         </div>
@@ -417,35 +427,47 @@ function ConversationRow({
             <p className="truncate font-bold text-foreground">{c.lastMessage}</p>
           ) : (
             <>
-              {lastMessageIsOutbound && <ReadStatus status={lastMessage.status} className="mr-1 h-4 w-4 shrink-0"/>}
+              {lastMessageIsOutbound && (
+                <ReadStatus
+                  status={outboundStatus}
+                  className="mr-1 h-4 w-4 shrink-0"
+                />
+              )}
               <p className="truncate">{c.lastMessage}</p>
             </>
           )}
         </div>
       </div>
-      
-       {/* Zone 3: Status (Pin & Unread Count) - This container is fixed-width */}
-       <div className="w-10 shrink-0 flex flex-col items-end justify-between text-muted-foreground pl-2 h-[42px]">
+
+      <div className="w-10 shrink-0 flex flex-col items-end justify-between text-muted-foreground pl-2 h-[42px]">
         <DropdownMenu>
-            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full data-[state=open]:bg-secondary -mr-2">
-                    <MoreVertical className="h-4 w-4" />
-                </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                <DropdownMenuItem onClick={() => onTogglePin(c.id)}>
-                    {c.pinned ? <PinOff className="mr-2 h-4 w-4" /> : <Pin className="mr-2 h-4 w-4" />}
-                    <span>{c.pinned ? 'Unpin' : 'Pin'}</span>
-                </DropdownMenuItem>
-                 <DropdownMenuItem>
-                    <Users className="mr-2 h-4 w-4" />
-                    <span>Assign</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                    <Mail className="mr-2 h-4 w-4" />
-                    <span>Mark as unread</span>
-                </DropdownMenuItem>
-            </DropdownMenuContent>
+          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 rounded-full data-[state=open]:bg-secondary -mr-2"
+            >
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+            <DropdownMenuItem onClick={() => onTogglePin(c.id)}>
+              {c.pinned ? (
+                <PinOff className="mr-2 h-4 w-4" />
+              ) : (
+                <Pin className="mr-2 h-4 w-4" />
+              )}
+              <span>{c.pinned ? 'Unpin' : 'Pin'}</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem>
+              <Users className="mr-2 h-4 w-4" />
+              <span>Assign</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem>
+              <Mail className="mr-2 h-4 w-4" />
+              <span>Mark as unread</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
         </DropdownMenu>
 
         {isUnread ? (
@@ -456,14 +478,13 @@ function ConversationRow({
           <Pin className="h-4 w-4 text-muted-foreground/70" />
         ) : lastMessageIsOutbound ? (
           <ReadStatus
-            status={lastMessage.status}
+            status={outboundStatus}
             className="h-4 w-4 text-muted-foreground/70"
           />
         ) : (
-          <div className="h-5 w-5" /> // Placeholder for alignment
+          <div className="h-5 w-5" />
         )}
       </div>
-
     </div>
   );
 }
@@ -489,15 +510,15 @@ function MessagePanel({
   }, [conversation.messages]);
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 min-w-0">
-      <div className="flex items-center gap-3 border-b bg-background p-2">
+    <div className="h-full flex flex-col bg-slate-50 min-w-0 overflow-hidden">
+      <div className="flex items-center gap-3 border-b bg-background p-2 shrink-0">
         <Avatar className="h-9 w-9 border" data-ai-hint="person portrait">
           <AvatarImage src={conversation.avatar} />
           <AvatarFallback>{conversation.name.charAt(0)}</AvatarFallback>
         </Avatar>
-        <div className="flex-1">
-          <p className="font-semibold">{conversation.name}</p>
-          <p className="text-sm text-muted-foreground">{conversation.phone}</p>
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold truncate">{conversation.name}</p>
+          <p className="text-sm text-muted-foreground truncate">{conversation.phone}</p>
         </div>
         <AssignmentPopover
           agents={mockAgents}
@@ -505,15 +526,15 @@ function MessagePanel({
           onAssign={onAssign}
           disabled={disabled}
         />
-        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
+        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full shrink-0">
           <Search className="h-5 w-5 text-muted-foreground" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
+        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full shrink-0">
           <MoreVertical className="h-5 w-5 text-muted-foreground" />
         </Button>
       </div>
-      <ScrollArea className="flex-1" viewportRef={scrollAreaRef}>
-        <div className="p-4 md:p-6 space-y-1">
+      <ScrollArea className="flex-1 w-full" viewportRef={scrollAreaRef}>
+        <div className="p-4 md:p-6 space-y-1 w-full">
           {conversation.messages.map((m) => {
             if (m.type === 'internal') {
               return <InternalNote key={m.id} message={m} />;
@@ -528,17 +549,19 @@ function MessagePanel({
               >
                 <div
                   className={cn(
-                    'relative max-w-[75%] rounded-lg px-3 py-2 shadow-sm',
+                    'relative max-w-[85%] rounded-lg px-3 py-2 shadow-sm',
                     m.type === 'outbound' ? 'bg-green-100' : 'bg-background'
                   )}
                 >
-                  <span className="block break-words pr-16">
+                  <span className="block break-all whitespace-pre-wrap pr-16 text-sm md:text-base">
                     {m.text}
                   </span>
-                  <div className="absolute bottom-1 right-2 flex items-center gap-1 whitespace-nowrap text-xs text-muted-foreground/70">
-                    <span>{format(new Date(m.time), 'p')}</span>
+                  <div className="absolute bottom-1 right-2 flex items-center gap-1 whitespace-nowrap text-[10px] text-muted-foreground/70">
+                    <span suppressHydrationWarning>
+                      {format(new Date(m.time), 'p')}
+                    </span>
                     {m.type === 'outbound' && (
-                      <ReadStatus status={(m as any).status} />
+                      <ReadStatus status={(m as OutboundMessage).status} />
                     )}
                   </div>
                 </div>
@@ -561,7 +584,7 @@ function InternalNote({ message }: { message: Message }) {
           Internal Note by {agent?.name || 'an agent'}
         </div>
         <p className="italic">{message.text}</p>
-        <p className="mt-1 text-gray-400">
+        <p className="mt-1 text-gray-400" suppressHydrationWarning>
           {format(new Date(message.time), 'Pp')}
         </p>
       </div>
@@ -569,15 +592,23 @@ function InternalNote({ message }: { message: Message }) {
   );
 }
 
-const ReadStatus = ({ status, className }: { status?: 'sent' | 'delivered' | 'read', className?: string }) => {
+const ReadStatus = ({
+  status,
+  className,
+}: {
+  status?: 'sent' | 'delivered' | 'read';
+  className?: string;
+}) => {
   if (!status || status === 'sent') {
-    return <Check className={cn("h-4 w-4 inline", className)} />;
+    return <Check className={cn('h-4 w-4 inline', className)} />;
   }
   if (status === 'delivered') {
-    return <CheckCheck className={cn("h-4 w-4 inline", className)} />;
+    return <CheckCheck className={cn('h-4 w-4 inline', className)} />;
   }
   if (status === 'read') {
-    return <CheckCheck className={cn("h-4 w-4 inline text-blue-500", className)} />;
+    return (
+      <CheckCheck className={cn('h-4 w-4 inline text-blue-500', className)} />
+    );
   }
   return null;
 };
@@ -644,7 +675,7 @@ function ReplyBox({
   );
 }
 
-export default function InboxPage() {
+function InboxPage() {
   const [currentUser, setCurrentUser] = React.useState<User | null>(null);
 
   React.useEffect(() => {
@@ -725,10 +756,13 @@ export default function InboxPage() {
   const handleAssign = (agentId: string | null) => {
     if (!selectedId) return;
     setConversations((convs) =>
-      convs.map((c) => (c.id === selectedId ? { ...c, assignedTo: agentId } : c))
+      convs.map((c) =>
+        c.id === selectedId ? { ...c, assignedTo: agentId } : c
+      )
     );
-    const agentName =
-      agentId ? mockAgents.find((a) => a.id === agentId)?.name : 'unassigned';
+    const agentName = agentId
+      ? mockAgents.find((a) => a.id === agentId)?.name
+      : 'unassigned';
     toast({
       title: 'Conversation Assigned',
       description: `Assigned to ${agentName}.`,
@@ -741,8 +775,9 @@ export default function InboxPage() {
         selectedIds.includes(c.id) ? { ...c, assignedTo: agentId } : c
       )
     );
-    const agentName =
-      agentId ? mockAgents.find((a) => a.id === agentId)?.name : 'unassigned';
+    const agentName = agentId
+      ? mockAgents.find((a) => a.id === agentId)?.name
+      : 'unassigned';
     toast({
       title: 'Bulk Action',
       description: `${selectedIds.length} conversations assigned to ${agentName}.`,
@@ -776,8 +811,8 @@ export default function InboxPage() {
 
     const newPinnedState = !conv.pinned;
 
-    setConversations(convs => {
-      const newConvs = convs.map(c =>
+    setConversations((convs) => {
+      const newConvs = convs.map((c) =>
         c.id === id ? { ...c, pinned: newPinnedState } : c
       );
       return newConvs.sort((a, b) => {
@@ -789,7 +824,9 @@ export default function InboxPage() {
 
     toast({
       title: 'Conversation Updated',
-      description: `Conversation has been ${newPinnedState ? 'pinned' : 'unpinned'}.`,
+      description: `Conversation has been ${
+        newPinnedState ? 'pinned' : 'unpinned'
+      }.`,
     });
   };
 
@@ -827,7 +864,7 @@ export default function InboxPage() {
         text: text,
         time: new Date(newTimestamp).toISOString(),
         status: 'sent',
-      };
+      } as OutboundMessage;
     }
 
     setConversations((convs) => {
@@ -909,8 +946,8 @@ export default function InboxPage() {
       <ResizablePanel
         defaultSize={25}
         minSize={20}
-        maxSize={35}
-        className="min-w-[320px]"
+        maxSize={50}
+        collapsible={true} /* Added collapsible for smoother UX if dragged too small */
       >
         <ConversationList
           conversations={conversations}
@@ -928,32 +965,36 @@ export default function InboxPage() {
 
       <ResizableHandle withHandle />
 
-      <ResizablePanel defaultSize={75} className="min-w-0">
+      <ResizablePanel defaultSize={75} minSize={30} className="min-w-0">
         <div className="flex h-full flex-col min-w-0">
-        {selectedConversation ? (
-          <>
-            <MessagePanel
-              conversation={selectedConversation}
-              onAssign={handleAssign}
-              disabled={!!isReadOnly}
-            />
-            <ReplyBox onSend={handleSend} disabled={!!isReadOnly} />
-          </>
-        ) : (
-          <div className="flex h-full flex-col items-center justify-center p-4 text-center bg-background">
-            <div className="text-center">
-              <MessageSquare className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-              <h3 className="text-xl font-semibold">Select a conversation</h3>
-              <p className="mt-2 text-muted-foreground">
-                Choose from an existing conversation to start chatting.
-              </p>
+          {selectedConversation ? (
+            <>
+              <MessagePanel
+                conversation={selectedConversation}
+                onAssign={handleAssign}
+                disabled={!!isReadOnly}
+              />
+              <ReplyBox onSend={handleSend} disabled={!!isReadOnly} />
+            </>
+          ) : (
+            <div className="flex h-full flex-col items-center justify-center p-4 text-center bg-background">
+              <div className="text-center">
+                <MessageSquare className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+                <h3 className="text-xl font-semibold">
+                  Select a conversation
+                </h3>
+                <p className="mt-2 text-muted-foreground">
+                  Choose from an existing conversation to start chatting.
+                </p>
+              </div>
             </div>
-          </div>
-        )}
+          )}
         </div>
       </ResizablePanel>
     </ResizablePanelGroup>
   );
 }
+
+export default InboxPage;
 
     

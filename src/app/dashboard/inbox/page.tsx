@@ -9,6 +9,8 @@ import {
   Paperclip,
   Mic,
   FileText,
+  Search,
+  MoreHorizontal,
 } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
 
@@ -21,14 +23,161 @@ import {
   mockConversations as initialConversations,
   type Conversation,
   type Message,
+  type Template as TemplateType,
+  mockTemplates,
 } from '@/lib/mock/mockInbox';
 import { mockAgents } from '@/lib/mock/mockAgents';
 import { getCurrentUser, User } from '@/lib/auth';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 
 // --- HELPER TYPES ---
 interface OutboundMessage extends Message {
   status?: 'sent' | 'delivered' | 'read';
 }
+
+function TemplateDialog({
+  open,
+  onOpenChange,
+  onSendTemplate,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSendTemplate: (template: TemplateType, variables: Record<string, string>) => void;
+}) {
+  const [selectedTemplate, setSelectedTemplate] = React.useState<TemplateType | null>(
+    null
+  );
+  const [variables, setVariables] = React.useState<Record<string, string>>({});
+
+  const variablePlaceholders = React.useMemo(() => {
+    if (!selectedTemplate) return [];
+    const regex = /\{\{(\d+)\}\}/g;
+    const matches = new Set<string>();
+    let match;
+    while ((match = regex.exec(selectedTemplate.content)) !== null) {
+      matches.add(match[1]);
+    }
+    return Array.from(matches).sort((a, b) => parseInt(a) - parseInt(b));
+  }, [selectedTemplate]);
+
+  const handleVariableChange = (key: string, value: string) => {
+    setVariables((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleSend = () => {
+    if (selectedTemplate) {
+      onSendTemplate(selectedTemplate, variables);
+      onOpenChange(false);
+      setSelectedTemplate(null);
+      setVariables({});
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Send Template Message</DialogTitle>
+          <DialogDescription>
+            The 24-hour window is closed. You must send a template message to
+            re-open the conversation.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-6 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="template">Message Template</Label>
+            <Select
+              onValueChange={(val) =>
+                setSelectedTemplate(mockTemplates.find((t) => t.id === val) || null)
+              }
+            >
+              <SelectTrigger className="rounded-xl">
+                <SelectValue placeholder="Select an approved template" />
+              </SelectTrigger>
+              <SelectContent>
+                {mockTemplates.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.name} ({t.category})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {selectedTemplate && (
+            <div className="space-y-4 rounded-2xl bg-secondary/50 p-4">
+              <div className="space-y-2">
+                <Label className="text-muted-foreground">Template Preview</Label>
+                <p className="whitespace-pre-wrap rounded-xl bg-background p-3 text-sm">
+                  {selectedTemplate.content}
+                </p>
+              </div>
+              {variablePlaceholders.length > 0 && (
+                <div className="space-y-4">
+                  <Label className="text-muted-foreground">
+                    Template Variables
+                  </Label>
+                  {variablePlaceholders.map((key) => (
+                    <div key={key} className="space-y-2">
+                      <Label
+                        htmlFor={`var-${key}`}
+                        className="font-mono text-sm"
+                      >{`{{${key}}}`}</Label>
+                      <Input
+                        id={`var-${key}`}
+                        value={variables[key] || ''}
+                        onChange={(e) => handleVariableChange(key, e.target.value)}
+                        className="rounded-xl"
+                        placeholder={`Enter value for variable ${key}`}
+                        suppressHydrationWarning={true}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button
+            onClick={handleSend}
+            className="rounded-full"
+            size="lg"
+            disabled={
+              !selectedTemplate ||
+              variablePlaceholders.length !== Object.keys(variables).length
+            }
+          >
+            Send Template
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 
 // --- COMPONENTS ---
 
@@ -49,9 +198,15 @@ function ConversationList({
   onSelect: (id: string) => void;
 }) {
   return (
-    <div className="h-full flex flex-col bg-background border-r">
-      <ScrollArea className="flex-1 w-full">
-        <div className="flex min-h-full flex-col w-full">
+    <div className="flex h-full flex-col border-r bg-background">
+      <div className="shrink-0 border-b p-3">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input placeholder="Search or start new chat" className="h-10 rounded-full pl-10" />
+        </div>
+      </div>
+      <ScrollArea className="flex-1">
+        <div className="flex w-full min-h-full flex-col">
           {conversations.map((c) => (
             <ConversationRow
               key={c.id}
@@ -139,8 +294,10 @@ function ConversationRow({
 
 function MessagePanel({
   conversation,
+  onOpenTemplateDialog,
 }: {
   conversation: Conversation;
+  onOpenTemplateDialog: () => void;
 }) {
   const scrollAreaRef = React.useRef<HTMLDivElement>(null);
 
@@ -154,8 +311,8 @@ function MessagePanel({
   }, [conversation.messages]);
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 min-w-0 overflow-hidden">
-      <div className="flex items-center gap-3 border-b bg-background p-2 shrink-0">
+    <div className="flex h-full min-w-0 flex-col overflow-hidden bg-slate-50">
+      <div className="flex shrink-0 items-center gap-3 border-b bg-background p-2">
         <Avatar className="h-9 w-9 border" data-ai-hint="person portrait">
           <AvatarImage src={conversation.avatar} />
           <AvatarFallback>{conversation.name.charAt(0)}</AvatarFallback>
@@ -164,9 +321,32 @@ function MessagePanel({
           <p className="font-semibold truncate">{conversation.name}</p>
           <p className="text-sm text-muted-foreground truncate">{conversation.phone}</p>
         </div>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
+            <Search className="h-5 w-5 text-muted-foreground" />
+          </Button>
+           <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
+                <MoreHorizontal className="h-5 w-5 text-muted-foreground" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuItem>Contact info</DropdownMenuItem>
+              <DropdownMenuItem>Select messages</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem>Mute notifications</DropdownMenuItem>
+              <DropdownMenuItem>Clear messages</DropdownMenuItem>
+              <DropdownMenuItem className="text-destructive">
+                Delete chat
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
       <ScrollArea className="flex-1 w-full" viewportRef={scrollAreaRef}>
-        <div className="p-4 md:p-6 space-y-1 w-full">
+        <div className="space-y-1 p-4 md:p-6">
           {conversation.messages.map((m) => {
             if (m.type === 'internal') {
               return <InternalNote key={m.id} message={m} />;
@@ -199,7 +379,7 @@ function MessagePanel({
                 </div>
               </div>
             );
-})}
+          })}
         </div>
       </ScrollArea>
     </div>
@@ -248,16 +428,22 @@ const ReadStatus = ({
 
 function ReplyBox({
   onSend,
+  onOpenTemplateDialog,
   disabled,
 }: {
   onSend: (text: string) => void;
+  onOpenTemplateDialog: () => void;
   disabled?: boolean;
 }) {
   const [text, setText] = React.useState('');
 
   const handleSend = () => {
-    if (!text.trim() || disabled) return;
-    onSend(text);
+    if (!text.trim()) return;
+    if (disabled) {
+      onOpenTemplateDialog();
+    } else {
+      onSend(text);
+    }
     setText('');
   };
 
@@ -267,30 +453,27 @@ function ReplyBox({
         <Button
           variant="ghost"
           size="icon"
-          className="rounded-full h-10 w-10"
-          disabled={disabled}
+          className="h-10 w-10 rounded-full"
         >
           <Paperclip className="h-5 w-5 text-muted-foreground" />
         </Button>
         <Input
           placeholder={
             disabled
-              ? 'This conversation is closed'
+              ? '24-hour window closed. Send template to continue.'
               : 'Type a message or /note for an internal note...'
           }
-          className="rounded-full h-11 flex-1"
+          className="h-11 flex-1 rounded-full"
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSend()}
           suppressHydrationWarning
-          disabled={disabled}
         />
-        {text.trim() ? (
+        {text.trim() || disabled ? (
           <Button
             size="icon"
             className="h-10 w-10 rounded-full bg-primary text-primary-foreground"
             onClick={handleSend}
-            disabled={disabled}
           >
             <Send className="h-5 w-5" />
           </Button>
@@ -298,7 +481,6 @@ function ReplyBox({
           <Button
             size="icon"
             className="h-10 w-10 rounded-full bg-primary text-primary-foreground"
-            disabled={disabled}
           >
             <Mic className="h-5 w-5" />
           </Button>
@@ -310,6 +492,8 @@ function ReplyBox({
 
 export default function InboxPage() {
   const [currentUser, setCurrentUser] = React.useState<User | null>(null);
+  const [isTemplateDialogOpen, setTemplateDialogOpen] = React.useState(false);
+
 
   React.useEffect(() => {
     setCurrentUser(getCurrentUser());
@@ -333,6 +517,17 @@ export default function InboxPage() {
     () => conversations.find((c) => c.id === selectedId),
     [selectedId, conversations]
   );
+  
+  const handleSendTemplate = (
+    template: TemplateType,
+    variables: Record<string, string>
+  ) => {
+    let content = template.content;
+    for (const key in variables) {
+      content = content.replace(`{{${key}}}`, variables[key]);
+    }
+    handleSend(`TEMPLATE: ${template.name}\n${content}`);
+  };
 
   const handleSend = (text: string) => {
     if (!selectedId || !currentUser) return;
@@ -372,6 +567,8 @@ export default function InboxPage() {
             lastAgentMessageAt: isInternal
               ? c.lastAgentMessageAt
               : newTimestamp,
+            // When we send a message, the 24hr window re-opens
+            isWindowOpen: true,
           };
         }
         return c;
@@ -429,8 +626,9 @@ export default function InboxPage() {
   const isReplyDisabled = !selectedConversation?.isWindowOpen;
 
   return (
+    <>
     <div className="flex h-full max-h-[calc(100vh-theme(spacing.14))] items-stretch bg-background md:max-h-full">
-      <div className="flex-shrink-0 w-96 bg-background h-full">
+      <div className="h-full w-full max-w-sm flex-shrink-0 bg-background">
          <ConversationList
             conversations={conversations}
             selectedId={selectedId}
@@ -442,8 +640,13 @@ export default function InboxPage() {
             <>
               <MessagePanel
                 conversation={selectedConversation}
+                onOpenTemplateDialog={() => setTemplateDialogOpen(true)}
               />
-              <ReplyBox onSend={handleSend} disabled={isReplyDisabled} />
+              <ReplyBox 
+                onSend={handleSend} 
+                disabled={isReplyDisabled}
+                onOpenTemplateDialog={() => setTemplateDialogOpen(true)}
+              />
             </>
           ) : (
             <div className="flex h-full flex-col items-center justify-center p-4 text-center bg-background">
@@ -460,5 +663,12 @@ export default function InboxPage() {
           )}
       </div>
     </div>
+    <TemplateDialog 
+        open={isTemplateDialogOpen}
+        onOpenChange={setTemplateDialogOpen}
+        onSendTemplate={handleSendTemplate}
+      />
+    </>
   );
 }
+    

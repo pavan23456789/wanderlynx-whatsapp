@@ -11,6 +11,7 @@ import {
   FileText,
   MoreVertical,
   Archive,
+  Loader2,
 } from 'lucide-react';
 import { format, isToday, isYesterday, differenceInHours } from 'date-fns';
 
@@ -19,13 +20,9 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
-import {
-  mockConversations as initialConversations,
-  type Conversation,
-  type Message,
-  type Template as TemplateType,
-  mockTemplates,
-} from '@/lib/mock/mockInbox';
+import type {
+  Template as TemplateType,
+} from '@/lib/data';
 import { mockAgents } from '@/lib/mock/mockAgents';
 import { getCurrentUser, User } from '@/lib/auth';
 import {
@@ -53,11 +50,28 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
 
-// --- HELPER TYPES ---
-interface OutboundMessage extends Message {
-  status?: 'sent' | 'delivered' | 'read';
-}
+// --- DATA TYPES ---
+// These types now reflect the data coming from the API
+export type Message = {
+  id: string;
+  text: string;
+  sender: 'me' | 'them'; // 'me' is outbound, 'them' is inbound
+  time: string; // ISO 8601 string
+};
+
+export type Conversation = {
+  id: string;
+  name: string;
+  phone: string;
+  avatar: string;
+  lastMessage: string;
+  lastMessageTimestamp: string;
+  unread: number;
+  messages: Message[];
+};
+
 
 function TemplateDialog({
   open,
@@ -71,12 +85,27 @@ function TemplateDialog({
     variables: Record<string, string>
   ) => void;
 }) {
+  const [templates, setTemplates] = React.useState<TemplateType[]>([]);
   const [selectedTemplate, setSelectedTemplate] =
     React.useState<TemplateType | null>(null);
   const [variables, setVariables] = React.useState<Record<string, string>>({});
+  
+  React.useEffect(() => {
+    if (open) {
+      const fetchTemplates = async () => {
+        const response = await fetch('/api/templates');
+        if(response.ok) {
+            const data = await response.json();
+            setTemplates(data);
+        }
+      }
+      fetchTemplates();
+    }
+  }, [open]);
 
   const variablePlaceholders = React.useMemo(() => {
     if (!selectedTemplate) return [];
+    // Updated regex to find variables like {{1}}, {{2}}, etc.
     const regex = /\{\{(\d+)\}\}/g;
     const matches = new Set<string>();
     let match;
@@ -115,7 +144,7 @@ function TemplateDialog({
             <Select
               onValueChange={(val) =>
                 setSelectedTemplate(
-                  mockTemplates.find((t) => t.id === val) || null
+                  templates.find((t) => t.name === val) || null
                 )
               }
             >
@@ -123,8 +152,8 @@ function TemplateDialog({
                 <SelectValue placeholder="Select an approved template" />
               </SelectTrigger>
               <SelectContent>
-                {mockTemplates.map((t) => (
-                  <SelectItem key={t.id} value={t.id}>
+                {templates.map((t) => (
+                  <SelectItem key={t.id} value={t.name}>
                     {t.name} ({t.category})
                   </SelectItem>
                 ))}
@@ -185,9 +214,7 @@ function TemplateDialog({
   );
 }
 
-// --- COMPONENTS ---
-
-const formatFuzzyDate = (timestamp: number) => {
+const formatFuzzyDate = (timestamp: string | number) => {
   const d = new Date(timestamp);
   if (isToday(d)) return format(d, 'p');
   if (isYesterday(d)) return 'Yesterday';
@@ -198,11 +225,28 @@ function ConversationList({
   conversations,
   selectedId,
   onSelect,
+  isLoading,
 }: {
   conversations: Conversation[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  isLoading: boolean;
 }) {
+  if (isLoading) {
+    return (
+      <div className="flex h-full flex-col border-r bg-background p-3 space-y-3">
+        {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3">
+                <Skeleton className="h-12 w-12 rounded-full" />
+                <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-4 w-1/2" />
+                </div>
+            </div>
+        ))}
+      </div>
+    );
+  }
   return (
     <div className="flex h-full flex-col border-r bg-background">
       <div className="shrink-0 border-b p-3">
@@ -239,16 +283,10 @@ function ConversationRow({
   onSelect: (id: string) => void;
 }) {
   const c = conversation;
-  const isUnread = (c.unread ?? 0) > 0;
+  const isUnread = c.unread > 0;
   
-  let previewText = c.lastMessage;
-  if (previewText.length > 10) {
-      previewText = previewText.slice(0, 10) + "…";
-  }
-
-  const lastMessageIsOutbound = c.messages[c.messages.length - 1]?.type === 'outbound';
-  const outboundStatus = lastMessageIsOutbound ? (c.messages[c.messages.length - 1] as OutboundMessage).status : undefined;
-
+  const previewText = c.lastMessage.length > 10 ? c.lastMessage.slice(0, 10) + "…" : c.lastMessage;
+  const lastMessageIsOutbound = c.messages[c.messages.length - 1]?.sender === 'me';
 
   return (
     <div
@@ -283,7 +321,7 @@ function ConversationRow({
             <>
               {lastMessageIsOutbound && (
                 <ReadStatus
-                  status={outboundStatus}
+                  status={'read'} // Mock, should come from data
                   className="mr-1 h-4 w-4 shrink-0"
                 />
               )}
@@ -294,7 +332,7 @@ function ConversationRow({
       </div>
 
       <div className="flex h-[42px] w-6 shrink-0 flex-col items-end justify-between pl-2 text-muted-foreground">
-        {isUnread && (
+        {isUnread > 0 && (
           <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
             {c.unread}
           </div>
@@ -364,8 +402,10 @@ function MessagePanel({
       <ScrollArea className="w-full flex-1" viewportRef={scrollAreaRef}>
         <div className="space-y-1 p-4 md:p-6">
           {conversation.messages.map((m) => {
-            const agent = m.agentId ? mockAgents.find(a => a.id === m.agentId) : null;
-            if (m.type === 'internal') {
+             // Internal notes are not supported by the API yet
+             const isInternal = false;
+             const agent = null; // Agent info isn't in message data yet
+            if (isInternal) {
               return <InternalNote key={m.id} message={m} agent={agent} />;
             }
             return (
@@ -373,16 +413,16 @@ function MessagePanel({
                 key={m.id}
                 className={cn(
                   'flex items-end gap-2',
-                  m.type === 'outbound' ? 'justify-end' : 'justify-start'
+                  m.sender === 'me' ? 'justify-end' : 'justify-start'
                 )}
               >
                 <div
                   className={cn(
                     'relative max-w-[75%] rounded-lg px-3 py-2 shadow-sm',
-                    m.type === 'outbound' ? 'bg-green-100' : 'bg-background'
+                    m.sender === 'me' ? 'bg-green-100' : 'bg-background'
                   )}
                 >
-                  {m.type === 'outbound' && agent && (
+                  {m.sender === 'me' && agent && (
                      <div className="text-xs font-semibold text-gray-600 mb-1">
                         {agent.name} &bull; {agent.role === 'Super Admin' ? 'Admin' : 'Support'}
                      </div>
@@ -394,8 +434,8 @@ function MessagePanel({
                     <span suppressHydrationWarning>
                       {format(new Date(m.time), 'p')}
                     </span>
-                    {m.type === 'outbound' && (
-                      <ReadStatus status={(m as OutboundMessage).status} />
+                    {m.sender === 'me' && (
+                      <ReadStatus status={'read'} /> // Mock
                     )}
                   </div>
                 </div>
@@ -429,10 +469,10 @@ const ReadStatus = ({
   status,
   className,
 }: {
-  status?: 'sent' | 'delivered' | 'read';
+  status?: 'sent' | 'delivered' | 'read' | 'pending';
   className?: string;
 }) => {
-  if (!status || status === 'sent') {
+  if (!status || status === 'sent' || status === 'pending') {
     return <Check className={cn('inline h-4 w-4', className)} />;
   }
   if (status === 'delivered') {
@@ -477,15 +517,16 @@ function ReplyBox({
           placeholder={
             disabled
               ? '24-hour window closed. Send template to continue.'
-              : 'Type a message or /note for an internal note...'
+              : 'Type a message... (Templates only for now)'
           }
           className="h-11 flex-1 rounded-full"
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSend()}
           suppressHydrationWarning
+          disabled // Free text is disabled for now, only templates
         />
-        {text.trim() || disabled ? (
+        {disabled ? (
           <Button
             size="icon"
             className="h-10 w-10 rounded-full bg-primary text-primary-foreground"
@@ -497,6 +538,7 @@ function ReplyBox({
           <Button
             size="icon"
             className="h-10 w-10 rounded-full bg-primary text-primary-foreground"
+            disabled
           >
             <Mic className="h-5 w-5" />
           </Button>
@@ -507,140 +549,107 @@ function ReplyBox({
 }
 
 export default function InboxPage() {
+  const { toast } = useToast();
   const [currentUser, setCurrentUser] = React.useState<User | null>(null);
   const [isTemplateDialogOpen, setTemplateDialogOpen] = React.useState(false);
-  const [conversations, setConversations] = React.useState<Conversation[]>(
-    () => {
-      // Sort conversations by pinned status, then by most recent message
-      return [...initialConversations].sort((a, b) => {
-        if (a.pinned && !b.pinned) return -1;
-        if (!a.pinned && b.pinned) return 1;
-        return b.lastMessageTimestamp - a.lastMessageTimestamp;
-      });
+  const [conversations, setConversations] = React.useState<Conversation[]>([]);
+  const [selectedId, setSelectedId] = React.useState<string | null>(null);
+  const [isLoading, setIsLoading] = React.useState(true);
+  
+  const fetchConversations = React.useCallback(async () => {
+    try {
+      const response = await fetch('/api/conversations');
+      if (!response.ok) {
+        throw new Error('Failed to fetch conversations');
+      }
+      const data = await response.json();
+      setConversations(data);
+      if (!selectedId && data.length > 0) {
+        setSelectedId(data[0].id);
+      }
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: error.message });
+    } finally {
+      setIsLoading(false);
     }
-  );
+  }, [toast, selectedId]);
   
   React.useEffect(() => {
     setCurrentUser(getCurrentUser());
-  }, []);
-
-  const [selectedId, setSelectedId] = React.useState<string | null>(
-    conversations.find(c => c.pinned)?.id || conversations[0]?.id || null
-  );
-
+    fetchConversations();
+    const interval = setInterval(fetchConversations, 15000);
+    return () => clearInterval(interval);
+  }, [fetchConversations]);
+  
   const selectedConversation = React.useMemo(
     () => conversations.find((c) => c.id === selectedId),
     [selectedId, conversations]
   );
   
   const isWindowOpen = React.useMemo(() => {
-    if (!selectedConversation?.lastCustomerMessageAt) return false;
+    if (!selectedConversation?.lastMessageTimestamp) return false;
+    const lastMsgTime = new Date(selectedConversation.lastMessageTimestamp);
+    // Find the last INBOUND message to check the window
+    const lastCustomerMessage = [...selectedConversation.messages].reverse().find(m => m.sender === 'them');
+    if (!lastCustomerMessage) return false;
+    
     const hoursSinceLastMessage = differenceInHours(
       new Date(),
-      new Date(selectedConversation.lastCustomerMessageAt)
+      new Date(lastCustomerMessage.time)
     );
     return hoursSinceLastMessage < 24;
   }, [selectedConversation]);
 
-  const handleSendTemplate = (
+  const handleSendTemplate = async (
     template: TemplateType,
     variables: Record<string, string>
   ) => {
-    let content = template.content;
-    for (const key in variables) {
-      content = content.replace(`{{${key}}}`, variables[key]);
-    }
-    handleSend(`TEMPLATE: ${template.name}\n${content}`);
-  };
+    if (!selectedConversation) return;
 
-  const handleSend = (text: string) => {
-    if (!selectedId || !currentUser) return;
-
-    const newTimestamp = new Date().getTime();
-    let newMessage: Message;
-    const isInternalNote = text.startsWith('/note ');
-
-    if (isInternalNote) {
-      newMessage = {
-        id: `msg_${newTimestamp}`,
-        type: 'internal',
-        agentId: currentUser.id,
-        text: text.substring(6), // Remove '/note '
-        time: new Date(newTimestamp).toISOString(),
-      };
-    } else {
-      newMessage = {
-        id: `msg_${newTimestamp}`,
-        type: 'outbound',
-        text: text,
-        time: new Date(newTimestamp).toISOString(),
-        status: 'sent',
-        agentId: currentUser.id, // Associate agent with outbound message
-      } as OutboundMessage;
-    }
-
-    setConversations((convs) => {
-      const newConvs = convs.map((c) => {
-        if (c.id === selectedId) {
-          return {
-            ...c,
-            messages: [...c.messages, newMessage],
-            lastMessage: isInternalNote ? c.lastMessage : text,
-            lastMessageTimestamp: newTimestamp,
-            lastAgentMessageAt: newTimestamp,
-          };
-        }
-        return c;
+    // The API expects variables as a simple array of strings in order.
+    const sortedVarKeys = Object.keys(variables).sort((a, b) => parseInt(a) - parseInt(b));
+    const params = sortedVarKeys.map(key => variables[key]);
+    
+    try {
+      const response = await fetch('/api/conversations/reply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contactId: selectedConversation.id,
+          templateName: template.name,
+          params: params,
+        }),
       });
 
-      // Re-sort conversations after sending a message
-      return newConvs.sort((a, b) => {
-        if (a.pinned && !b.pinned) return -1;
-        if (!a.pinned && b.pinned) return 1;
-        return b.lastMessageTimestamp - a.lastMessageTimestamp;
-      });
-    });
-
-    if (newMessage.type === 'outbound') {
-      setTimeout(() => {
-        setConversations((convs) =>
-          convs.map((c) => {
-            if (c.id === selectedId) {
-              const updatedMessages = c.messages.map((m) =>
-                m.id === newMessage.id
-                  ? { ...m, status: 'delivered' as const }
-                  : m
-              );
-              return { ...c, messages: updatedMessages };
-            }
-            return c;
-          })
-        );
-      }, 1000);
-      setTimeout(() => {
-        setConversations((convs) =>
-          convs.map((c) => {
-            if (c.id === selectedId) {
-              const updatedMessages = c.messages.map((m) =>
-                m.id === newMessage.id ? { ...m, status: 'read' as const } : m
-              );
-              return { ...c, messages: updatedMessages };
-            }
-            return c;
-          })
-        );
-      }, 2500);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to send template message');
+      }
+      toast({ title: "Message Sent", description: `Template "${template.name}" sent.` });
+      fetchConversations(); // Re-fetch to show the new message
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: error.message });
     }
   };
 
-  const handleSelectConversation = (id: string) => {
+  // This function is no longer used for sending messages as free-text is disabled
+  const handleSend = (text: string) => {};
+  
+  const handleSelectConversation = async (id: string) => {
     setSelectedId(id);
-    setConversations((convs) =>
-      convs.map((c) => (c.id === id ? { ...c, unread: 0 } : c))
-    );
+    // Fetch messages for the selected conversation
+    try {
+      const response = await fetch(`/api/conversations/messages?contactId=${id}`);
+      if (!response.ok) throw new Error('Failed to fetch messages');
+      const messages = await response.json();
+      setConversations(convs => convs.map(c => c.id === id ? { ...c, messages, unread: 0 } : c));
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Error', description: error.message });
+    }
   };
   
   const handleArchive = (id: string) => {
+      // Archiving is a visual-only operation for now
       setConversations(convs => convs.filter(c => c.id !== id));
       if (selectedId === id) {
           const nextConversation = conversations.find(c => c.id !== id);
@@ -660,6 +669,7 @@ export default function InboxPage() {
             conversations={conversations}
             selectedId={selectedId}
             onSelect={handleSelectConversation}
+            isLoading={isLoading}
           />
         </div>
         <div className="flex min-w-0 flex-1 flex-col h-full">
@@ -678,15 +688,17 @@ export default function InboxPage() {
             </>
           ) : (
             <div className="flex h-full flex-col items-center justify-center bg-background p-4 text-center">
-              <div className="text-center">
-                <MessageSquare className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-                <h3 className="text-xl font-semibold">
-                  Select a conversation
-                </h3>
-                <p className="mt-2 text-muted-foreground">
-                  Choose from an existing conversation to start chatting.
-                </p>
-              </div>
+              {isLoading ? <Loader2 className="h-12 w-12 animate-spin text-muted-foreground" /> :
+                <div className="text-center">
+                  <MessageSquare className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+                  <h3 className="text-xl font-semibold">
+                    Select a conversation
+                  </h3>
+                  <p className="mt-2 text-muted-foreground">
+                    Choose from an existing conversation to start chatting.
+                  </p>
+                </div>
+              }
             </div>
           )}
         </div>
@@ -699,3 +711,5 @@ export default function InboxPage() {
     </>
   );
 }
+
+    

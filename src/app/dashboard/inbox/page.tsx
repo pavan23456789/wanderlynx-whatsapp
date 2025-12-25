@@ -9,13 +9,6 @@ import {
   Paperclip,
   Mic,
   FileText,
-  Search,
-  UserPlus,
-  MoreVertical,
-  Pin,
-  PinOff,
-  Mail,
-  Users,
 } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
 
@@ -24,35 +17,13 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
-import { useToast } from '@/hooks/use-toast';
 import {
   mockConversations as initialConversations,
   type Conversation,
   type Message,
 } from '@/lib/mock/mockInbox';
-import { mockAgents, type Agent } from '@/lib/mock/mockAgents';
+import { mockAgents } from '@/lib/mock/mockAgents';
 import { getCurrentUser, User } from '@/lib/auth';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import {
-  Command,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 
 // --- HELPER TYPES ---
 interface OutboundMessage extends Message {
@@ -77,80 +48,11 @@ function ConversationList({
   selectedId: string | null;
   onSelect: (id: string) => void;
 }) {
-  const [search, setSearch] = React.useState('');
-
-  const filteredConversations = React.useMemo(() => {
-    return conversations.filter((c) => {
-      if (search.trim() === '') return true;
-      const searchTerm = search.toLowerCase();
-      const inName = c.name.toLowerCase().includes(searchTerm);
-      const inPhone = c.phone.toLowerCase().includes(searchTerm);
-      return inName || inPhone;
-    });
-  }, [conversations, search]);
-
-  React.useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (
-        e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement
-      ) {
-        return;
-      }
-
-      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-        e.preventDefault();
-
-        const currentIdx = filteredConversations.findIndex(
-          (c) => c.id === selectedId
-        );
-        let nextIdx;
-
-        if (e.key === 'ArrowDown') {
-          nextIdx =
-            currentIdx < filteredConversations.length - 1
-              ? currentIdx + 1
-              : 0;
-        } else {
-          // ArrowUp
-          nextIdx =
-            currentIdx > 0 ? currentIdx - 1 : filteredConversations.length - 1;
-        }
-
-        const nextConv = filteredConversations[nextIdx];
-        if (nextConv) {
-          onSelect(nextConv.id);
-          const element = document.querySelector(
-            `[data-conv-id="${nextConv.id}"]`
-          );
-          element?.scrollIntoView({ block: 'nearest' });
-        }
-      } else if (e.key === 'Enter' && selectedId) {
-        onSelect(selectedId);
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [selectedId, filteredConversations, onSelect]);
-
   return (
     <div className="h-full flex flex-col bg-background border-r">
-      <div className="flex-shrink-0 p-3 border-b">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search or start new chat..."
-            className="h-9 rounded-full bg-secondary pl-9"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            suppressHydrationWarning
-          />
-        </div>
-      </div>
       <ScrollArea className="flex-1 w-full">
         <div className="flex min-h-full flex-col w-full">
-          {filteredConversations.map((c) => (
+          {conversations.map((c) => (
             <ConversationRow
               key={c.id}
               conversation={c}
@@ -237,13 +139,10 @@ function ConversationRow({
 
 function MessagePanel({
   conversation,
-  onAssign,
 }: {
   conversation: Conversation;
-  onAssign: (agentId: string | null) => void;
 }) {
   const scrollAreaRef = React.useRef<HTMLDivElement>(null);
-  const currentUser = getCurrentUser();
 
   React.useEffect(() => {
     if (scrollAreaRef.current) {
@@ -253,10 +152,6 @@ function MessagePanel({
       });
     }
   }, [conversation.messages]);
-
-  const assignedAgent = mockAgents.find(
-    (a) => a.id === conversation.assignedTo
-  );
 
   return (
     <div className="h-full flex flex-col bg-slate-50 min-w-0 overflow-hidden">
@@ -268,34 +163,6 @@ function MessagePanel({
         <div className="flex-1 min-w-0">
           <p className="font-semibold truncate">{conversation.name}</p>
           <p className="text-sm text-muted-foreground truncate">{conversation.phone}</p>
-        </div>
-        <div className="flex items-center gap-2">
-         <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
-                <MoreVertical className="h-5 w-5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem>
-                <Search className="mr-2 h-4 w-4" />
-                <span>Search</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Mail className="mr-2 h-4 w-4" />
-                <span>Mark as Unread</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem disabled>
-                <UserPlus className="mr-2 h-4 w-4" />
-                <span>Assign to...</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem disabled>
-                <Pin className="mr-2 h-4 w-4" />
-                <span>Pin Conversation</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
       </div>
       <ScrollArea className="flex-1 w-full" viewportRef={scrollAreaRef}>
@@ -332,7 +199,7 @@ function MessagePanel({
                 </div>
               </div>
             );
-          })}
+})}
         </div>
       </ScrollArea>
     </div>
@@ -467,19 +334,6 @@ export default function InboxPage() {
     [selectedId, conversations]
   );
 
-  const handleAssignAgent = (agentId: string | null) => {
-    if (!selectedId) return;
-
-    setConversations((prev) =>
-      prev.map((c) => {
-        if (c.id === selectedId) {
-          return { ...c, assignedTo: agentId };
-        }
-        return c;
-      })
-    );
-  };
-
   const handleSend = (text: string) => {
     if (!selectedId || !currentUser) return;
 
@@ -588,7 +442,6 @@ export default function InboxPage() {
             <>
               <MessagePanel
                 conversation={selectedConversation}
-                onAssign={handleAssignAgent}
               />
               <ReplyBox onSend={handleSend} disabled={isReplyDisabled} />
             </>

@@ -594,11 +594,11 @@ function MessageBubble({
             Sent by {agent.name}
           </div>
         )}
-        <p className="max-w-full overflow-hidden whitespace-pre-wrap break-all text-sm md:text-base">
+        <p className="max-w-full overflow-hidden whitespace-pre-wrap break-words text-sm md:text-base">
           {message.text}
         </p>
       </div>
-      <div className="mt-1 flex items-center justify-end gap-1 whitespace-nowrap px-1 text-[11px] text-muted-foreground/80">
+       <div className="mt-1 flex items-center justify-end gap-1 whitespace-nowrap px-1 text-[11px] text-muted-foreground/80">
         <span suppressHydrationWarning>
           {format(new Date(message.time), 'p')}
         </span>
@@ -775,7 +775,7 @@ export default function InboxPage() {
           return { 
             ...c, 
             messages: updatedMessages,
-            lastMessage: text,
+            lastMessage: type !== 'internal' ? text : c.lastMessage,
             lastMessageTimestamp: new Date().getTime(),
              ...(type !== 'internal' && { unread: 0 }),
           };

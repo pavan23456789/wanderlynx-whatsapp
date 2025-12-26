@@ -339,15 +339,23 @@ const stateConfig = {
   Resolved: { className: 'bg-gray-200 text-gray-800' },
 } as const;
 
+type FilterState = 'All' | 'Open' | 'Pending' | 'Resolved';
+
 function ConversationList({
   conversations,
   selectedId,
   onSelect,
+  activeFilter,
+  onSetFilter,
 }: {
   conversations: Conversation[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  activeFilter: FilterState;
+  onSetFilter: (filter: FilterState) => void;
 }) {
+  const filters: FilterState[] = ['All', 'Open', 'Pending', 'Resolved'];
+
   return (
     <div className="flex h-full flex-col border-r bg-background">
       <div className="shrink-0 border-b p-3">
@@ -358,17 +366,36 @@ function ConversationList({
             className="h-10 rounded-full pl-9"
           />
         </div>
+        <div className="mt-3 flex gap-1">
+          {filters.map((filter) => (
+            <Button
+              key={filter}
+              variant={activeFilter === filter ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-7 rounded-full px-3 text-xs"
+              onClick={() => onSetFilter(filter)}
+            >
+              {filter}
+            </Button>
+          ))}
+        </div>
       </div>
       <ScrollArea className="flex-1">
         <div className="flex min-h-full w-full flex-col">
-          {conversations.map((c) => (
-            <ConversationRow
-              key={c.id}
-              conversation={c}
-              isActive={selectedId === c.id}
-              onSelect={onSelect}
-            />
-          ))}
+          {conversations.length > 0 ? (
+            conversations.map((c) => (
+              <ConversationRow
+                key={c.id}
+                conversation={c}
+                isActive={selectedId === c.id}
+                onSelect={onSelect}
+              />
+            ))
+          ) : (
+            <div className="flex h-full items-center justify-center p-4 text-center text-sm text-muted-foreground">
+              No conversations match the current filter.
+            </div>
+          )}
         </div>
       </ScrollArea>
     </div>
@@ -626,8 +653,8 @@ function MessageBubble({
 
   // ⚠️ CHAT BUBBLE SAFETY — DO NOT TOUCH
   // `w-fit` + `min-w-0` are REQUIRED to prevent flex-end
-  // shrink-to-fit width collapse for long or repeated messages.
-  // Removing these WILL break message rendering.
+  // shrink-to-fit width collapse for long messages.
+  // Do NOT remove or replace with flex-1 or w-full.
   return (
     <div
       className={cn(
@@ -646,10 +673,10 @@ function MessageBubble({
             Sent by {agent.name}
           </div>
         )}
-        {/* ⚠️ TEXT RENDERING INVARIANT */}
-        {/* Do NOT add `overflow-hidden`, `line-clamp`, or truncation here. */}
-        {/* Chat messages must always render full text with natural wrapping. */}
-        <p className="block whitespace-pre-wrap break-all">
+        {/* ⚠️ TEXT RENDERING INVARIANT
+// Do NOT add `overflow-hidden`, `line-clamp`, or truncation here.
+// Chat messages must always render full text with natural wrapping. */}
+        <p className="block whitespace-pre-wrap break-words">
           {message.text}
         </p>
       </div>
@@ -815,12 +842,36 @@ TooltipContent.displayName = TooltipPrimitive.Content.displayName;
 export default function InboxPage() {
   const [currentUser, setCurrentUser] = React.useState<User | null>(null);
   const [conversations, setConversations] = React.useState<Conversation[]>(mockConversations);
-  const [selectedId, setSelectedId] = React.useState<string | null>(mockConversations[0]?.id || null);
-
+  const [selectedId, setSelectedId] = React.useState<string | null>(null);
+  const [activeFilter, setActiveFilter] = React.useState<FilterState>('All');
+  
   React.useEffect(() => {
     setCurrentUser(getCurrentUser());
   }, []);
 
+  const filteredConversations = React.useMemo(() => {
+    const sorted = [...conversations].sort(
+      (a, b) => (b.pinned ? 1 : -1) - (a.pinned ? 1 : -1) || b.lastMessageTimestamp - a.lastMessageTimestamp
+    );
+
+    if (activeFilter === 'All') {
+      return sorted;
+    }
+    return sorted.filter((c) => c.state === activeFilter);
+  }, [conversations, activeFilter]);
+
+  React.useEffect(() => {
+    // If there's a selected conversation, check if it's still in the filtered list.
+    // If not, clear the selection.
+    if (selectedId && !filteredConversations.find(c => c.id === selectedId)) {
+        setSelectedId(null);
+    }
+    // If there is no selection, but the list is not empty, select the first one.
+    else if (!selectedId && filteredConversations.length > 0) {
+        setSelectedId(filteredConversations[0].id);
+    }
+  }, [selectedId, filteredConversations]);
+  
   const handleSelectConversation = (conversationId: string) => {
     setSelectedId(conversationId);
     // Mark as read
@@ -832,6 +883,9 @@ export default function InboxPage() {
   };
 
   const handleSetConversationState = (conversationId: string, state: Conversation['state']) => {
+    // ⚠️ STATE BEHAVIOR GUARANTEE
+    // Sending a message in a Resolved conversation MUST reopen it.
+    // This is intentional UX behavior. Do NOT remove this guardrail.
     setConversations(prev =>
       prev.map(c =>
         c.id === conversationId ? { ...c, state: state } : c
@@ -907,15 +961,17 @@ export default function InboxPage() {
       <div className="flex h-full max-h-[calc(100vh-theme(spacing.14))] min-w-0 items-stretch bg-card md:max-h-full">
         <div className="h-full w-full max-w-sm flex-shrink-0 bg-card">
           <ConversationList
-            conversations={conversations}
+            conversations={filteredConversations}
             selectedId={selectedId}
             onSelect={handleSelectConversation}
+            activeFilter={activeFilter}
+            onSetFilter={setActiveFilter}
           />
         </div>
-        {/* ⚠️ LAYOUT INVARIANT — DO NOT MODIFY */}
-        {/* This middle panel MUST use `flex-[1_1_0%]` with `min-w-0`. */}
-        {/* Changing this causes the message panel to shrink or leave unused space */}
-        {/* in a 3-column flex layout with a fixed-width sidebar. */}
+        {/* ⚠️ LAYOUT INVARIANT — DO NOT MODIFY
+// This panel MUST use `flex-[1_1_0%]` and `min-w-0`.
+// Changing this causes the middle panel to collapse horizontally
+// in a 3-column flex layout with a fixed sidebar. */}
         <div className="flex flex-[1_1_0%] min-w-0 flex-col h-full">
           {selectedConversation ? (
             <MessagePanel

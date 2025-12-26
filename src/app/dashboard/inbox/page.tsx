@@ -8,13 +8,14 @@ import {
   CheckCheck,
   Paperclip,
   FileText,
-  MoreVertical,
   Archive,
   Pin,
   Search,
   AlertTriangle,
+  MoreVertical,
 } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
+import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -362,7 +363,7 @@ function ConversationRow({
   const lastVisibleMessage = [...c.messages].reverse().find(m => m.type !== 'internal');
   
   const previewTextRaw = lastVisibleMessage?.text || c.lastMessage || '';
-  const previewText = previewTextRaw.length > 10 ? `${previewTextRaw.slice(0, 10)}…` : previewTextRaw;
+  const previewText = previewTextRaw.length > 10 ? `${previewTextRaw.slice(0, 10)}...` : previewTextRaw;
 
   const StateBadge = stateConfig[c.state];
 
@@ -708,8 +709,8 @@ function ReplyBox({
 }
 
 // Tooltip Components (kept for unassigned reply icon)
-const TooltipProvider = Tooltip;
 const Tooltip = TooltipPrimitive.Root;
+const TooltipProvider = TooltipPrimitive.Provider;
 const TooltipTrigger = TooltipPrimitive.Trigger;
 const TooltipContent = React.forwardRef<
   React.ElementRef<typeof TooltipPrimitive.Content>,

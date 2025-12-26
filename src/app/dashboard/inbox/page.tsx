@@ -13,6 +13,8 @@ import {
   MoreVertical,
   Trash2,
   CheckCircle2,
+  Undo2,
+  RefreshCcw,
 } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
@@ -122,6 +124,7 @@ const mockConversations: Conversation[] = [
     messages: [
       { id: 'msg_1_1', type: 'inbound', text: 'Hi there, I have a question about my booking.', time: new Date(now - 3 * 60 * 1000).toISOString() },
       { id: 'msg_1_2', type: 'outbound', text: 'Sure, I can help with that. What is your booking ID?', time: new Date(now - 2 * 60 * 1000).toISOString(), status: 'read', agentId: '2' },
+      { id: 'msg_1_3', type: 'outbound', text: 'This message has failed to send.', time: new Date(now - 1 * 60 * 1000).toISOString(), status: 'failed', agentId: '2' },
     ],
     assignedTo: '2',
     pinned: true,
@@ -389,10 +392,12 @@ function ConversationRow({
   const lastVisibleMessage = [...c.messages].reverse().find(m => m.type !== 'internal');
   
   const rawPreviewText = lastVisibleMessage?.text || c.lastMessage || '';
+  
   // ⚠️ PREVIEW TEXT RULE
-// Preview text is intentionally limited to 10 characters + ellipsis.
-// This is a product decision. Do NOT change length or use CSS truncation.
-const previewText = rawPreviewText.length > 10 ? `${rawPreviewText.slice(0, 10)}…` : rawPreviewText;
+  // Preview text is intentionally limited to 10 characters + ellipsis.
+  // This is a product decision. Do NOT change length or use CSS truncation.
+  const previewText = rawPreviewText.length > 10 ? `${rawPreviewText.slice(0, 10)}…` : rawPreviewText;
+
 
   const StateBadge = stateConfig[c.state];
 
@@ -465,11 +470,13 @@ function MessagePanel({
   currentUser,
   onSetConversationState,
   onSendMessage,
+  onRetryMessage,
 }: {
   conversation: Conversation;
   currentUser: User | null;
   onSetConversationState: (id: string, state: Conversation['state']) => void;
   onSendMessage: (text: string, type: 'outbound' | 'internal') => void;
+  onRetryMessage: (messageId: string) => void;
 }) {
   const scrollAreaRef = React.useRef<HTMLDivElement>(null);
   const [isTemplateDialogOpen, setTemplateDialogOpen] = React.useState(false);
@@ -485,6 +492,7 @@ function MessagePanel({
   }, [conversation.messages]);
 
   const assignedAgent = mockAgents.find(a => a.id === conversation.assignedTo);
+  const isResolved = conversation.state === 'Resolved';
 
   const handleSendTemplate = (template: TemplateType, variables: Record<string, string>) => {
         let content = template.content;
@@ -493,6 +501,31 @@ function MessagePanel({
         }
         onSendMessage(content, 'outbound');
   };
+
+  const ResolveButton = () => (
+    <Button
+        variant="ghost"
+        size="icon"
+        className="h-9 w-9 rounded-full"
+        onClick={() => onSetConversationState(conversation.id, 'Resolved')}
+    >
+        <Archive className="h-5 w-5" />
+        <span className="sr-only">Mark as Resolved</span>
+    </Button>
+  );
+
+  const ReopenButton = () => (
+    <Button
+        variant="ghost"
+        size="icon"
+        className="h-9 w-9 rounded-full"
+        onClick={() => onSetConversationState(conversation.id, 'Open')}
+    >
+        <Undo2 className="h-5 w-5" />
+        <span className="sr-only">Reopen Conversation</span>
+    </Button>
+  );
+
 
   return (
     <div className="flex h-full min-w-0 flex-col overflow-hidden bg-background">
@@ -513,6 +546,7 @@ function MessagePanel({
           </div>
         </div>
         <div className="flex items-center gap-1">
+          {isResolved ? <ReopenButton /> : <ResolveButton />}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
@@ -524,13 +558,20 @@ function MessagePanel({
               <DropdownMenuItem>Contact info</DropdownMenuItem>
               <DropdownMenuItem>Search</DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem 
-                className="text-yellow-600 focus:text-yellow-600 focus:bg-yellow-50"
-                onClick={() => onSetConversationState(conversation.id, 'Resolved')}
-              >
-                <Archive className="mr-2 h-4 w-4" />
-                <span>Mark as Resolved</span>
-              </DropdownMenuItem>
+               {isResolved ? (
+                <DropdownMenuItem onClick={() => onSetConversationState(conversation.id, 'Open')}>
+                  <Undo2 className="mr-2 h-4 w-4" />
+                  <span>Reopen Conversation</span>
+                </DropdownMenuItem>
+               ) : (
+                 <DropdownMenuItem 
+                    className="text-yellow-600 focus:text-yellow-600 focus:bg-yellow-50"
+                    onClick={() => onSetConversationState(conversation.id, 'Resolved')}
+                  >
+                    <Archive className="mr-2 h-4 w-4" />
+                    <span>Mark as Resolved</span>
+                  </DropdownMenuItem>
+               )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -545,7 +586,7 @@ function MessagePanel({
               return <InternalNote key={m.id} message={m} agent={agent} />;
             }
             return (
-              <MessageBubble key={m.id} message={m} agent={agent} assignedToId={conversation.assignedTo} />
+              <MessageBubble key={m.id} message={m} agent={agent} assignedToId={conversation.assignedTo} onRetry={() => onRetryMessage(m.id)}/>
             );
           })}
         </div>
@@ -555,6 +596,7 @@ function MessagePanel({
         onSendInternalNote={(text) => onSendMessage(text, 'internal')}
         onOpenTemplateDialog={() => setTemplateDialogOpen(true)}
         isWindowOpen={conversation.isWindowOpen}
+        isResolved={isResolved}
         assignedAgent={assignedAgent}
         currentUser={currentUser}
       />
@@ -571,14 +613,20 @@ function MessageBubble({
   message,
   agent,
   assignedToId,
+  onRetry,
 }: {
   message: Message;
   agent: Agent | null | undefined;
   assignedToId?: string | null;
+  onRetry: () => void;
 }) {
   const isOutbound = message.type === 'outbound';
   const isUnassignedReply = isOutbound && agent && agent.id !== assignedToId;
 
+  // ⚠️ CHAT BUBBLE SAFETY
+  // `w-fit` + `min-w-0` are REQUIRED to prevent flex-end
+  // shrink-to-fit width collapse for long messages.
+  // Do NOT remove or replace with flex-1 or w-full.
   return (
     <div
       className={cn(
@@ -586,10 +634,6 @@ function MessageBubble({
         isOutbound ? 'items-end' : 'items-start'
       )}
     >
-      {/* ⚠️ CHAT BUBBLE SAFETY */}
-      {/* `w-fit` + `min-w-0` are REQUIRED to prevent flex-end */}
-      {/* shrink-to-fit width collapse for long messages. */}
-      {/* Do NOT remove or replace with flex-1 or w-full. */}
       <div
         className={cn(
           'relative w-fit min-w-0 max-w-[75%] rounded-2xl px-3 py-2 shadow-sm',
@@ -601,11 +645,18 @@ function MessageBubble({
             Sent by {agent.name}
           </div>
         )}
-        <p className="block whitespace-pre-wrap break-all text-sm md:text-base">
+        <p className="block whitespace-pre-wrap break-words">
           {message.text}
         </p>
       </div>
-       <div className="mt-1 flex items-center justify-end gap-1 whitespace-nowrap px-1 text-[11px] text-muted-foreground/80">
+       <div className="mt-1 flex items-center justify-end gap-1.5 whitespace-nowrap px-1 text-[11px] text-muted-foreground/80">
+        {message.status === 'failed' && (
+            <>
+              <span className="font-semibold text-red-500">Failed</span>
+              <Button variant="link" size="sm" className="h-auto p-0 text-[11px] text-blue-500" onClick={onRetry}>Retry</Button>
+              <span className="mx-1">•</span>
+            </>
+        )}
         <span suppressHydrationWarning>
           {format(new Date(message.time), 'p')}
         </span>
@@ -637,6 +688,7 @@ function ReplyBox({
   onSendInternalNote,
   onOpenTemplateDialog,
   isWindowOpen,
+  isResolved,
   assignedAgent,
   currentUser,
 }: {
@@ -644,6 +696,7 @@ function ReplyBox({
   onSendInternalNote: (text: string) => void;
   onOpenTemplateDialog: () => void;
   isWindowOpen: boolean;
+  isResolved: boolean;
   assignedAgent: Agent | null | undefined;
   currentUser: User | null;
 }) {
@@ -672,6 +725,9 @@ function ReplyBox({
     : '24-hour window closed. Send template to continue.';
 
   const getFooterLabel = () => {
+    if (isResolved && !isInternal) {
+        return <span className="font-semibold text-yellow-600">This conversation is resolved. Sending a message will reopen it.</span>
+    }
     if (currentUser?.id === assignedAgent?.id) return null;
     
     if (assignedAgent) {
@@ -685,7 +741,8 @@ function ReplyBox({
   return (
     <div className="border-t bg-secondary/70 p-3">
        {footerLabel && (
-           <div className="text-xs px-2 pb-1.5">
+           <div className="text-xs px-2 pb-1.5 flex items-center gap-2">
+             {isResolved && <AlertTriangle className="h-3 w-3 text-yellow-600" />}
              {footerLabel}
            </div>
        )}
@@ -698,7 +755,12 @@ function ReplyBox({
           className="h-11 flex-1 rounded-full"
           value={text}
           onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+          onKeyDown={(e) => {
+             if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+            }
+          }}
           suppressHydrationWarning
           disabled={!isWindowOpen && !isInternal}
         />
@@ -755,6 +817,16 @@ export default function InboxPage() {
     setCurrentUser(getCurrentUser());
   }, []);
 
+  const handleSelectConversation = (conversationId: string) => {
+    setSelectedId(conversationId);
+    // Mark as read
+    setConversations(prev =>
+        prev.map(c => 
+            c.id === conversationId ? { ...c, unread: 0 } : c
+        )
+    );
+  };
+
   const handleSetConversationState = (conversationId: string, state: Conversation['state']) => {
     setConversations(prev =>
       prev.map(c =>
@@ -766,29 +838,52 @@ export default function InboxPage() {
   const handleSendMessage = (text: string, type: 'outbound' | 'internal') => {
     if (!selectedId || !currentUser || !text.trim()) return;
 
-    const newMessage: Message = {
-      id: `msg_${Date.now()}`,
-      type,
-      text,
-      time: new Date().toISOString(),
-      agentId: currentUser.id,
-      status: type === 'outbound' ? 'sent' : undefined,
-    };
-
     setConversations(prev =>
       prev.map(c => {
         if (c.id === selectedId) {
-          const updatedMessages = [...c.messages, newMessage];
-          return { 
-            ...c, 
-            messages: updatedMessages,
-            lastMessage: type !== 'internal' ? text : c.lastMessage,
-            lastMessageTimestamp: new Date().getTime(),
-             ...(type !== 'internal' && { unread: 0 }),
-          };
+            const isResolved = c.state === 'Resolved';
+            
+            const newMessage: Message = {
+                id: `msg_${Date.now()}`,
+                type,
+                text,
+                time: new Date().toISOString(),
+                agentId: currentUser.id,
+                status: type === 'outbound' ? 'sent' : undefined,
+            };
+
+            const updatedMessages = [...c.messages, newMessage];
+
+            // Reopen conversation if a message is sent to a resolved one
+            const newState = (isResolved && type !== 'internal') ? 'Open' : c.state;
+
+            return { 
+                ...c, 
+                messages: updatedMessages,
+                lastMessage: type !== 'internal' ? text : c.lastMessage,
+                lastMessageTimestamp: new Date().getTime(),
+                state: newState,
+                 ...(type !== 'internal' && { unread: 0 }),
+            };
         }
         return c;
       })
+    );
+  };
+
+  const handleRetryMessage = (messageId: string) => {
+    if (!selectedId) return;
+
+    setConversations(prev =>
+        prev.map(c => {
+            if (c.id === selectedId) {
+                const updatedMessages = c.messages.map(m => 
+                    m.id === messageId ? { ...m, status: 'sent' as const, time: new Date().toISOString() } : m
+                );
+                return { ...c, messages: updatedMessages };
+            }
+            return c;
+        })
     );
   };
   
@@ -803,18 +898,18 @@ export default function InboxPage() {
 
   return (
     <>
+      {/* ⚠️ LAYOUT INVARIANT — DO NOT MODIFY */}
+      {/* This panel MUST use `flex-[1_1_0%]` and `min-w-0`. */}
+      {/* Changing this causes the middle panel to collapse horizontally */}
+      {/* in a 3-column flex layout with a fixed sidebar. */}
       <div className="flex h-full max-h-[calc(100vh-theme(spacing.14))] min-w-0 items-stretch bg-card md:max-h-full">
         <div className="h-full w-full max-w-sm flex-shrink-0 bg-card">
           <ConversationList
             conversations={conversations}
             selectedId={selectedId}
-            onSelect={setSelectedId}
+            onSelect={handleSelectConversation}
           />
         </div>
-        {/* ⚠️ LAYOUT INVARIANT — DO NOT MODIFY */}
-        {/* This panel MUST use `flex-[1_1_0%]` and `min-w-0`. */}
-        {/* Changing this causes the middle panel to collapse horizontally */}
-        {/* in a 3-column flex layout with a fixed sidebar. */}
         <div
           className="
             flex
@@ -830,6 +925,7 @@ export default function InboxPage() {
               currentUser={currentUser}
               onSetConversationState={handleSetConversationState}
               onSendMessage={handleSendMessage}
+              onRetryMessage={handleRetryMessage}
             />
           ) : (
             <div className="flex h-full flex-col items-center justify-center bg-background p-4 text-center">

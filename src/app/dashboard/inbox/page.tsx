@@ -389,7 +389,10 @@ function ConversationRow({
   const lastVisibleMessage = [...c.messages].reverse().find(m => m.type !== 'internal');
   
   const rawPreviewText = lastVisibleMessage?.text || c.lastMessage || '';
-  const previewText = rawPreviewText.length > 10 ? `${rawPreviewText.slice(0, 10)}…` : rawPreviewText;
+  // ⚠️ PREVIEW TEXT RULE
+// Preview text is intentionally limited to 10 characters + ellipsis.
+// This is a product decision. Do NOT change length or use CSS truncation.
+const previewText = rawPreviewText.length > 10 ? `${rawPreviewText.slice(0, 10)}…` : rawPreviewText;
 
   const StateBadge = stateConfig[c.state];
 
@@ -583,6 +586,10 @@ function MessageBubble({
         isOutbound ? 'items-end' : 'items-start'
       )}
     >
+      {/* ⚠️ CHAT BUBBLE SAFETY */}
+      {/* `w-fit` + `min-w-0` are REQUIRED to prevent flex-end */}
+      {/* shrink-to-fit width collapse for long messages. */}
+      {/* Do NOT remove or replace with flex-1 or w-full. */}
       <div
         className={cn(
           'relative w-fit min-w-0 max-w-[75%] rounded-2xl px-3 py-2 shadow-sm',
@@ -594,8 +601,6 @@ function MessageBubble({
             Sent by {agent.name}
           </div>
         )}
-        {/* ⚠️ Do not add overflow-hidden or line-clamp here. */}
-        {/* This breaks long-message rendering in chat bubbles. */}
         <p className="block whitespace-pre-wrap break-all text-sm md:text-base">
           {message.text}
         </p>
@@ -806,8 +811,10 @@ export default function InboxPage() {
             onSelect={setSelectedId}
           />
         </div>
-        {/* ⚠️ Do not remove w-full or min-w-0. */}
-        {/* Required to prevent middle panel width collapse in flex layouts. */}
+        {/* ⚠️ LAYOUT INVARIANT — DO NOT MODIFY */}
+        {/* This panel MUST use `flex-[1_1_0%]` and `min-w-0`. */}
+        {/* Changing this causes the middle panel to collapse horizontally */}
+        {/* in a 3-column flex layout with a fixed sidebar. */}
         <div
           className="
             flex

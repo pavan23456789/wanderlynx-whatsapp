@@ -533,9 +533,6 @@ function MessagePanel({
         onSendMessage(content, 'outbound');
   };
 
-  // ⚠️ STATE BEHAVIOR GUARANTEE
-  // Sending a message in a Resolved conversation MUST reopen it.
-  // This is intentional UX behavior. Do NOT remove this guardrail.
   const ResolveButton = () => (
     <Button
         variant="ghost"
@@ -664,8 +661,8 @@ function MessageBubble({
 
   // ⚠️ CHAT BUBBLE SAFETY — DO NOT TOUCH
   // `w-fit` + `min-w-0` are REQUIRED to prevent flex-end
-  // shrink-to-fit width collapse for long messages.
-  // Do NOT remove or replace with flex-1 or w-full.
+  // shrink-to-fit width collapse for long or repeated messages.
+  // Removing these WILL break message rendering.
   return (
     <div
       className={cn(
@@ -684,10 +681,10 @@ function MessageBubble({
             Sent by {agent.name}
           </div>
         )}
-        {/* ⚠️ TEXT RENDERING INVARIANT */}
-        {/* Do NOT add `overflow-hidden`, `line-clamp`, or truncation here. */}
-        {/* Chat messages must always render full text with natural wrapping. */}
-        <p className="block whitespace-pre-wrap break-words">
+        {/* ⚠️ MESSAGE TEXT WRAP INVARIANT */}
+        {/* Do NOT remove `min-w-0` or `break-all`. */}
+        {/* This prevents long unbroken strings from breaking chat layout. */}
+        <p className="min-w-0 whitespace-pre-wrap break-all">
           {message.text}
         </p>
       </div>
@@ -981,8 +978,8 @@ export default function InboxPage() {
         </div>
         {/* ⚠️ LAYOUT INVARIANT — DO NOT MODIFY */}
         {/* This middle panel MUST use `flex-[1_1_0%]` with `min-w-0`. */}
-        {/* Changing this causes the message panel to shrink or leave unused space */}
-        {/* in a 3-column layout with a fixed-width sidebar. */}
+        {/* Changing this causes the middle panel to collapse horizontally */}
+        {/* in a 3-column flex layout with a fixed-width sidebar. */}
         <div className="flex flex-[1_1_0%] min-w-0 flex-col h-full">
           {selectedConversation ? (
             <MessagePanel

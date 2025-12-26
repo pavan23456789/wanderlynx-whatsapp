@@ -35,30 +35,23 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { useToast } from '@/hooks/use-toast';
 
-
-const mockTemplates: Template[] = [
-    { id: 'TPL001', name: 'welcome_message', category: 'Marketing', content: 'Hello {{1}}! Welcome to Wanderlynx. How can we help you plan your next adventure?', status: 'Approved' },
-    { id: 'TPL002', name: 'trip_reminder', category: 'Utility', content: 'Hi {{1}}, This is a reminder about your upcoming trip {{2}} which starts on {{3}}. Please ensure you arrive at the pickup point on time. Have a great trip!', status: 'Approved' },
-    { id: 'TPL003', name: 'promo_q2_2024', category: 'Marketing', content: 'Ready for a new adventure? Get 15% off our new trip to {{1}}! Limited time offer.', status: 'Approved' },
-    { id: 'TPL004', name: 'payment_issue', category: 'Utility', content: 'Hello, we noticed an issue with your payment for booking {{1}}. Please contact us to resolve it. Thank you.', status: 'Pending' },
-    { id: 'TPL005', name: 'cancellation_flow_v2', category: 'Utility', content: 'We are sorry to see you go. Your cancellation for booking {{1}} has been initiated but is not yet complete. Awaiting final confirmation.', status: 'Rejected' },
-];
 
 const statusConfig = {
-  Approved: {
+  APPROVED: {
     variant: 'default',
     icon: CheckCircle,
     className:
       'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300',
   },
-  Pending: {
+  PENDING: {
     variant: 'secondary',
     icon: Clock,
     className:
       'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300',
   },
-  Rejected: {
+  REJECTED: {
     variant: 'destructive',
     icon: XCircle,
     className:
@@ -68,7 +61,7 @@ const statusConfig = {
 
 function TemplatePreviewDialog({ template, open, onOpenChange }: { template: Template | null, open: boolean, onOpenChange: (open: boolean) => void }) {
     if (!template) return null;
-    const config = statusConfig[template.status as keyof typeof statusConfig];
+    const config = statusConfig[template.status as keyof typeof statusConfig] || statusConfig.PENDING;
     const Icon = config.icon;
 
     return (
@@ -99,16 +92,35 @@ function TemplatePreviewDialog({ template, open, onOpenChange }: { template: Tem
 }
 
 export default function TemplatesPage() {
-  const [templates] = React.useState<Template[]>(mockTemplates);
+  const [templates, setTemplates] = React.useState<Template[]>([]);
   const [filteredTemplates, setFilteredTemplates] = React.useState<Template[]>([]);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [isLoading, setIsLoading] = React.useState(true);
   const [selectedTemplate, setSelectedTemplate] = React.useState<Template | null>(null);
+  const { toast } = useToast();
 
   React.useEffect(() => {
-    // Simulate loading
-    setTimeout(() => setIsLoading(false), 500);
-  }, []);
+    const fetchTemplates = async () => {
+      setIsLoading(true);
+      try {
+        const response = await fetch('/api/templates');
+        if (!response.ok) {
+          throw new Error('Failed to fetch templates');
+        }
+        const data = await response.json();
+        setTemplates(data);
+      } catch (error) {
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Could not load templates. Please try again later.',
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchTemplates();
+  }, [toast]);
 
   React.useEffect(() => {
     const results = templates.filter(
@@ -181,7 +193,7 @@ export default function TemplatesPage() {
             : filteredTemplates.map((template) => {
                 const config =
                   statusConfig[template.status as keyof typeof statusConfig] ||
-                  statusConfig.Pending;
+                  statusConfig.PENDING;
                 const Icon = config.icon;
                 return (
                   <Card

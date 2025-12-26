@@ -346,7 +346,7 @@ function ConversationList({
   onSelect: (id: string) => void;
 }) {
   return (
-    <div className="flex h-full flex-col border-r bg-background">
+    <div className="flex h-full flex-col border-r bg-card">
       <div className="shrink-0 border-b p-3">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -493,7 +493,7 @@ function MessagePanel({
 
   return (
     <div className="flex h-full min-w-0 flex-col overflow-hidden bg-background">
-      <div className="flex shrink-0 items-center gap-3 border-b bg-background p-2">
+      <div className="flex shrink-0 items-center gap-3 border-b bg-card p-2">
         <Avatar className="h-9 w-9 border" data-ai-hint="person portrait">
           <AvatarImage src={conversation.avatar} />
           <AvatarFallback>{conversation.name.charAt(0)}</AvatarFallback>
@@ -594,7 +594,9 @@ function MessageBubble({
             Sent by {agent.name}
           </div>
         )}
-        <p className="max-w-full overflow-hidden whitespace-pre-wrap break-words text-sm md:text-base">
+        {/* ⚠️ Do not add overflow-hidden or line-clamp here. */}
+        {/* This breaks long-message rendering in chat bubbles. */}
+        <p className="block whitespace-pre-wrap break-words text-sm md:text-base">
           {message.text}
         </p>
       </div>
@@ -796,8 +798,8 @@ export default function InboxPage() {
 
   return (
     <>
-      <div className="flex h-full max-h-[calc(100vh-theme(spacing.14))] min-w-0 items-stretch bg-background md:max-h-full">
-        <div className="h-full w-full max-w-sm flex-shrink-0 bg-background">
+      <div className="flex h-full max-h-[calc(100vh-theme(spacing.14))] min-w-0 items-stretch bg-card md:max-h-full">
+        <div className="h-full w-full max-w-sm flex-shrink-0 bg-card">
           <ConversationList
             conversations={conversations}
             selectedId={selectedId}

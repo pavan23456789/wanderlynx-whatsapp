@@ -1,4 +1,8 @@
 'use client';
+// ⚠️ SCROLLING INVARIANT
+// Scrolling is intentionally handled at the PAGE level.
+// DO NOT move overflow / height logic to dashboard layout.
+// Changing global layout will break Inbox & Chat.
 
 import {
   PlusCircle,
@@ -254,7 +258,7 @@ export default function CampaignsPage() {
     
     return (
         <TooltipProvider>
-        <main className="flex flex-1 flex-col gap-6 p-6 md:gap-8 md:p-10">
+        <main className="flex flex-1 flex-col gap-6 p-6 md:gap-8 md:p-10 overflow-y-auto">
              <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold">Campaigns</h1>

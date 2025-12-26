@@ -1,8 +1,11 @@
 'use client';
-// ⚠️ IMPORTANT:
-// Scrolling for this page is intentionally handled here.
-// Do NOT move overflow or height logic to dashboard/layout.tsx.
-// Doing so breaks Inbox and Chat layouts.
+// ⚠️ SCROLLING INVARIANT
+// Scrolling is intentionally handled at the PAGE level.
+// DO NOT move overflow / height logic to dashboard layout.
+// Changing global layout will break Inbox & Chat.
+
+// ⚠️ This page manages TEMPLATE state only.
+// Do not reuse Contact or Campaign selection logic here.
 
 import * as React from 'react';
 import {
@@ -40,8 +43,6 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 
-// ⚠️ This page manages TEMPLATE state only.
-// Do not reuse Contact or Campaign selection logic here.
 
 const statusConfig = {
   Approved: {

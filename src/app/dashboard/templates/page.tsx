@@ -218,7 +218,7 @@ export default function TemplatesPage() {
                 );
               })}
         </div>
-        <TemplatePreviewDialog template={selectedContact} open={!!selectedTemplate} onOpenChange={() => setSelectedTemplate(null)} />
+        <TemplatePreviewDialog template={selectedTemplate} open={!!selectedTemplate} onOpenChange={() => setSelectedTemplate(null)} />
       </main>
     </TooltipProvider>
   );

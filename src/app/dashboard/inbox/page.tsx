@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   MoreVertical,
   Trash2,
+  CheckCircle2,
 } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
@@ -179,7 +180,7 @@ const mockConversations: Conversation[] = [
     isWindowOpen: false,
     messages: [
       { id: 'msg_4_1', type: 'inbound', text: 'Can I add another person to my booking? My booking ID is BK-2024-98A6F and I need to know ASAP thanks! It is a very long message to test the wrapping capability of the UI and to ensure that the preview text is handled correctly.', time: new Date(now - 3 * 24 * 60 * 60 * 1000).toISOString() },
-      { id: 'msg_4_2', type: 'outbound', text: 'I will check on that for you, but I am not assigned to this conversation.', time: new Date(now - 2.9 * 24 * 60 * 60 * 1000).toISOString(), status: 'sent', agentId: '1' }
+      { id: 'msg_4_2', type: 'outbound', text: 'Sent by Super Admin', time: new Date(now - 2.9 * 24 * 60 * 60 * 1000).toISOString(), status: 'sent', agentId: '1' }
     ],
     assignedTo: '2',
     pinned: false,
@@ -459,9 +460,11 @@ function ConversationRow({
 function MessagePanel({
   conversation,
   currentUser,
+  onSetConversationState,
 }: {
   conversation: Conversation;
   currentUser: User | null;
+  onSetConversationState: (id: string, state: Conversation['state']) => void;
 }) {
   const scrollAreaRef = React.useRef<HTMLDivElement>(null);
 
@@ -475,6 +478,7 @@ function MessagePanel({
   }, [conversation.messages]);
 
   const assignedAgent = mockAgents.find(a => a.id === conversation.assignedTo);
+  const StateBadge = stateConfig[conversation.state];
 
   return (
     <div className="flex h-full min-w-0 flex-col overflow-hidden bg-slate-50">
@@ -495,6 +499,17 @@ function MessagePanel({
           </div>
         </div>
         <div className="flex items-center gap-1">
+          {conversation.state !== 'Resolved' && (
+             <Button 
+                variant="outline"
+                size="sm"
+                className="rounded-full"
+                onClick={() => onSetConversationState(conversation.id, 'Resolved')}
+              >
+               <CheckCircle2 className="mr-2 h-4 w-4" />
+               Mark as Resolved
+             </Button>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
@@ -506,13 +521,12 @@ function MessagePanel({
               <DropdownMenuItem>Contact info</DropdownMenuItem>
               <DropdownMenuItem>Search</DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-yellow-600 focus:text-yellow-600 focus:bg-yellow-50">
+              <DropdownMenuItem 
+                className="text-yellow-600 focus:text-yellow-600 focus:bg-yellow-50"
+                onClick={() => onSetConversationState(conversation.id, 'Resolved')}
+              >
                 <Archive className="mr-2 h-4 w-4" />
                 <span>Archive chat</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-red-50">
-                 <Trash2 className="mr-2 h-4 w-4" />
-                <span>Delete chat</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -729,13 +743,21 @@ export default function InboxPage() {
     setCurrentUser(getCurrentUser());
   }, []);
 
+  const handleSetConversationState = (conversationId: string, state: Conversation['state']) => {
+    setConversations(prev =>
+      prev.map(c =>
+        c.id === conversationId ? { ...c, state: state } : c
+      )
+    );
+  };
+
   const selectedConversation = React.useMemo(
     () => conversations.find((c) => c.id === selectedId),
     [selectedId, conversations]
   );
   
   const handleArchive = (conversationId: string) => {
-    setConversations(prev => prev.map(c => c.id === conversationId ? {...c, state: 'Resolved'} : c));
+    handleSetConversationState(conversationId, 'Resolved');
   };
   
   if (!currentUser) {
@@ -757,6 +779,7 @@ export default function InboxPage() {
             <MessagePanel
               conversation={selectedConversation}
               currentUser={currentUser}
+              onSetConversationState={handleSetConversationState}
             />
           ) : (
             <div className="flex h-full flex-col items-center justify-center bg-background p-4 text-center">
@@ -779,5 +802,3 @@ export default function InboxPage() {
     </>
   );
 }
-
-    

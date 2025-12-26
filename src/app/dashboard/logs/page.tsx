@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import {
   Card,
   CardContent,
@@ -23,8 +24,11 @@ import {
   XCircle,
   SkipForward,
   AlertTriangle,
+  Lock,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { getCurrentUser, User } from '@/lib/auth';
+import { Button } from '@/components/ui/button';
 
 const statusConfig = {
   SUCCESS: {
@@ -51,8 +55,11 @@ export default function LogsPage() {
   const [logs, setLogs] = React.useState<LogEntry[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [currentUser, setCurrentUser] = React.useState<User | null>(null);
 
   React.useEffect(() => {
+    setCurrentUser(getCurrentUser());
+
     const fetchLogs = async () => {
       setIsLoading(true);
       try {
@@ -69,8 +76,32 @@ export default function LogsPage() {
       }
     };
 
-    fetchLogs();
+    if (getCurrentUser()?.role === 'Super Admin') {
+        fetchLogs();
+    } else {
+        setIsLoading(false);
+    }
   }, []);
+
+  if (isLoading) {
+      return <div className="p-10 text-center">Loading...</div>
+  }
+
+  if (currentUser?.role !== 'Super Admin') {
+      return (
+        <main className="flex flex-1 flex-col items-center justify-center gap-6 p-6 md:gap-8 md:p-10 text-center">
+            <Lock className="h-16 w-16 text-muted-foreground" />
+            <h1 className="text-3xl font-bold">Access Restricted</h1>
+            <p className="text-muted-foreground">
+                Only Admins can view event logs.
+            </p>
+            <Button asChild>
+                <Link href="/dashboard">Return to Dashboard</Link>
+            </Button>
+        </main>
+      )
+  }
+
 
   return (
     <main className="flex flex-1 flex-col gap-6 p-6 md:gap-8 md:p-10">
@@ -91,9 +122,7 @@ export default function LogsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="text-center text-muted-foreground">Loading logs...</div>
-          ) : error ? (
+          {error ? (
             <div className="text-center text-destructive">{error}</div>
           ) : (
             <div className="overflow-x-auto">

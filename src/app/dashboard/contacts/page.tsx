@@ -8,8 +8,6 @@ import * as React from 'react';
 import {
   File,
   PlusCircle,
-  Download,
-  Send,
   MoreHorizontal,
   Search,
   Users,
@@ -20,8 +18,6 @@ import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
 } from '@/components/ui/card';
 import {
   DropdownMenu,
@@ -49,6 +45,7 @@ import {
   SheetHeader,
   SheetTitle,
   SheetDescription,
+  SheetFooter,
 } from '@/components/ui/sheet';
 import {
   TooltipProvider,
@@ -56,6 +53,7 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from '@/components/ui/tooltip';
+import { getCurrentUser, User } from '@/lib/auth';
 
 const mockContacts: Contact[] = [
     { id: '1', name: 'Olivia Martin', email: 'olivia.martin@email.com', phone: '+14155552671', trip: 'Bali Adventure', tags: ['vip', 'new'], avatar: 'https://picsum.photos/seed/1/80/80' },
@@ -67,11 +65,13 @@ function ContactDialog({
   onOpenChange,
   onSave,
   contact,
+  canEdit,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (contact: Contact) => void;
   contact: Contact | null;
+  canEdit: boolean;
 }) {
   const { toast } = useToast();
   const [formData, setFormData] = React.useState<Partial<Contact>>({});
@@ -90,6 +90,10 @@ function ContactDialog({
   };
 
   const handleSave = () => {
+    if (!canEdit) {
+        toast({ variant: 'destructive', title: 'Permission Denied'});
+        return;
+    }
     if (!formData.name || !formData.phone) {
       toast({
         variant: 'destructive',
@@ -127,6 +131,7 @@ function ContactDialog({
               onChange={handleChange}
               className="rounded-xl"
               suppressHydrationWarning={true}
+              disabled={!canEdit}
             />
           </div>
           <div className="space-y-2">
@@ -138,6 +143,7 @@ function ContactDialog({
               onChange={handleChange}
               className="rounded-xl"
               suppressHydrationWarning={true}
+              disabled={!canEdit}
             />
           </div>
           <div className="space-y-2">
@@ -148,11 +154,12 @@ function ContactDialog({
               onChange={handleChange}
               className="rounded-xl"
               suppressHydrationWarning={true}
+              disabled={!canEdit}
             />
           </div>
         </div>
         <DialogFooter>
-          <Button onClick={handleSave} className="rounded-full" size="lg">
+          <Button onClick={handleSave} className="rounded-full" size="lg" disabled={!canEdit}>
             {contact ? 'Save Changes' : 'Add Contact'}
           </Button>
         </DialogFooter>
@@ -205,11 +212,11 @@ function UploadDialog({
 }
 
 
-function ContactDetailPanel({ contact, open, onOpenChange }: { contact: Contact | null, open: boolean, onOpenChange: (open: boolean) => void }) {
+function ContactDetailPanel({ contact, open, onOpenChange, canEdit }: { contact: Contact | null, open: boolean, onOpenChange: (open: boolean) => void, canEdit: boolean }) {
     if (!contact) return null;
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent className="w-full sm:max-w-md p-0">
+            <SheetContent className="w-full sm:max-w-md p-0 flex flex-col">
                 <SheetHeader className="p-6 border-b">
                     <div className="flex items-center gap-4">
                         <Avatar className="h-16 w-16" data-ai-hint="person portrait">
@@ -222,40 +229,41 @@ function ContactDetailPanel({ contact, open, onOpenChange }: { contact: Contact 
                         </div>
                     </div>
                 </SheetHeader>
-                <div className="p-6 space-y-4">
+                <div className="p-6 space-y-4 overflow-y-auto flex-1">
                     <h3 className="font-semibold text-lg">Details</h3>
                     <div className="grid gap-3 text-sm">
                         <div className="grid grid-cols-3 items-center">
                             <span className="text-muted-foreground">Email</span>
-                            <span className="col-span-2">{contact.email}</span>
+                            <span className="col-span-2">{contact.email || '-'}</span>
                         </div>
                         <div className="grid grid-cols-3 items-center">
                             <span className="text-muted-foreground">Trip</span>
-                            <span className="col-span-2">{contact.trip}</span>
+                            <span className="col-span-2">{contact.trip || '-'}</span>
                         </div>
                         <div className="grid grid-cols-3 items-center">
                             <span className="text-muted-foreground">Tags</span>
-                            <div className="col-span-2 flex gap-2">
-                                {contact.tags.map(tag => (
+                            <div className="col-span-2 flex flex-wrap gap-2">
+                                {contact.tags && contact.tags.length > 0 ? contact.tags.map(tag => (
                                     <Badge key={tag} variant={tag === 'vip' ? 'destructive' : 'secondary'}>{tag}</Badge>
-                                ))}
+                                )) : <span className="text-muted-foreground">-</span>}
                             </div>
                         </div>
                     </div>
-                     <h3 className="font-semibold text-lg pt-4">Actions</h3>
-                     <div className="flex gap-2">
-                        <TooltipProvider>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button variant="outline" className="rounded-full" disabled>
-                                        <Send className="mr-2 h-4 w-4" /> Message
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent><p>Coming soon</p></TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
-                     </div>
                 </div>
+                 <SheetFooter className="p-6 border-t bg-background">
+                     <TooltipProvider>
+                         <Tooltip>
+                            <TooltipTrigger asChild>
+                                <div>
+                                    <Button variant="outline" className="w-full rounded-full" disabled={!canEdit}>
+                                        Edit Contact
+                                    </Button>
+                                </div>
+                            </TooltipTrigger>
+                            {!canEdit && <TooltipContent><p>Only Admins and Marketing can edit contacts.</p></TooltipContent>}
+                         </Tooltip>
+                     </TooltipProvider>
+                 </SheetFooter>
             </SheetContent>
         </Sheet>
     )
@@ -267,11 +275,14 @@ export default function ContactsPage() {
   const [searchTerm, setSearchTerm] = React.useState('');
   const [isContactDialogOpen, setContactDialogOpen] = React.useState(false);
   const [isUploadOpen, setUploadOpen] = React.useState(false);
-  const [editingContact, setEditingContact] = React.useState<Contact | null>(
-    null
-  );
-    const [selectedContact, setSelectedContact] = React.useState<Contact | null>(null);
+  const [editingContact, setEditingContact] = React.useState<Contact | null>(null);
+  const [selectedContact, setSelectedContact] = React.useState<Contact | null>(null);
   const { toast } = useToast();
+  const [currentUser, setCurrentUser] = React.useState<User | null>(null);
+
+  React.useEffect(() => {
+    setCurrentUser(getCurrentUser());
+  }, []);
 
   React.useEffect(() => {
     const results = contacts.filter(
@@ -306,7 +317,18 @@ export default function ContactsPage() {
     console.log(`Uploaded ${count} contacts.`);
   };
 
+  // --- RBAC ---
+  const canCreate = currentUser?.role === 'Super Admin';
+  const canUpload = currentUser?.role === 'Super Admin' || currentUser?.role === 'Marketing';
+  const canEdit = currentUser?.role === 'Super Admin';
+  const canDelete = currentUser?.role === 'Super Admin';
+  
+  if (!currentUser) {
+    return null; // Or a loading spinner
+  }
+
   return (
+    <TooltipProvider>
     <main className="flex flex-1 flex-col gap-6 p-6 md:gap-8 md:p-10 overflow-y-auto">
       <div className="flex items-center justify-between">
         <div>
@@ -316,17 +338,25 @@ export default function ContactsPage() {
           </p>
         </div>
         <div className="flex items-center gap-4">
-          <Button
-            size="lg"
-            className="rounded-full"
-            onClick={() => {
-              setEditingContact(null);
-              setContactDialogOpen(true);
-            }}
-          >
-            <PlusCircle className="mr-2 h-5 w-5" />
-            Add Contact
-          </Button>
+          <Tooltip>
+              <TooltipTrigger asChild>
+                  <div className="relative">
+                      <Button
+                        size="lg"
+                        className="rounded-full"
+                        onClick={() => {
+                          setEditingContact(null);
+                          setContactDialogOpen(true);
+                        }}
+                        disabled={!canCreate}
+                      >
+                        <PlusCircle className="mr-2 h-5 w-5" />
+                        Add Contact
+                      </Button>
+                  </div>
+              </TooltipTrigger>
+              {!canCreate && <TooltipContent><p>Only Admins can create contacts.</p></TooltipContent>}
+          </Tooltip>
         </div>
       </div>
 
@@ -342,15 +372,23 @@ export default function ContactsPage() {
           />
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="rounded-full"
-            onClick={() => setUploadOpen(true)}
-          >
-            <File className="mr-2 h-4 w-4" />
-            Upload CSV
-          </Button>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <div className="relative">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="rounded-full"
+                        onClick={() => setUploadOpen(true)}
+                        disabled={!canUpload}
+                      >
+                        <File className="mr-2 h-4 w-4" />
+                        Upload CSV
+                      </Button>
+                    </div>
+                </TooltipTrigger>
+                {!canUpload && <TooltipContent><p>Only Admins and Marketing can upload contacts.</p></TooltipContent>}
+            </Tooltip>
         </div>
       </div>
 
@@ -396,20 +434,36 @@ export default function ContactsPage() {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="rounded-xl" onClick={e => e.stopPropagation()}>
                     <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                    <DropdownMenuItem
-                      onClick={() => {
-                        setEditingContact(contact);
-                        setContactDialogOpen(true);
-                      }}
-                    >
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="text-destructive"
-                      onClick={() => handleDeleteContact(contact.id)}
-                    >
-                      Delete
-                    </DropdownMenuItem>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                             <div className="w-full">
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    setEditingContact(contact);
+                                    setContactDialogOpen(true);
+                                  }}
+                                  disabled={!canEdit}
+                                >
+                                  Edit
+                                </DropdownMenuItem>
+                            </div>
+                        </TooltipTrigger>
+                         {!canEdit && <TooltipContent><p>Only Admins can edit contacts.</p></TooltipContent>}
+                    </Tooltip>
+                    <Tooltip>
+                         <TooltipTrigger asChild>
+                            <div className="w-full">
+                                <DropdownMenuItem
+                                className="text-destructive"
+                                onClick={() => handleDeleteContact(contact.id)}
+                                disabled={!canDelete}
+                                >
+                                Delete
+                                </DropdownMenuItem>
+                            </div>
+                        </TooltipTrigger>
+                        {!canDelete && <TooltipContent><p>Only Admins can delete contacts.</p></TooltipContent>}
+                    </Tooltip>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -422,13 +476,15 @@ export default function ContactsPage() {
         onOpenChange={setContactDialogOpen}
         onSave={handleSaveContact}
         contact={editingContact}
+        canEdit={canEdit}
       />
       <UploadDialog
         open={isUploadOpen}
         onOpenChange={setUploadOpen}
         onUpload={handleUpload}
       />
-      <ContactDetailPanel contact={selectedContact} open={!!selectedContact} onOpenChange={() => setSelectedContact(null)} />
+      <ContactDetailPanel contact={selectedContact} open={!!selectedContact} onOpenChange={() => setSelectedContact(null)} canEdit={canEdit} />
     </main>
+    </TooltipProvider>
   );
 }

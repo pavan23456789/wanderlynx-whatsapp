@@ -19,8 +19,7 @@ import {
   Search,
   AlertTriangle,
   MoreVertical,
-  Trash2,
-  CheckCircle2,
+  Lock,
   Undo2,
   RefreshCcw,
 } from 'lucide-react';
@@ -61,6 +60,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 // --- IN-PAGE MOCK DATA (As per instructions) ---
 
@@ -570,6 +570,7 @@ function MessagePanel({
 
   const assignedAgent = mockAgents.find(a => a.id === conversation.assignedTo);
   const isResolved = conversation.state === 'Resolved';
+  const canReopen = currentUser?.role === 'Super Admin';
 
   const handleSendTemplate = (template: TemplateType, variables: Record<string, string>) => {
         let content = template.content;
@@ -592,15 +593,25 @@ function MessagePanel({
   );
 
   const ReopenButton = () => (
-    <Button
-        variant="ghost"
-        size="icon"
-        className="h-9 w-9 rounded-full"
-        onClick={() => onSetConversationState(conversation.id, 'Open')}
-    >
-        <Undo2 className="h-5 w-5" />
-        <span className="sr-only">Reopen Conversation</span>
-    </Button>
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+            <div>
+              <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 rounded-full"
+                  onClick={() => canReopen && onSetConversationState(conversation.id, 'Open')}
+                  disabled={!canReopen}
+              >
+                  <Undo2 className="h-5 w-5" />
+                  <span className="sr-only">Reopen Conversation</span>
+              </Button>
+            </div>
+        </TooltipTrigger>
+        {!canReopen && <TooltipContent><p>Only Admins can reopen conversations.</p></TooltipContent>}
+      </Tooltip>
+    </TooltipProvider>
   );
 
 
@@ -636,10 +647,19 @@ function MessagePanel({
               <DropdownMenuItem>Search</DropdownMenuItem>
               <DropdownMenuSeparator />
                {isResolved ? (
-                <DropdownMenuItem onClick={() => onSetConversationState(conversation.id, 'Open')}>
-                  <Undo2 className="mr-2 h-4 w-4" />
-                  <span>Reopen Conversation</span>
-                </DropdownMenuItem>
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                           <div>
+                             <DropdownMenuItem disabled={!canReopen} onClick={() => canReopen && onSetConversationState(conversation.id, 'Open')}>
+                                <Undo2 className="mr-2 h-4 w-4" />
+                                <span>Reopen Conversation</span>
+                            </DropdownMenuItem>
+                           </div>
+                        </TooltipTrigger>
+                        {!canReopen && <TooltipContent><p>Only Admins can reopen.</p></TooltipContent>}
+                    </Tooltip>
+                </TooltipProvider>
                ) : (
                  <DropdownMenuItem 
                     className="text-yellow-600 focus:text-yellow-600 focus:bg-yellow-50"
@@ -659,6 +679,15 @@ function MessagePanel({
       <div className="w-full flex-1 min-h-0">
           <ScrollArea className="h-full" viewportRef={scrollAreaRef}>
             <div className="space-y-1 p-4 md:p-6">
+              {currentUser?.role === 'Marketing' && (
+                <Alert variant="default" className="bg-blue-50 border-blue-200 text-blue-800 mb-4">
+                  <Lock className="h-4 w-4 !text-blue-800" />
+                  <AlertTitle>Read-only Access</AlertTitle>
+                  <AlertDescription>
+                    Your role has read-only access to the inbox. You can view conversations but cannot reply.
+                  </AlertDescription>
+                </Alert>
+              )}
               {conversation.messages.map((m) => {
                 const agent = m.agentId
                   ? mockAgents.find((a) => a.id === m.agentId)
@@ -673,15 +702,17 @@ function MessagePanel({
             </div>
           </ScrollArea>
       </div>
-       <ReplyBox
-        onSend={(text) => onSendMessage(text, 'outbound')}
-        onSendInternalNote={(text) => onSendMessage(text, 'internal')}
-        onOpenTemplateDialog={() => setTemplateDialogOpen(true)}
-        isWindowOpen={conversation.isWindowOpen}
-        isResolved={isResolved}
-        assignedAgent={assignedAgent}
-        currentUser={currentUser}
-      />
+       {currentUser?.role !== 'Marketing' && (
+         <ReplyBox
+            onSend={(text) => onSendMessage(text, 'outbound')}
+            onSendInternalNote={(text) => onSendMessage(text, 'internal')}
+            onOpenTemplateDialog={() => setTemplateDialogOpen(true)}
+            isWindowOpen={conversation.isWindowOpen}
+            isResolved={isResolved}
+            assignedAgent={assignedAgent}
+            currentUser={currentUser}
+        />
+       )}
        <TemplateDialog
         open={isTemplateDialogOpen}
         onOpenChange={setTemplateDialogOpen}
@@ -949,6 +980,9 @@ export default function InboxPage() {
   
   const handleSendMessage = (text: string, type: 'outbound' | 'internal') => {
     if (!selectedId || !currentUser || !text.trim()) return;
+
+    // RBAC: Marketing role cannot send messages.
+    if (currentUser.role === 'Marketing') return;
 
     setConversations(prev =>
       prev.map(c => {

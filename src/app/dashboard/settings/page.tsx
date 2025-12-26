@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import {
     Card,
     CardContent,
@@ -23,6 +24,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { getCurrentUser, User, getTeamMembers } from '@/lib/auth';
+import { Lock } from 'lucide-react';
 
 export default function SettingsPage() {
     const { toast } = useToast();
@@ -32,8 +34,9 @@ export default function SettingsPage() {
     const [isWelcomeEnabled, setWelcomeEnabled] = React.useState(true);
 
     React.useEffect(() => {
-        setUser(getCurrentUser());
-        if (getCurrentUser()?.role === 'Super Admin') {
+        const currentUser = getCurrentUser();
+        setUser(currentUser);
+        if (currentUser?.role === 'Super Admin') {
             setTeamMembers(getTeamMembers());
         }
     }, []);
@@ -68,6 +71,22 @@ export default function SettingsPage() {
 
     if (!user) {
         return <div>Loading...</div>;
+    }
+
+    // RBAC check
+    if (user.role !== 'Super Admin') {
+        return (
+             <main className="flex flex-1 flex-col items-center justify-center gap-6 p-6 md:gap-8 md:p-10 text-center">
+                <Lock className="h-16 w-16 text-muted-foreground" />
+                <h1 className="text-3xl font-bold">Access Restricted</h1>
+                <p className="text-muted-foreground">
+                    Only Admins can access the settings page.
+                </p>
+                <Button asChild>
+                    <Link href="/dashboard">Return to Dashboard</Link>
+                </Button>
+            </main>
+        )
     }
 
     return (

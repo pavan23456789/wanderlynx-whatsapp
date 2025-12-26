@@ -42,16 +42,16 @@ import { logout, getCurrentUser, User } from '@/lib/auth';
 import { Separator } from '@/components/ui/separator';
 
 const menuItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['Super Admin', 'Internal Staff'] },
-  { href: '/dashboard/inbox', label: 'Inbox', icon: MessageSquare, roles: ['Super Admin', 'Internal Staff'], badge: '12' },
-  { href: '/dashboard/contacts', label: 'Contacts', icon: Users, roles: ['Super Admin', 'Internal Staff'] },
-  { href: '/dashboard/campaigns', label: 'Campaigns', icon: Send, roles: ['Super Admin'] },
-  { href: '/dashboard/templates', label: 'Templates', icon: ScrollText, roles: ['Super Admin'] },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['Super Admin', 'Marketing', 'Customer Support'] },
+  { href: '/dashboard/inbox', label: 'Inbox', icon: MessageSquare, roles: ['Super Admin', 'Marketing', 'Customer Support'], badge: '12' },
+  { href: '/dashboard/contacts', label: 'Contacts', icon: Users, roles: ['Super Admin', 'Marketing', 'Customer Support'] },
+  { href: '/dashboard/campaigns', label: 'Campaigns', icon: Send, roles: ['Super Admin', 'Marketing'] },
+  { href: '/dashboard/templates', label: 'Templates', icon: ScrollText, roles: ['Super Admin', 'Marketing', 'Customer Support'] },
 ];
 
 const adminMenuItems = [
   { href: '/dashboard/logs', label: 'Event Logs', icon: History, roles: ['Super Admin'] },
-  { href: '/dashboard/settings', label: 'Settings', icon: Settings, roles: ['Super Admin', 'Internal Staff'] },
+  { href: '/dashboard/settings', label: 'Settings', icon: Settings, roles: ['Super Admin'] },
 ];
 
 export default function DashboardLayout({
@@ -132,24 +132,26 @@ export default function DashboardLayout({
               ))}
             </SidebarMenu>
 
-            <SidebarGroup className="mt-auto">
-              <SidebarGroupLabel>Admin</SidebarGroupLabel>
-              <SidebarMenu>
-                {accessibleAdminItems.map((item) => (
-                  <SidebarMenuItem key={item.href}>
-                    <Link href={item.href}>
-                      <SidebarMenuButton
-                        isActive={pathname === item.href}
-                        tooltip={{ children: item.label }}
-                      >
-                        <item.icon />
-                        <span>{item.label}</span>
-                      </SidebarMenuButton>
-                    </Link>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroup>
+            {accessibleAdminItems.length > 0 && (
+                <SidebarGroup className="mt-auto">
+                    <SidebarGroupLabel>Admin</SidebarGroupLabel>
+                    <SidebarMenu>
+                        {accessibleAdminItems.map((item) => (
+                        <SidebarMenuItem key={item.href}>
+                            <Link href={item.href}>
+                            <SidebarMenuButton
+                                isActive={pathname === item.href}
+                                tooltip={{ children: item.label }}
+                            >
+                                <item.icon />
+                                <span>{item.label}</span>
+                            </SidebarMenuButton>
+                            </Link>
+                        </SidebarMenuItem>
+                        ))}
+                    </SidebarMenu>
+                </SidebarGroup>
+            )}
           </SidebarContent>
 
           <SidebarFooter>

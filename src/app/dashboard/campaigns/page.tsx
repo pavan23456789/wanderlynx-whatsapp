@@ -1,10 +1,10 @@
+'use client';
 // ⚠️ CAMPAIGNS PAGE INVARIANT
 // This page handles campaign lifecycle UI only.
 // States, actions, confirmations are intentionally UI-only.
 // DO NOT move logic to dashboard layout or shared components.
 // Any backend wiring must preserve these UX guardrails.
 
-'use client';
 // ⚠️ SCROLLING INVARIANT
 // Scrolling is intentionally handled at the PAGE level.
 // DO NOT move overflow / height logic to dashboard layout.
@@ -25,6 +25,7 @@ import {
   Calendar,
   X,
   BarChart,
+  Lock,
 } from 'lucide-react';
 import * as React from 'react';
 import Link from 'next/link';
@@ -75,6 +76,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { getCurrentUser, User } from '@/lib/auth';
 
 
 const mockTemplates: Template[] = [
@@ -140,7 +142,7 @@ function CreateCampaignDialog({
             createdAt: new Date().toISOString(),
             messages: [],
             variables: {},
-            statusMessage: 'Campaign created in draft mode.',
+            statusMessage: 'Next actions: Edit, Send, or Schedule.',
             type: 'Template',
         };
         onCampaignCreated(newCampaign);
@@ -209,13 +211,18 @@ function CreateCampaignDialog({
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start rounded-xl text-muted-foreground"
-                    disabled
-                  >
-                    Select Audience...
-                  </Button>
+                  {/* The TooltipTrigger needs a single child.
+                      The disabled Button was being wrapped in a span which broke things.
+                      Wrapping the button in a div fixes this. */}
+                  <div>
+                    <Button
+                        variant="outline"
+                        className="w-full justify-start rounded-xl text-muted-foreground"
+                        disabled
+                    >
+                        Select Audience...
+                    </Button>
+                  </div>
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>Audience selection coming soon.</p>
@@ -250,7 +257,8 @@ function ConfirmationDialog({ state, onConfirm, onCancel }: { state: Confirmatio
     const messages = {
         Send: `This will immediately send the campaign "${state.campaign.name}" to ${state.campaign.audienceCount.toLocaleString()} contacts.`,
         Schedule: `This will schedule the campaign "${state.campaign.name}" to be sent to ${state.campaign.audienceCount.toLocaleString()} contacts.`,
-        Cancel: `This will cancel the scheduled campaign "${state.campaign.name}" and return it to a draft.`,
+        Cancel: `This will cancel the scheduled campaign "${state
+.campaign.name}" and return it to a draft.`,
         Pause: 'This will pause the currently sending campaign. Messages already in the queue may still be sent.',
         Resume: 'This will resume sending the paused campaign.',
         Archive: 'This will archive the campaign, hiding it from the main list. This action can be undone later.',
@@ -298,6 +306,7 @@ const ActionMenuItem = ({ children, disabled, tooltip }: { children: React.React
             </Tooltip>
         );
     }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return <DropdownMenuItem onSelect={(e) => { e.preventDefault(); (children as any).props.onClick?.() }}>{React.cloneElement(children as any)}</DropdownMenuItem>;
 };
 
@@ -310,22 +319,29 @@ export default function CampaignsPage() {
     const [isLoading, setIsLoading] = React.useState(true);
     const [confirmationState, setConfirmationState] = React.useState<ConfirmationState>({ action: null, campaign: null });
     const { toast } = useToast();
+    const [currentUser, setCurrentUser] = React.useState<User | null>(null);
+
+    // Get current user for role checks
+    React.useEffect(() => {
+        setCurrentUser(getCurrentUser());
+    }, []);
 
     // Initial load
     React.useEffect(() => {
         setCampaigns([
-            { id: 'camp_1', name: 'Q2 Promotion', templateName: 'promo_q2_2024', templateContent: 'Get 15% off our new trip to {{1}}!', status: 'Completed', audienceCount: 1200, sent: 1190, failed: 10, createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), messages: [], variables: {}, statusMessage: 'Completed', type: 'Template'},
-            { id: 'camp_2', name: 'New Welcome Flow', templateName: 'welcome_message', templateContent: 'Hello {{1}}! Welcome to Wanderlynx.', status: 'Sending', audienceCount: 50, sent: 10, failed: 0, createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), messages: [], variables: {}, statusMessage: 'Sending...', type: 'Template' },
-            { id: 'camp_3', name: 'July Trip Reminders', templateName: 'trip_reminder', templateContent: 'Hi {{1}}, a reminder about your trip {{2}}.', status: 'Draft', audienceCount: 85, sent: 0, failed: 0, createdAt: new Date().toISOString(), messages: [], variables: {}, statusMessage: 'Next actions: Edit, Send, or Schedule', type: 'Template' },
-            { id: 'camp_4', name: 'August Newsletter', templateName: 'feedback_request_v3', templateContent: 'Hi {{1}}, thanks for traveling with us!', status: 'Scheduled', audienceCount: 15000, sent: 0, failed: 0, createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), messages: [], variables: {}, statusMessage: 'Scheduled for tomorrow', type: 'Template' },
+            { id: 'camp_1', name: 'Q2 Promotion', templateName: 'promo_q2_2024', templateContent: 'Get 15% off our new trip to {{1}}!', status: 'Completed', audienceCount: 1200, sent: 1190, failed: 10, createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), messages: [], variables: {}, statusMessage: 'Completed 3 days ago', type: 'Template'},
+            { id: 'camp_2', name: 'New Welcome Flow', templateName: 'welcome_message', templateContent: 'Hello {{1}}! Welcome to Wanderlynx.', status: 'Sending', audienceCount: 50, sent: 10, failed: 0, createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), messages: [], variables: {}, statusMessage: 'Sending to 50 contacts...', type: 'Template' },
+            { id: 'camp_3', name: 'July Trip Reminders', templateName: 'trip_reminder', templateContent: 'Hi {{1}}, a reminder about your trip {{2}}.', status: 'Draft', audienceCount: 85, sent: 0, failed: 0, createdAt: new Date().toISOString(), messages: [], variables: {}, statusMessage: 'Next actions: Edit, Send, or Schedule.', type: 'Template' },
+            { id: 'camp_4', name: 'August Newsletter', templateName: 'feedback_request_v3', templateContent: 'Hi {{1}}, thanks for traveling with us!', status: 'Scheduled', audienceCount: 15000, sent: 0, failed: 0, createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), messages: [], variables: {}, statusMessage: 'Scheduled for tomorrow at 10:00 AM', type: 'Template' },
             { id: 'camp_5', name: 'Follow-up on Paused', templateName: 'trip_reminder', templateContent: 'This is a test...', status: 'Paused', audienceCount: 200, sent: 50, failed: 5, createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), messages: [], variables: {}, statusMessage: 'Paused by user', type: 'Template' },
+            { id: 'camp_6', name: 'Archived Test', templateName: 'welcome_message', templateContent: 'An old test campaign', status: 'Archived', audienceCount: 10, sent: 10, failed: 0, createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(), messages: [], variables: {}, statusMessage: 'Archived', type: 'Template' },
         ]);
         setIsLoading(false);
     }, []);
 
      React.useEffect(() => {
         const results = campaigns.filter(campaign =>
-            !campaign.status.includes('Archived') && (
+            campaign.status !== 'Archived' && (
             campaign.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             campaign.templateName.toLowerCase().includes(searchTerm.toLowerCase())
             )
@@ -362,8 +378,24 @@ export default function CampaignsPage() {
         setConfirmationState({ action: null, campaign: null });
     };
 
-    if (isLoading) {
+    if (isLoading || !currentUser) {
         return <div className="flex justify-center items-center h-full"><Loader className="h-8 w-8 animate-spin" /></div>;
+    }
+
+    // Role-based access control for Customer Support
+    if (currentUser.role === 'Customer Support') {
+        return (
+             <main className="flex flex-1 flex-col items-center justify-center gap-6 p-6 md:gap-8 md:p-10 text-center">
+                <Lock className="h-16 w-16 text-muted-foreground" />
+                <h1 className="text-3xl font-bold">Access Restricted</h1>
+                <p className="text-muted-foreground">
+                    Your role does not have permission to view or manage campaigns.
+                </p>
+                <Button asChild>
+                    <Link href="/dashboard">Return to Dashboard</Link>
+                </Button>
+            </main>
+        )
     }
     
     return (
@@ -402,12 +434,17 @@ export default function CampaignsPage() {
                         const config = statusConfig[campaign.status as keyof typeof statusConfig] || statusConfig.Draft;
                         const Icon = config.icon;
                         const progress = campaign.audienceCount > 0 ? ((campaign.sent + campaign.failed) / campaign.audienceCount) * 100 : 0;
+                        
                         const isDraft = campaign.status === 'Draft';
                         const isSending = campaign.status === 'Sending';
                         const isScheduled = campaign.status === 'Scheduled';
                         const isPaused = campaign.status === 'Paused';
                         const isDone = campaign.status === 'Completed' || campaign.status === 'Failed';
                         
+                        // RBAC checks for actions
+                        const canSendNow = currentUser.role === 'Super Admin';
+                        const canPause = currentUser.role === 'Super Admin';
+
                         return (
                             <Card key={campaign.id} className="group relative transition-all hover:shadow-lg flex flex-col">
                                 <CardHeader className="flex flex-row items-start justify-between">
@@ -469,14 +506,14 @@ export default function CampaignsPage() {
                                             <ActionMenuItem disabled={!isDraft} tooltip="Only drafts can be edited.">
                                                 <button onClick={() => {}} className="flex items-center w-full"><Edit className="mr-2 h-4 w-4" /> Edit Draft</button>
                                             </ActionMenuItem>
-                                             <ActionMenuItem disabled={!isDraft} tooltip="Only drafts can be sent.">
+                                             <ActionMenuItem disabled={!isDraft || !canSendNow} tooltip={!canSendNow ? "Admin approval required to send campaigns" : "Only drafts can be sent."}>
                                                 <button onClick={() => setConfirmationState({ action: 'Send', campaign })} className="flex items-center w-full"><Send className="mr-2 h-4 w-4" /> Send Now</button>
                                             </ActionMenuItem>
                                              <ActionMenuItem disabled={!isDraft} tooltip="Only drafts can be scheduled.">
-                                                <button onClick={() => {}} className="flex items-center w-full"><Calendar className="mr-2 h-4 w-4" /> Schedule</button>
+                                                <button onClick={() => setConfirmationState({ action: 'Schedule', campaign })} className="flex items-center w-full"><Calendar className="mr-2 h-4 w-4" /> Schedule</button>
                                             </ActionMenuItem>
                                             <DropdownMenuSeparator />
-                                            <ActionMenuItem disabled={!isSending} tooltip="Only a sending campaign can be paused.">
+                                            <ActionMenuItem disabled={!isSending || !canPause} tooltip={!canPause ? "Only Admins can pause campaigns" : "Only a sending campaign can be paused."}>
                                                 <button onClick={() => setConfirmationState({ action: 'Pause', campaign })} className="flex items-center w-full"><Pause className="mr-2 h-4 w-4" /> Pause</button>
                                             </ActionMenuItem>
                                             <ActionMenuItem disabled={!isPaused} tooltip="Only a paused campaign can be resumed.">
@@ -486,7 +523,7 @@ export default function CampaignsPage() {
                                                 <button onClick={() => setConfirmationState({ action: 'Cancel', campaign })} className="flex items-center w-full text-destructive"><X className="mr-2 h-4 w-4" /> Cancel Schedule</button>
                                             </ActionMenuItem>
                                             <DropdownMenuSeparator />
-                                            <ActionMenuItem disabled={isDraft || isScheduled} tooltip="Only sent campaigns have reports.">
+                                            <ActionMenuItem disabled={!isDone} tooltip="Only sent campaigns have reports.">
                                                 <Link href={`/dashboard/campaigns/${campaign.id}`} className="flex items-center"><BarChart className="mr-2 h-4 w-4" /> View Report</Link>
                                             </ActionMenuItem>
                                             <ActionMenuItem>

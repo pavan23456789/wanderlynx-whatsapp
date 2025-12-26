@@ -11,9 +11,7 @@ import {
   FileText,
   MoreVertical,
   Archive,
-  UserPlus,
   Pin,
-  PinOff,
   Search,
 } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
@@ -242,7 +240,6 @@ function ConversationRow({
   const assignedAgent = mockAgents.find((a) => a.id === c.assignedTo);
   const isOnline = assignedAgent && assignedAgent.id !== '3'; // Mock: Jane is offline
 
-  const lastMessage = c.messages[c.messages.length - 1];
   const lastVisibleMessage = [...c.messages].reverse().find(m => m.type !== 'internal');
   
   const previewText = lastVisibleMessage?.text || c.lastMessage || '';
@@ -293,9 +290,9 @@ function ConversationRow({
             <p className="font-bold text-foreground">{preview}</p>
           ) : (
             <>
-              {lastMessage?.type === 'outbound' && (
+              {lastVisibleMessage?.type === 'outbound' && (
                 <ReadStatus
-                  status={lastMessage.status}
+                  status={lastVisibleMessage.status}
                   className="mr-1 h-4 w-4 shrink-0"
                 />
               )}
@@ -325,8 +322,6 @@ function MessagePanel({
   currentUser: User | null;
 }) {
   const scrollAreaRef = React.useRef<HTMLDivElement>(null);
-  const assignedAgent = mockAgents.find((a) => a.id === conversation.assignedTo);
-  const isOnline = assignedAgent && assignedAgent.id !== '3'; // Mocked logic
 
   React.useEffect(() => {
     if (scrollAreaRef.current) {

@@ -585,8 +585,7 @@ function MessageBubble({
     >
       <div
         className={cn(
-          'relative max-w-[75%] rounded-2xl px-3 py-2 shadow-sm',
-          'w-fit min-w-0',
+          'relative w-fit min-w-0 max-w-[75%] rounded-2xl px-3 py-2 shadow-sm',
           isOutbound ? 'bg-secondary' : 'bg-[#E3F2FD]'
         )}
       >
@@ -595,6 +594,8 @@ function MessageBubble({
             Sent by {agent.name}
           </div>
         )}
+        {/* ⚠️ Do not add overflow-hidden or line-clamp here. */}
+        {/* This breaks long-message rendering in chat bubbles. */}
         <p className="block whitespace-pre-wrap break-all text-sm md:text-base">
           {message.text}
         </p>
@@ -805,7 +806,18 @@ export default function InboxPage() {
             onSelect={setSelectedId}
           />
         </div>
-        <div className="flex min-w-0 flex-1 flex-col h-full">
+        {/* ⚠️ Do not remove w-full or min-w-0. */}
+        {/* Required to prevent middle panel width collapse in flex layouts. */}
+        <div
+          className="
+            flex
+            flex-1
+            min-w-0
+            w-full
+            flex-col
+            h-full
+          "
+        >
           {selectedConversation ? (
             <MessagePanel
               conversation={selectedConversation}

@@ -186,7 +186,7 @@ function CreateCampaignDialog({
             <Label>Audience</Label>
             <TooltipProvider>
               <Tooltip>
-                <TooltipTrigger className="w-full">
+                <TooltipTrigger asChild className="w-full">
                   <Button
                     variant="outline"
                     className="w-full justify-start rounded-xl text-muted-foreground"

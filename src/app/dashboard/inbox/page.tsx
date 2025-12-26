@@ -346,7 +346,7 @@ function ConversationList({
   onSelect: (id: string) => void;
 }) {
   return (
-    <div className="flex h-full flex-col border-r bg-secondary/30">
+    <div className="flex h-full flex-col border-r bg-background">
       <div className="shrink-0 border-b p-3">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -581,19 +581,12 @@ function MessageBubble({
             <div className={cn('relative max-w-[75%] rounded-2xl px-3 py-2 shadow-sm', 
                 isOutbound ? 'bg-green-100' : 'bg-[#E3F2FD]'
             )}>
-                {isUnassignedReply && agent && (
+                 {isOutbound && agent && !isUnassignedReply && (
+                     <div className="hidden"></div>
+                 )}
+                 {isOutbound && agent && isUnassignedReply && (
                     <div className="mb-1 flex items-center gap-2 text-xs font-semibold text-gray-600">
-                        <span>Sent by {agent.name}</span>
-                        <TooltipProvider>
-                            <Tooltip>
-                                <TooltipTrigger>
-                                    <AlertTriangle className="h-3 w-3 text-orange-500" />
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>This message was sent by an agent not assigned to this conversation.</p>
-                                </TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
+                       Sent by {agent.name}
                     </div>
                 )}
                 <p className="max-w-full overflow-hidden whitespace-pre-wrap break-all text-sm md:text-base">
@@ -616,7 +609,6 @@ function InternalNote({ message, agent }: { message: Message; agent: Agent | nul
     <div className="my-4 flex items-center justify-center">
       <div className="w-full max-w-md rounded-xl bg-yellow-100/80 p-3 text-center text-xs text-yellow-900 border border-yellow-200">
         <div className="mb-1 flex items-center justify-center gap-2 font-semibold">
-          <FileText className="h-3 w-3" />
            Internal Note • {agent.name}
         </div>
         <p className="italic whitespace-pre-wrap break-all">{message.text}</p>
@@ -668,13 +660,12 @@ function ReplyBox({
     : '24-hour window closed. Send template to continue.';
 
   const getFooterLabel = () => {
-    if (!assignedAgent) {
-        return <span className="font-semibold text-gray-600">Unassigned Conversation</span>
-    }
-    if (assignedAgent.id !== currentUser?.id) {
+    if (currentUser?.id === assignedAgent?.id) return null;
+    
+    if (assignedAgent) {
         return <span className="font-semibold text-orange-600">Assigned to {assignedAgent.name}</span>
     }
-    return null;
+    return <span className="font-semibold text-gray-600">Unassigned Conversation</span>
   };
 
   const footerLabel = getFooterLabel();

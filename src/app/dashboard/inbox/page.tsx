@@ -346,7 +346,7 @@ function ConversationList({
   onSelect: (id: string) => void;
 }) {
   return (
-    <div className="flex h-full flex-col border-r bg-card">
+    <div className="flex h-full flex-col border-r bg-background">
       <div className="shrink-0 border-b p-3">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -586,6 +586,7 @@ function MessageBubble({
       <div
         className={cn(
           'relative max-w-[75%] rounded-2xl px-3 py-2 shadow-sm',
+          'w-fit min-w-0',
           isOutbound ? 'bg-secondary' : 'bg-[#E3F2FD]'
         )}
       >
@@ -594,9 +595,7 @@ function MessageBubble({
             Sent by {agent.name}
           </div>
         )}
-        {/* ⚠️ Do not add overflow-hidden or line-clamp here. */}
-        {/* This breaks long-message rendering in chat bubbles. */}
-        <p className="block whitespace-pre-wrap break-words text-sm md:text-base">
+        <p className="block whitespace-pre-wrap break-all text-sm md:text-base">
           {message.text}
         </p>
       </div>

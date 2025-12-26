@@ -7,12 +7,12 @@ import {
   Check,
   CheckCheck,
   Paperclip,
-  Mic,
   FileText,
   MoreVertical,
   Archive,
   Pin,
   Search,
+  AlertTriangle,
 } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
 
@@ -23,12 +23,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import {
-  mockConversations,
-  mockTemplates,
-  type Conversation as ConversationType,
-  type Message as MessageType,
   type Template as TemplateType,
-} from '@/lib/mock/mockInbox';
+} from '@/lib/data';
 import { mockAgents, Agent } from '@/lib/mock/mockAgents';
 import { getCurrentUser, User } from '@/lib/auth';
 import {
@@ -56,6 +52,124 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 
+// --- IN-PAGE MOCK DATA (As per instructions) ---
+
+type Message = {
+  id: string;
+  type: 'inbound' | 'outbound' | 'internal';
+  text: string;
+  time: string; // ISO 8601 string
+  status?: 'sent' | 'delivered' | 'read' | 'failed';
+  agentId?: string;
+};
+
+type Conversation = {
+  id: string;
+  name: string;
+  phone: string;
+  avatar: string;
+  lastMessage: string;
+  lastMessageTimestamp: number;
+  isWindowOpen: boolean;
+  messages: Message[];
+  assignedTo?: string | null;
+  pinned?: boolean;
+  unread?: number;
+  lastCustomerMessageAt?: number | null;
+  lastAgentMessageAt?: number | null;
+  state: 'Open' | 'Pending' | 'Resolved';
+};
+
+const now = new Date().getTime();
+
+const mockConversations: Conversation[] = [
+  {
+    id: 'conv_1',
+    name: 'Olivia Martin',
+    phone: '+1 415 555 2671',
+    avatar: 'https://picsum.photos/seed/1/80/80',
+    lastMessage: 'Sure, I can help with that. What is your booking ID?',
+    lastMessageTimestamp: now - 2 * 60 * 1000,
+    isWindowOpen: true,
+    messages: [
+      { id: 'msg_1_1', type: 'inbound', text: 'Hi there, I have a question about my booking.', time: new Date(now - 3 * 60 * 1000).toISOString() },
+      { id: 'msg_1_2', type: 'outbound', text: 'Sure, I can help with that. What is your booking ID?', time: new Date(now - 2 * 60 * 1000).toISOString(), status: 'read', agentId: '2' },
+    ],
+    assignedTo: '2',
+    pinned: true,
+    unread: 0,
+    lastCustomerMessageAt: now - 3 * 60 * 1000,
+    lastAgentMessageAt: now - 2 * 60 * 1000,
+    state: 'Open',
+  },
+  {
+    id: 'conv_2',
+    name: 'Liam Anderson',
+    phone: '+1 212 555 1234',
+    avatar: 'https://picsum.photos/seed/2/80/80',
+    lastMessage: 'Is it possible to upgrade my room?',
+    lastMessageTimestamp: now - 65 * 60 * 1000,
+    isWindowOpen: true,
+    messages: [
+      { id: 'msg_2_1', type: 'inbound', text: 'Hello, I booked the Bali trip for next month.', time: new Date(now - 70 * 60 * 1000).toISOString() },
+      { id: 'msg_2_2', type: 'inbound', text: 'Is it possible to upgrade my room?', time: new Date(now - 65 * 60 * 1000).toISOString() },
+      { id: 'msg_2_3', type: 'internal', text: 'This customer has a history of last-minute upgrade requests. Proceed with caution and offer standard rates only.', time: new Date(now - 60 * 60 * 1000).toISOString(), agentId: '1' },
+    ],
+    assignedTo: null,
+    pinned: true,
+    unread: 1,
+    lastCustomerMessageAt: now - 65 * 60 * 1000,
+    lastAgentMessageAt: null,
+    state: 'Open',
+  },
+  {
+    id: 'conv_3',
+    name: 'Sophia Rodriguez',
+    phone: '+44 20 7946 0958',
+    avatar: 'https://picsum.photos/seed/3/80/80',
+    lastMessage: 'Perfect, thank you so much for your help!',
+    lastMessageTimestamp: now - 26 * 60 * 60 * 1000,
+    isWindowOpen: false,
+    messages: [
+      { id: 'msg_3_1', type: 'inbound', text: 'I need to cancel my trip.', time: new Date(now - 27 * 60 * 60 * 1000).toISOString() },
+      { id: 'msg_3_2', type: 'outbound', text: 'I have processed the cancellation for you. Your reference is CAN-12345.', time: new Date(now - 26.5 * 60 * 60 * 1000).toISOString(), status: 'read', agentId: '3' },
+      { id: 'msg_3_3', type: 'inbound', text: 'Perfect, thank you so much for your help!', time: new Date(now - 26 * 60 * 60 * 1000).toISOString() },
+    ],
+    assignedTo: '3',
+    pinned: false,
+    unread: 0,
+    lastCustomerMessageAt: now - 26 * 60 * 60 * 1000,
+    lastAgentMessageAt: now - 26.5 * 60 * 60 * 1000,
+    state: 'Resolved',
+  },
+  {
+    id: 'conv_4',
+    name: 'Noah Campbell',
+    phone: '+61 2 9250 7111',
+    avatar: 'https://picsum.photos/seed/4/80/80',
+    lastMessage: 'Can I add another person to my booking? My booking ID is BK-2024-98A6F and I need to know ASAP thanks! It is a very long message to test the wrapping capability of the UI and to ensure that the preview text is handled correctly.',
+    lastMessageTimestamp: now - 3 * 24 * 60 * 60 * 1000,
+    isWindowOpen: false,
+    messages: [
+      { id: 'msg_4_1', type: 'inbound', text: 'Can I add another person to my booking? My booking ID is BK-2024-98A6F and I need to know ASAP thanks! It is a very long message to test the wrapping capability of the UI and to ensure that the preview text is handled correctly.', time: new Date(now - 3 * 24 * 60 * 60 * 1000).toISOString() },
+      { id: 'msg_4_2', type: 'outbound', text: 'I will check on that for you, but I am not assigned to this conversation.', time: new Date(now - 2.9 * 24 * 60 * 60 * 1000).toISOString(), status: 'sent', agentId: '1' }
+    ],
+    assignedTo: '2',
+    pinned: false,
+    unread: 0,
+    lastCustomerMessageAt: now - 3 * 24 * 60 * 60 * 1000,
+    lastAgentMessageAt: null,
+    state: 'Pending',
+  },
+];
+
+const mockTemplates: TemplateType[] = [
+    { id: 'TPL001', name: 'follow_up_v1', category: 'Utility', content: 'Hi {{1}}, we missed you. Is there anything else we can help you with regarding your case?', status: 'Approved' },
+    { id: 'TPL002', name: 'payment_issue', category: 'Utility', content: 'Hello, we noticed an issue with your payment for booking {{1}}. Please contact us to resolve it. Thank you.', status: 'Approved' },
+    { id: 'TPL003', name: 'promo_q2_2024', category: 'Marketing', content: 'Ready for a new adventure? Get 15% off our new trip to {{1}}! Limited time offer.', status: 'Approved' },
+];
+
+
 function TemplateDialog({
   open,
   onOpenChange,
@@ -74,7 +188,6 @@ function TemplateDialog({
 
   const variablePlaceholders = React.useMemo(() => {
     if (!selectedTemplate) return [];
-    // Updated regex to find variables like {{1}}, {{2}}, etc.
     const regex = /\{\{(\d+)\}\}/g;
     const matches = new Set<string>();
     let match;
@@ -190,12 +303,18 @@ const formatFuzzyDate = (timestamp: string | number) => {
   return format(d, 'MM/dd/yy');
 };
 
+const stateConfig = {
+  Open: { className: 'bg-green-100 text-green-800' },
+  Pending: { className: 'bg-yellow-100 text-yellow-800' },
+  Resolved: { className: 'bg-gray-200 text-gray-800' },
+} as const;
+
 function ConversationList({
   conversations,
   selectedId,
   onSelect,
 }: {
-  conversations: ConversationType[];
+  conversations: Conversation[];
   selectedId: string | null;
   onSelect: (id: string) => void;
 }) {
@@ -231,84 +350,89 @@ function ConversationRow({
   isActive,
   onSelect,
 }: {
-  conversation: ConversationType;
+  conversation: Conversation;
   isActive: boolean;
   onSelect: (id: string) => void;
 }) {
   const c = conversation;
   const isUnread = c.unread && c.unread > 0;
   const assignedAgent = mockAgents.find((a) => a.id === c.assignedTo);
-  const isOnline = assignedAgent && assignedAgent.id !== '3'; // Mock: Jane is offline
+  const isOnline = assignedAgent?.name !== 'Jane Appleseed'; 
 
   const lastVisibleMessage = [...c.messages].reverse().find(m => m.type !== 'internal');
   
-  const previewText = lastVisibleMessage?.text || c.lastMessage || '';
-  const preview = previewText.length > 35 ? previewText.slice(0, 35) + '…' : previewText;
+  const previewTextRaw = lastVisibleMessage?.text || c.lastMessage || '';
+  const previewText = previewTextRaw.length > 10 ? `${previewTextRaw.slice(0, 10)}…` : previewTextRaw;
+
+  const StateBadge = stateConfig[c.state];
 
   return (
     <div
       data-conv-id={c.id}
       onClick={() => onSelect(c.id)}
       className={cn(
-        'flex w-full cursor-pointer items-start border-b p-3',
-        isActive && 'bg-secondary'
+        'w-full cursor-pointer border-b p-3',
+        isActive ? 'bg-secondary' : 'hover:bg-secondary/50'
       )}
     >
-      <div className="relative shrink-0 pt-1">
-        <Avatar className="h-12 w-12">
-          <AvatarImage src={c.avatar} />
-          <AvatarFallback>{c.name[0]}</AvatarFallback>
-        </Avatar>
-        {assignedAgent && (
-          <div className="absolute -bottom-1 -right-1">
-            <Avatar className="h-5 w-5 border-2 border-background">
-              <AvatarImage src={assignedAgent.avatar} />
-              <AvatarFallback>{assignedAgent.name[0]}</AvatarFallback>
-            </Avatar>
-            <span
-              className={cn(
-                'absolute -bottom-px -right-px block h-2 w-2 rounded-full border-2 border-background',
-                isOnline ? 'bg-green-500' : 'bg-slate-400'
-              )}
-            />
-          </div>
-        )}
-      </div>
-
-      <div className="min-w-0 flex-1 pl-3">
-        <div className="flex justify-between">
-          <p className="truncate font-semibold">{c.name}</p>
-          <span
-            className="shrink-0 whitespace-nowrap pl-2 text-xs text-muted-foreground"
-            suppressHydrationWarning
-          >
-            {formatFuzzyDate(c.lastMessageTimestamp)}
-          </span>
-        </div>
-        <div className="flex items-center text-sm text-muted-foreground">
-          {isUnread ? (
-            <p className="font-bold text-foreground">{preview}</p>
-          ) : (
-            <>
-              {lastVisibleMessage?.type === 'outbound' && (
-                <ReadStatus
-                  status={lastVisibleMessage.status}
-                  className="mr-1 h-4 w-4 shrink-0"
-                />
-              )}
-              <p className="line-clamp-2">{preview}</p>
-            </>
+      <div className="flex w-full items-start">
+         <div className="relative shrink-0 pt-1">
+          <Avatar className="h-12 w-12">
+            <AvatarImage src={c.avatar} />
+            <AvatarFallback>{c.name[0]}</AvatarFallback>
+          </Avatar>
+          {assignedAgent && (
+            <div className="absolute -bottom-1 -right-1">
+              <Avatar className="h-5 w-5 border-2 border-background">
+                <AvatarImage src={assignedAgent.avatar} />
+                <AvatarFallback>{assignedAgent.name[0]}</AvatarFallback>
+              </Avatar>
+              <span
+                className={cn(
+                  'absolute -bottom-px -right-px block h-2 w-2 rounded-full border-2 border-background',
+                  isOnline ? 'bg-green-500' : 'bg-slate-400'
+                )}
+              />
+            </div>
           )}
         </div>
-      </div>
 
-      <div className="flex h-[42px] w-6 shrink-0 flex-col items-end justify-between pl-2 text-muted-foreground">
+        <div className="min-w-0 flex-1 pl-3">
+          <div className="flex justify-between">
+            <p className="truncate font-semibold">{c.name}</p>
+            <span
+              className="shrink-0 whitespace-nowrap pl-2 text-xs text-muted-foreground"
+              suppressHydrationWarning
+            >
+              {formatFuzzyDate(c.lastMessageTimestamp)}
+            </span>
+          </div>
+          <div className="flex items-center text-sm text-muted-foreground">
+            {isUnread ? (
+              <p className="font-bold text-foreground">{previewText}</p>
+            ) : (
+              <>
+                {lastVisibleMessage?.type === 'outbound' && (
+                  <ReadStatus
+                    status={lastVisibleMessage.status}
+                    className="mr-1 h-4 w-4 shrink-0"
+                  />
+                )}
+                <p className="line-clamp-1">{previewText}</p>
+              </>
+            )}
+          </div>
+          <div className="mt-2 flex items-center gap-2">
+            <Badge className={cn('text-xs', StateBadge.className)}>{c.state}</Badge>
+            {c.pinned && <Pin className="h-3 w-3 text-muted-foreground" />}
+          </div>
+        </div>
+
         {isUnread > 0 && (
-          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+          <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground ml-2">
             {c.unread}
           </div>
         )}
-        {c.pinned && <Pin className="h-4 w-4 text-primary" />}
       </div>
     </div>
   );
@@ -318,7 +442,7 @@ function MessagePanel({
   conversation,
   currentUser,
 }: {
-  conversation: ConversationType;
+  conversation: Conversation;
   currentUser: User | null;
 }) {
   const scrollAreaRef = React.useRef<HTMLDivElement>(null);
@@ -332,6 +456,8 @@ function MessagePanel({
     }
   }, [conversation.messages]);
 
+  const assignedAgent = mockAgents.find(a => a.id === conversation.assignedTo);
+
   return (
     <div className="flex h-full min-w-0 flex-col overflow-hidden bg-slate-50">
       <div className="flex shrink-0 items-center gap-3 border-b bg-background p-2">
@@ -342,7 +468,9 @@ function MessagePanel({
         <div className="min-w-0 flex-1">
           <p className="truncate font-semibold">{conversation.name}</p>
           <div className="flex items-center gap-2">
-             <Badge variant={conversation.isWindowOpen ? 'default' : 'secondary'} className={cn(conversation.isWindowOpen ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-600")}>Open</Badge>
+             <Badge variant={conversation.isWindowOpen ? 'default' : 'secondary'} className={cn(conversation.isWindowOpen ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-600")}>
+                {conversation.isWindowOpen ? 'Window Open' : 'Window Closed'}
+             </Badge>
              <p className="truncate text-sm text-muted-foreground">
                 {conversation.phone}
              </p>
@@ -355,14 +483,12 @@ function MessagePanel({
                 <MoreVertical className="h-5 w-5" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuContent align="end" className="w-48 rounded-xl">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
               <DropdownMenuItem>Contact info</DropdownMenuItem>
               <DropdownMenuItem>Search</DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-yellow-600 focus:text-yellow-600 focus:bg-yellow-50"
-              >
+              <DropdownMenuItem className="text-yellow-600 focus:text-yellow-600 focus:bg-yellow-50">
                 <Archive className="mr-2 h-4 w-4" />
                 <span>Archive chat</span>
               </DropdownMenuItem>
@@ -380,52 +506,90 @@ function MessagePanel({
               return <InternalNote key={m.id} message={m} agent={agent} />;
             }
             return (
-              <div
-                key={m.id}
-                className={cn(
-                  'flex items-end gap-2',
-                  m.type === 'outbound' ? 'justify-end' : 'justify-start'
-                )}
-              >
-                <div
-                  className={cn(
-                    'relative max-w-[75%] rounded-lg px-3 py-2 shadow-sm',
-                    m.type === 'outbound' ? 'bg-green-100' : 'bg-background'
-                  )}
-                >
-                  {m.type === 'outbound' && agent && (
-                     <div className="text-xs font-semibold text-gray-600 mb-1">
-                        {agent.name} &bull; {mockAgents.find(a => a.id === agent.id)?.id === '1' ? 'Admin' : 'Support'}
-                     </div>
-                  )}
-                  <span className="block max-w-full overflow-hidden whitespace-pre-wrap break-all pr-16 text-sm md:text-base">
-                    {m.text}
-                  </span>
-                  <div className="absolute bottom-1 right-2 flex items-center gap-1 whitespace-nowrap text-[10px] text-muted-foreground/70">
-                    <span suppressHydrationWarning>
-                      {format(new Date(m.time), 'p')}
-                    </span>
-                    {m.type === 'outbound' && (
-                      <ReadStatus status={m.status} />
-                    )}
-                  </div>
-                </div>
-              </div>
+              <MessageBubble key={m.id} message={m} agent={agent} assignedToId={conversation.assignedTo} />
             );
           })}
         </div>
       </ScrollArea>
+       <ReplyBox
+        onSend={(text) => console.log('send public', text)}
+        onSendInternalNote={(text) => console.log('send internal', text)}
+        isWindowOpen={conversation.isWindowOpen}
+        onOpenTemplateDialog={() => console.log('open template')}
+        assignedAgent={assignedAgent}
+        currentUser={currentUser}
+      />
     </div>
   );
 }
 
-function InternalNote({ message, agent }: { message: MessageType; agent: Agent | null | undefined }) {
+function MessageBubble({
+  message,
+  agent,
+  assignedToId,
+}: {
+  message: Message,
+  agent: Agent | null | undefined,
+  assignedToId?: string | null
+}) {
+    const isOutbound = message.type === 'outbound';
+    const isUnassignedReply = isOutbound && agent && agent.id !== assignedToId;
+
+    return (
+      <div
+        className={cn(
+          'flex items-end gap-2',
+          isOutbound ? 'justify-end' : 'justify-start'
+        )}
+      >
+        <div
+          className={cn(
+            'relative max-w-[75%] rounded-2xl px-3 py-2 shadow-sm',
+            isOutbound ? 'bg-green-100' : 'bg-background'
+          )}
+        >
+          {isOutbound && agent && (
+             <div className="flex items-center gap-2 mb-1 text-xs font-semibold text-gray-600">
+                {agent.name} &bull; {mockAgents.find(a => a.id === agent.id)?.role.replace('Super ', '')}
+                {isUnassignedReply && (
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger>
+                                <AlertTriangle className="h-3 w-3 text-orange-500"/>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>This reply was sent by an unassigned agent.</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                )}
+             </div>
+          )}
+          <span className="block max-w-full overflow-hidden whitespace-pre-wrap break-all text-sm md:text-base">
+            {message.text}
+          </span>
+          <div className="absolute bottom-1 right-2 flex items-center gap-1 whitespace-nowrap text-[10px] text-muted-foreground/70">
+            <span suppressHydrationWarning>
+              {format(new Date(message.time), 'p')}
+            </span>
+            {isOutbound && (
+              <ReadStatus status={message.status} />
+            )}
+          </div>
+        </div>
+      </div>
+    );
+}
+
+
+function InternalNote({ message, agent }: { message: Message; agent: Agent | null | undefined }) {
+  if (!agent) return null;
   return (
     <div className="my-4 flex items-center justify-center">
-      <div className="w-full max-w-md rounded-xl bg-yellow-100 p-3 text-center text-xs text-yellow-900">
+      <div className="w-full max-w-md rounded-xl bg-yellow-100/80 p-3 text-center text-xs text-yellow-900 border border-yellow-200">
         <div className="mb-1 flex items-center justify-center gap-2 font-semibold">
           <FileText className="h-3 w-3" />
-          Internal note — {agent?.name || 'an agent'}
+          Internal note — {agent.name} ({agent.role.replace('Super ', '')})
         </div>
         <p className="italic whitespace-pre-wrap break-all">{message.text}</p>
         <p className="mt-1 text-gray-500" suppressHydrationWarning>
@@ -462,11 +626,15 @@ function ReplyBox({
   onSendInternalNote,
   onOpenTemplateDialog,
   isWindowOpen,
+  assignedAgent,
+  currentUser,
 }: {
   onSend: (text: string) => void;
   onSendInternalNote: (text: string) => void;
   onOpenTemplateDialog: () => void;
   isWindowOpen: boolean;
+  assignedAgent: Agent | null | undefined;
+  currentUser: User | null;
 }) {
   const [text, setText] = React.useState('');
   const [isInternal, setInternal] = React.useState(false);
@@ -494,6 +662,15 @@ function ReplyBox({
 
   return (
     <div className="border-t bg-secondary/70 p-3">
+       <div className="text-xs text-muted-foreground px-2 pb-1.5">
+          {assignedAgent ? (
+            <span>Assigned to: <span className="font-semibold text-foreground">{assignedAgent.name}</span></span>
+          ) : (
+            <span className="font-semibold text-orange-600">Unassigned</span>
+          )}
+          <span className="mx-2">&bull;</span>
+          <span>Replying as: <span className="font-semibold text-foreground">{currentUser?.name}</span></span>
+       </div>
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full">
           <Paperclip className="h-5 w-5 text-muted-foreground" />
@@ -530,13 +707,31 @@ function ReplyBox({
   );
 }
 
+// Tooltip Components (kept for unassigned reply icon)
+const TooltipProvider = Tooltip;
+const Tooltip = TooltipPrimitive.Root;
+const TooltipTrigger = TooltipPrimitive.Trigger;
+const TooltipContent = React.forwardRef<
+  React.ElementRef<typeof TooltipPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Content>
+>(({ className, sideOffset = 4, ...props }, ref) => (
+  <TooltipPrimitive.Content
+    ref={ref}
+    sideOffset={sideOffset}
+    className={cn(
+      "z-50 overflow-hidden rounded-md border bg-popover px-3 py-1.5 text-sm text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+      className
+    )}
+    {...props}
+  />
+));
+TooltipContent.displayName = TooltipPrimitive.Content.displayName;
+
+
 export default function InboxPage() {
   const [currentUser, setCurrentUser] = React.useState<User | null>(null);
-  const [conversations, setConversations] =
-    React.useState<ConversationType[]>(mockConversations);
-  const [selectedId, setSelectedId] = React.useState<string | null>(
-    mockConversations[0]?.id || null
-  );
+  const [conversations, setConversations] = React.useState<Conversation[]>(mockConversations);
+  const [selectedId, setSelectedId] = React.useState<string | null>(mockConversations[0]?.id || null);
   const [isTemplateDialogOpen, setTemplateDialogOpen] = React.useState(false);
 
   React.useEffect(() => {
@@ -547,76 +742,14 @@ export default function InboxPage() {
     () => conversations.find((c) => c.id === selectedId),
     [selectedId, conversations]
   );
-
-  const handleSend = (text: string) => {
-    if (!selectedId || !currentUser) return;
-    const newMessage: MessageType = {
-      id: `msg_${Date.now()}`,
-      type: 'outbound',
-      text,
-      time: new Date().toISOString(),
-      status: 'sent',
-      agentId: currentUser.id,
-    };
-    setConversations((prev) =>
-      prev.map((c) =>
-        c.id === selectedId
-          ? {
-              ...c,
-              messages: [...c.messages, newMessage],
-              lastMessage: text,
-              lastMessageTimestamp: new Date().getTime(),
-            }
-          : c
-      )
-    );
+  
+  const handleArchive = (conversationId: string) => {
+    setConversations(prev => prev.filter(c => c.id !== conversationId));
+    if (selectedId === conversationId) {
+        setSelectedId(conversations.find(c => c.id !== conversationId)?.id || null);
+    }
   };
   
-  const handleSendInternalNote = (text: string) => {
-    if (!selectedId || !currentUser) return;
-    const newNote: MessageType = {
-        id: `note_${Date.now()}`,
-        type: 'internal',
-        text,
-        time: new Date().toISOString(),
-        agentId: currentUser.id,
-    };
-    setConversations(prev => prev.map(c => c.id === selectedId ? { ...c, messages: [...c.messages, newNote] } : c));
-  }
-
-  const handleSendTemplate = (
-    template: TemplateType,
-    variables: Record<string, string>
-  ) => {
-    if (!selectedId || !currentUser) return;
-    let content = template.content;
-    for (const key in variables) {
-      content = content.replace(`{{${key}}}`, variables[key]);
-    }
-
-    const newMessage: MessageType = {
-      id: `msg_${Date.now()}`,
-      type: 'outbound',
-      text: content,
-      time: new Date().toISOString(),
-      status: 'sent',
-      agentId: currentUser.id,
-    };
-    setConversations((prev) =>
-      prev.map((c) =>
-        c.id === selectedId
-          ? {
-              ...c,
-              messages: [...c.messages, newMessage],
-              lastMessage: `Template: ${template.name}`,
-              lastMessageTimestamp: new Date().getTime(),
-              isWindowOpen: true, // Re-opens the window
-            }
-          : c
-      )
-    );
-  };
-
   if (!currentUser) {
     return <div>Loading...</div>;
   }
@@ -633,18 +766,10 @@ export default function InboxPage() {
         </div>
         <div className="flex min-w-0 flex-1 flex-col h-full">
           {selectedConversation ? (
-            <>
-              <MessagePanel
-                conversation={selectedConversation}
-                currentUser={currentUser}
-              />
-              <ReplyBox
-                onSend={handleSend}
-                onSendInternalNote={handleSendInternalNote}
-                isWindowOpen={selectedConversation.isWindowOpen}
-                onOpenTemplateDialog={() => setTemplateDialogOpen(true)}
-              />
-            </>
+            <MessagePanel
+              conversation={selectedConversation}
+              currentUser={currentUser}
+            />
           ) : (
             <div className="flex h-full flex-col items-center justify-center bg-background p-4 text-center">
               <MessageSquare className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
@@ -661,7 +786,7 @@ export default function InboxPage() {
       <TemplateDialog
         open={isTemplateDialogOpen}
         onOpenChange={setTemplateDialogOpen}
-        onSendTemplate={handleSendTemplate}
+        onSendTemplate={() => {}}
       />
     </>
   );

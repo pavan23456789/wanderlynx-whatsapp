@@ -200,12 +200,53 @@ const mockConversations: Conversation[] = [
     lastAgentMessageAt: null,
     state: 'Pending',
   },
+  {
+    id: 'conv_5',
+    name: 'Ethan Choi',
+    phone: '+81 3 1234 5678',
+    avatar: 'https://picsum.photos/seed/5/80/80',
+    lastMessage: 'What is the weather like in Kyoto right now?',
+    lastMessageTimestamp: now - 5 * 24 * 60 * 60 * 1000,
+    isWindowOpen: false,
+    messages: [
+        { id: 'msg_5_1', type: 'inbound', text: 'I am arriving in Japan next week.', time: new Date(now - 5.1 * 24 * 60 * 60 * 1000).toISOString() },
+        { id: 'msg_5_2', type: 'inbound', text: 'What is the weather like in Kyoto right now?', time: new Date(now - 5 * 24 * 60 * 60 * 1000).toISOString() },
+        { id: 'msg_5_3', type: 'outbound', text: 'Template `follow_up_v1` sent.', time: new Date(now - 1 * 24 * 60 * 60 * 1000).toISOString(), agentId: '1', status: 'delivered' }
+    ],
+    assignedTo: null,
+    pinned: false,
+    unread: 0,
+    lastCustomerMessageAt: now - 5 * 24 * 60 * 60 * 1000,
+    lastAgentMessageAt: now - 1 * 24 * 60 * 60 * 1000,
+    state: 'Pending',
+  },
+  {
+    id: 'conv_6',
+    name: 'Ava Garcia',
+    phone: '+49 30 1234567',
+    avatar: 'https://picsum.photos/seed/6/80/80',
+    lastMessage: 'My flight was cancelled, what should I do?',
+    lastMessageTimestamp: now - 10 * 60 * 1000,
+    isWindowOpen: true,
+    messages: [
+        { id: 'msg_6_1', type: 'inbound', text: 'HELP!', time: new Date(now - 11 * 60 * 1000).toISOString() },
+        { id: 'msg_6_2', type: 'inbound', text: 'My flight was cancelled, what should I do?', time: new Date(now - 10 * 60 * 1000).toISOString() },
+    ],
+    assignedTo: null,
+    pinned: false,
+    unread: 2,
+    lastCustomerMessageAt: now - 10 * 60 * 1000,
+    lastAgentMessageAt: null,
+    state: 'Open',
+  },
 ];
 
 const mockTemplates: TemplateType[] = [
     { id: 'TPL001', name: 'follow_up_v1', category: 'Utility', content: 'Hi {{1}}, we missed you. Is there anything else we can help you with regarding your case?', status: 'Approved' },
     { id: 'TPL002', name: 'payment_issue', category: 'Utility', content: 'Hello, we noticed an issue with your payment for booking {{1}}. Please contact us to resolve it. Thank you.', status: 'Approved' },
     { id: 'TPL003', name: 'promo_q2_2024', category: 'Marketing', content: 'Ready for a new adventure? Get 15% off our new trip to {{1}}! Limited time offer.', status: 'Approved' },
+    { id: 'TPL004', name: 'agent_unavailable', category: 'Utility', content: 'Apologies, but no agents are available right now. We will get back to you as soon as possible. Your reference is {{1}}.', status: 'Approved' },
+    { id: 'TPL005', name: 'survey_request_v2', category: 'Marketing', content: 'Thanks for chatting with us, {{1}}! Would you mind taking a moment to complete our survey? Your feedback is valuable.', status: 'Approved' },
 ];
 
 function TemplateDialog({
@@ -971,6 +1012,10 @@ export default function InboxPage() {
 
   return (
     <>
+      {/* ⚠️ LAYOUT INVARIANT — DO NOT MODIFY */}
+      {/* This middle panel MUST use `flex-[1_1_0%]` with `min-w-0`. */}
+      {/* Changing this causes the message panel to shrink or leave unused space */}
+      {/* in a 3-column layout with a fixed-width sidebar. */}
       <div className="flex h-full max-h-[calc(100vh-theme(spacing.14))] min-w-0 items-stretch bg-card md:max-h-full">
         <div className="h-full w-full max-w-sm flex-shrink-0 bg-card">
           <ConversationList
@@ -981,10 +1026,6 @@ export default function InboxPage() {
             onSetFilter={setActiveFilter}
           />
         </div>
-        {/* ⚠️ LAYOUT INVARIANT — DO NOT MODIFY */}
-        {/* This middle panel MUST use `flex-[1_1_0%]` with `min-w-0`. */}
-        {/* Changing this causes the message panel to shrink or leave unused space */}
-        {/* in a 3-column layout with a fixed-width sidebar. */}
         <div className="flex flex-[1_1_0%] min-w-0 flex-col h-full">
           {selectedConversation ? (
             <MessagePanel

@@ -63,6 +63,8 @@ const mockTemplates: Template[] = [
     { id: 'TPL002', name: 'trip_reminder', category: 'Utility', content: 'Hi {{1}}, This is a reminder about your upcoming trip {{2}} which starts on {{3}}.', status: 'Approved' },
     { id: 'TPL003', name: 'promo_q2_2024', category: 'Marketing', content: 'Ready for a new adventure? Get 15% off our new trip to {{1}}! Limited time offer.', status: 'Approved' },
     { id: 'TPL004', name: 'payment_issue', category: 'Utility', content: 'Hello, we noticed an issue with your payment for booking {{1}}. Please contact us to resolve it. Thank you.', status: 'Pending' },
+    { id: 'TPL005', name: 'booking_confirmation_v1', category: 'Utility', content: 'Your booking for {{1}} is confirmed! Your booking ID is {{2}}.', status: 'Approved' },
+    { id: 'TPL006', name: 'payment_pending_v1', category: 'Utility', content: 'Reminder: A payment of {{1}} is due on {{2}} for your upcoming trip.', status: 'Approved' },
 ];
 
 const statusConfig = {
@@ -226,6 +228,11 @@ export default function CampaignsPage() {
 
     // Initial load
     React.useEffect(() => {
+        setCampaigns([
+            { id: 'camp_1', name: 'Q2 Promotion', templateName: 'promo_q2_2024', templateContent: 'Get 15% off our new trip to {{1}}!', status: 'Sent', audienceCount: 1200, sent: 1190, failed: 10, createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), messages: [], variables: {}, statusMessage: 'Completed', type: 'Template'},
+            { id: 'camp_2', name: 'New Welcome Flow', templateName: 'welcome_message', templateContent: 'Hello {{1}}! Welcome to Wanderlynx.', status: 'Scheduled', audienceCount: 50, sent: 10, failed: 0, createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), messages: [], variables: {}, statusMessage: 'Sending...', type: 'Template' },
+            { id: 'camp_3', name: 'July Trip Reminders', templateName: 'trip_reminder', templateContent: 'Hi {{1}}, a reminder about your trip {{2}}.', status: 'Draft', audienceCount: 85, sent: 0, failed: 0, createdAt: new Date().toISOString(), messages: [], variables: {}, statusMessage: 'Draft', type: 'Template' },
+        ]);
         setIsLoading(false);
     }, []);
 

@@ -42,6 +42,41 @@ async function getStore(): Promise<TemplateStore> {
             "Hi {{1}}, This is a reminder about your upcoming trip {{2}}. The trip is scheduled to start at {{3}}. Please ensure you arrive at the pickup point on time. Have a great trip!",
           status: "Approved",
         },
+        {
+          id: "TPL005",
+          name: "booking_confirmation_v1",
+          category: "Utility",
+          content: 'Your booking for {{1}} is confirmed! Your booking ID is {{2}}.',
+          status: "Approved",
+        },
+        {
+          id: "TPL006",
+          name: "payment_pending_v1",
+          category: "Utility",
+          content: 'Reminder: A payment of {{1}} is due on {{2}} for your upcoming trip.',
+          status: "Approved",
+        },
+        {
+            id: 'TPL003',
+            name: 'promo_q2_2024',
+            category: 'Marketing',
+            content: 'Ready for a new adventure? Get 15% off our new trip to {{1}}! Limited time offer.',
+            status: 'Approved',
+        },
+        {
+            id: 'TPL004',
+            name: 'payment_issue',
+            category: 'Utility',
+            content: 'Hello, we noticed an issue with your payment for booking {{1}}. Please contact us to resolve it. Thank you.',
+            status: 'Pending',
+        },
+        {
+            id: 'TPL007',
+            name: 'agent_unavailable',
+            category: 'Utility',
+            content: 'Apologies, but no agents are available right now. We will get back to you as soon as possible. Your reference is {{1}}.',
+            status: 'Rejected',
+        }
       ];
 
       const defaultStore: TemplateStore = {

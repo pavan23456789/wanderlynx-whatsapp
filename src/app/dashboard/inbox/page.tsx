@@ -13,6 +13,7 @@ import {
   Search,
   AlertTriangle,
   MoreVertical,
+  Trash2,
 } from 'lucide-react';
 import { format, isToday, isYesterday } from 'date-fns';
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
@@ -26,8 +27,7 @@ import { cn } from '@/lib/utils';
 import {
   type Template as TemplateType,
 } from '@/lib/data';
-import { mockAgents, Agent } from '@/lib/mock/mockAgents';
-import { getCurrentUser, User } from '@/lib/auth';
+import { User, getCurrentUser } from '@/lib/auth';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -64,6 +64,13 @@ type Message = {
   agentId?: string;
 };
 
+type Agent = {
+  id: string;
+  name: string;
+  avatar: string;
+  role: 'Super Admin' | 'Internal Staff';
+};
+
 type Conversation = {
   id: string;
   name: string;
@@ -82,6 +89,27 @@ type Conversation = {
 };
 
 const now = new Date().getTime();
+
+const mockAgents: Agent[] = [
+  {
+    id: '1',
+    name: 'Super Admin',
+    avatar: 'https://picsum.photos/seed/8/80/80',
+    role: 'Super Admin',
+  },
+  {
+    id: '2',
+    name: 'John Doe',
+    avatar: 'https://picsum.photos/seed/9/40/40',
+    role: 'Internal Staff',
+  },
+  {
+    id: '3',
+    name: 'Jane Appleseed',
+    avatar: 'https://picsum.photos/seed/10/40/40',
+    role: 'Internal Staff',
+  },
+];
 
 const mockConversations: Conversation[] = [
   {
@@ -169,7 +197,6 @@ const mockTemplates: TemplateType[] = [
     { id: 'TPL002', name: 'payment_issue', category: 'Utility', content: 'Hello, we noticed an issue with your payment for booking {{1}}. Please contact us to resolve it. Thank you.', status: 'Approved' },
     { id: 'TPL003', name: 'promo_q2_2024', category: 'Marketing', content: 'Ready for a new adventure? Get 15% off our new trip to {{1}}! Limited time offer.', status: 'Approved' },
 ];
-
 
 function TemplateDialog({
   open,
@@ -362,8 +389,8 @@ function ConversationRow({
 
   const lastVisibleMessage = [...c.messages].reverse().find(m => m.type !== 'internal');
   
-  const previewTextRaw = lastVisibleMessage?.text || c.lastMessage || '';
-  const previewText = previewTextRaw.length > 10 ? `${previewTextRaw.slice(0, 10)}...` : previewTextRaw;
+  const rawPreviewText = lastVisibleMessage?.text || c.lastMessage || '';
+  const previewText = rawPreviewText.length > 10 ? `${rawPreviewText.slice(0, 10)}...` : rawPreviewText;
 
   const StateBadge = stateConfig[c.state];
 
@@ -429,8 +456,8 @@ function ConversationRow({
           </div>
         </div>
 
-        {isUnread > 0 && (
-          <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground ml-2">
+        {c.unread !== undefined && c.unread > 0 && (
+          <div className="ml-2 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
             {c.unread}
           </div>
         )}
@@ -493,6 +520,10 @@ function MessagePanel({
                 <Archive className="mr-2 h-4 w-4" />
                 <span>Archive chat</span>
               </DropdownMenuItem>
+              <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-red-50">
+                 <Trash2 className="mr-2 h-4 w-4" />
+                <span>Delete chat</span>
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -535,6 +566,7 @@ function MessageBubble({
 }) {
     const isOutbound = message.type === 'outbound';
     const isUnassignedReply = isOutbound && agent && agent.id !== assignedToId;
+    const agentRole = agent ? mockAgents.find(a => a.id === agent.id)?.role : '';
 
     return (
       <div
@@ -551,7 +583,7 @@ function MessageBubble({
         >
           {isOutbound && agent && (
              <div className="flex items-center gap-2 mb-1 text-xs font-semibold text-gray-600">
-                {agent.name} &bull; {mockAgents.find(a => a.id === agent.id)?.role.replace('Super ', '')}
+                {agent.name} &bull; {agentRole?.replace('Super ', '')}
                 {isUnassignedReply && (
                     <TooltipProvider>
                         <Tooltip>
@@ -585,12 +617,13 @@ function MessageBubble({
 
 function InternalNote({ message, agent }: { message: Message; agent: Agent | null | undefined }) {
   if (!agent) return null;
+  const agentRole = agent ? mockAgents.find(a => a.id === agent.id)?.role : '';
   return (
     <div className="my-4 flex items-center justify-center">
       <div className="w-full max-w-md rounded-xl bg-yellow-100/80 p-3 text-center text-xs text-yellow-900 border border-yellow-200">
         <div className="mb-1 flex items-center justify-center gap-2 font-semibold">
           <FileText className="h-3 w-3" />
-          Internal note — {agent.name} ({agent.role.replace('Super ', '')})
+          Internal note — {agent.name} ({agentRole?.replace('Super ', '')})
         </div>
         <p className="italic whitespace-pre-wrap break-all">{message.text}</p>
         <p className="mt-1 text-gray-500" suppressHydrationWarning>
@@ -709,8 +742,8 @@ function ReplyBox({
 }
 
 // Tooltip Components (kept for unassigned reply icon)
-const Tooltip = TooltipPrimitive.Root;
 const TooltipProvider = TooltipPrimitive.Provider;
+const Tooltip = TooltipPrimitive.Root;
 const TooltipTrigger = TooltipPrimitive.Trigger;
 const TooltipContent = React.forwardRef<
   React.ElementRef<typeof TooltipPrimitive.Content>,
@@ -745,10 +778,7 @@ export default function InboxPage() {
   );
   
   const handleArchive = (conversationId: string) => {
-    setConversations(prev => prev.filter(c => c.id !== conversationId));
-    if (selectedId === conversationId) {
-        setSelectedId(conversations.find(c => c.id !== conversationId)?.id || null);
-    }
+    setConversations(prev => prev.map(c => c.id === conversationId ? {...c, state: 'Resolved'} : c));
   };
   
   if (!currentUser) {

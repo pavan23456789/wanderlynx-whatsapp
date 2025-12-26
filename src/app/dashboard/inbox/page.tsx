@@ -461,12 +461,16 @@ function MessagePanel({
   conversation,
   currentUser,
   onSetConversationState,
+  onSendMessage,
 }: {
   conversation: Conversation;
   currentUser: User | null;
   onSetConversationState: (id: string, state: Conversation['state']) => void;
+  onSendMessage: (text: string, type: 'outbound' | 'internal') => void;
 }) {
   const scrollAreaRef = React.useRef<HTMLDivElement>(null);
+  const [isTemplateDialogOpen, setTemplateDialogOpen] = React.useState(false);
+
 
   React.useEffect(() => {
     if (scrollAreaRef.current) {
@@ -478,7 +482,14 @@ function MessagePanel({
   }, [conversation.messages]);
 
   const assignedAgent = mockAgents.find(a => a.id === conversation.assignedTo);
-  const StateBadge = stateConfig[conversation.state];
+
+  const handleSendTemplate = (template: TemplateType, variables: Record<string, string>) => {
+        let content = template.content;
+        for (const key in variables) {
+            content = content.replace(`{{${key}}}`, variables[key]);
+        }
+        onSendMessage(content, 'outbound');
+  };
 
   return (
     <div className="flex h-full min-w-0 flex-col overflow-hidden bg-slate-50">
@@ -499,17 +510,6 @@ function MessagePanel({
           </div>
         </div>
         <div className="flex items-center gap-1">
-          {conversation.state !== 'Resolved' && (
-             <Button 
-                variant="outline"
-                size="sm"
-                className="rounded-full"
-                onClick={() => onSetConversationState(conversation.id, 'Resolved')}
-              >
-               <CheckCircle2 className="mr-2 h-4 w-4" />
-               Mark as Resolved
-             </Button>
-          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
@@ -526,7 +526,7 @@ function MessagePanel({
                 onClick={() => onSetConversationState(conversation.id, 'Resolved')}
               >
                 <Archive className="mr-2 h-4 w-4" />
-                <span>Archive chat</span>
+                <span>Mark as Resolved</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -548,12 +548,17 @@ function MessagePanel({
         </div>
       </ScrollArea>
        <ReplyBox
-        onSend={(text) => console.log('send public', text)}
-        onSendInternalNote={(text) => console.log('send internal', text)}
-        onOpenTemplateDialog={() => console.log('open template')}
+        onSend={(text) => onSendMessage(text, 'outbound')}
+        onSendInternalNote={(text) => onSendMessage(text, 'internal')}
+        onOpenTemplateDialog={() => setTemplateDialogOpen(true)}
         isWindowOpen={conversation.isWindowOpen}
         assignedAgent={assignedAgent}
         currentUser={currentUser}
+      />
+       <TemplateDialog
+        open={isTemplateDialogOpen}
+        onOpenChange={setTemplateDialogOpen}
+        onSendTemplate={handleSendTemplate}
       />
     </div>
   );
@@ -572,30 +577,25 @@ function MessageBubble({
     const isUnassignedReply = isOutbound && agent && agent.id !== assignedToId;
 
     return (
-      <div className={cn('flex w-full items-end gap-2', isOutbound ? 'justify-end' : 'justify-start')}>
-        <div className="flex flex-col">
-            <div
-                className={cn(
-                    'relative max-w-[75%] rounded-2xl px-3 py-2 shadow-sm',
-                    isOutbound ? 'bg-green-100' : 'bg-background'
-                )}
-            >
-                {isUnassignedReply && agent && (
-                    <div className="mb-1 text-xs font-semibold text-gray-600">
-                        Sent by {agent.name}
-                    </div>
-                )}
-                <span className="block max-w-full overflow-hidden whitespace-pre-wrap break-all text-sm md:text-base">
-                    {message.text}
-                </span>
-            </div>
-            <div className={cn("mt-1 flex items-center gap-1 whitespace-nowrap text-[11px] text-muted-foreground/80", isOutbound ? 'justify-end' : 'justify-start')}>
-                <span suppressHydrationWarning>
-                    {format(new Date(message.time), 'p')}
-                </span>
+        <div className={cn('flex w-full items-end gap-2', isOutbound ? 'justify-end' : 'justify-start')}>
+            <div className="flex flex-col">
+                <div className={cn('relative max-w-[75%] rounded-2xl px-3 py-2 shadow-sm', isOutbound ? 'bg-green-100' : 'bg-background')}>
+                    {isUnassignedReply && agent && (
+                        <div className="mb-1 text-xs font-semibold text-gray-600">
+                            Sent by {agent.name}
+                        </div>
+                    )}
+                    <p className="max-w-full overflow-hidden whitespace-pre-wrap break-all text-sm md:text-base">
+                        {message.text}
+                    </p>
+                </div>
+                <div className={cn('mt-1 flex items-center justify-end gap-1 whitespace-nowrap text-[11px] text-muted-foreground/80')}>
+                    <span suppressHydrationWarning>
+                        {format(new Date(message.time), 'p')}
+                    </span>
+                </div>
             </div>
         </div>
-      </div>
     );
 }
 
@@ -607,7 +607,7 @@ function InternalNote({ message, agent }: { message: Message; agent: Agent | nul
       <div className="w-full max-w-md rounded-xl bg-yellow-100/80 p-3 text-center text-xs text-yellow-900 border border-yellow-200">
         <div className="mb-1 flex items-center justify-center gap-2 font-semibold">
           <FileText className="h-3 w-3" />
-           Internal Note • {agent.name}
+          Internal Note • {agent.name}
         </div>
         <p className="italic whitespace-pre-wrap break-all">{message.text}</p>
         <p className="mt-1 text-gray-500" suppressHydrationWarning>
@@ -737,7 +737,6 @@ export default function InboxPage() {
   const [currentUser, setCurrentUser] = React.useState<User | null>(null);
   const [conversations, setConversations] = React.useState<Conversation[]>(mockConversations);
   const [selectedId, setSelectedId] = React.useState<string | null>(mockConversations[0]?.id || null);
-  const [isTemplateDialogOpen, setTemplateDialogOpen] = React.useState(false);
 
   React.useEffect(() => {
     setCurrentUser(getCurrentUser());
@@ -750,15 +749,39 @@ export default function InboxPage() {
       )
     );
   };
+  
+  const handleSendMessage = (text: string, type: 'outbound' | 'internal') => {
+    if (!selectedId || !currentUser || !text.trim()) return;
 
+    const newMessage: Message = {
+      id: `msg_${Date.now()}`,
+      type,
+      text,
+      time: new Date().toISOString(),
+      agentId: currentUser.id,
+      status: type === 'outbound' ? 'sent' : undefined,
+    };
+
+    setConversations(prev =>
+      prev.map(c => {
+        if (c.id === selectedId) {
+          const updatedMessages = [...c.messages, newMessage];
+          return { 
+            ...c, 
+            messages: updatedMessages,
+            lastMessage: text,
+            lastMessageTimestamp: new Date().getTime(),
+          };
+        }
+        return c;
+      })
+    );
+  };
+  
   const selectedConversation = React.useMemo(
     () => conversations.find((c) => c.id === selectedId),
     [selectedId, conversations]
   );
-  
-  const handleArchive = (conversationId: string) => {
-    handleSetConversationState(conversationId, 'Resolved');
-  };
   
   if (!currentUser) {
     return <div>Loading...</div>;
@@ -780,6 +803,7 @@ export default function InboxPage() {
               conversation={selectedConversation}
               currentUser={currentUser}
               onSetConversationState={handleSetConversationState}
+              onSendMessage={handleSendMessage}
             />
           ) : (
             <div className="flex h-full flex-col items-center justify-center bg-background p-4 text-center">
@@ -794,11 +818,6 @@ export default function InboxPage() {
           )}
         </div>
       </div>
-      <TemplateDialog
-        open={isTemplateDialogOpen}
-        onOpenChange={setTemplateDialogOpen}
-        onSendTemplate={() => {}}
-      />
     </>
   );
 }

@@ -174,7 +174,7 @@ export default function DashboardLayout({
         </Sidebar>
 
         {/* MAIN CONTENT (can shrink safely now) */}
-        <SidebarInset className="flex-1 min-w-0 overflow-y-auto">
+        <SidebarInset className="flex-1 min-w-0">
           <header className="sticky top-0 z-10 flex h-14 items-center justify-between gap-4 border-b bg-background/80 px-4 backdrop-blur-sm md:hidden">
             <div className="flex items-center gap-2">
               <TravonexLogo className="size-7 text-primary" />

@@ -1,4 +1,8 @@
 'use client';
+// ⚠️ IMPORTANT:
+// Scrolling for this page is intentionally handled here.
+// Do NOT move overflow or height logic to dashboard/layout.tsx.
+// Doing so breaks Inbox and Chat layouts.
 
 import * as React from 'react';
 import {
@@ -38,15 +42,6 @@ import {
 
 // ⚠️ This page manages TEMPLATE state only.
 // Do not reuse Contact or Campaign selection logic here.
-
-const mockTemplates: Template[] = [
-    { id: 'TPL001', name: 'booking_confirmation_v1', category: 'Utility', content: 'Your booking for {{1}} is confirmed! Your booking ID is {{2}}.', status: 'Approved' },
-    { id: 'TPL002', name: 'payment_pending_v1', category: 'Utility', content: 'Reminder: A payment of {{1}} for your trip is due on {{2}}.', status: 'Approved' },
-    { id: 'TPL003', name: 'summer_promo_2024', category: 'Marketing', content: 'Ready for a new adventure? Get 15% off our new trip to {{1}}! Limited time offer.', status: 'Approved' },
-    { id: 'TPL004', name: 'cancellation_survey', category: 'Marketing', content: 'We are sorry to see you go. Would you mind telling us why you cancelled?', status: 'Pending' },
-    { id: 'TPL005', name: 'document_submission_failed', category: 'Utility', content: 'There was an issue with the document you submitted for booking {{1}}. Please re-upload.', status: 'Rejected' },
-];
-
 
 const statusConfig = {
   Approved: {
@@ -102,16 +97,30 @@ function TemplatePreviewDialog({ template, open, onOpenChange }: { template: Tem
 }
 
 export default function TemplatesPage() {
-  const [templates, setTemplates] = React.useState<Template[]>(mockTemplates);
+  const [templates, setTemplates] = React.useState<Template[]>([]);
   const [filteredTemplates, setFilteredTemplates] = React.useState<Template[]>([]);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [isLoading, setIsLoading] = React.useState(true);
   const [selectedTemplate, setSelectedTemplate] = React.useState<Template | null>(null);
 
   React.useEffect(() => {
-    // Simulate initial loading
-    const timer = setTimeout(() => setIsLoading(false), 500);
-    return () => clearTimeout(timer);
+    async function fetchTemplates() {
+        setIsLoading(true);
+        try {
+            const response = await fetch('/api/templates');
+            if (!response.ok) {
+                throw new Error('Failed to fetch templates');
+            }
+            const data = await response.json();
+            setTemplates(data);
+        } catch (error) {
+            console.error(error);
+            // Optionally, show a toast notification
+        } finally {
+            setIsLoading(false);
+        }
+    }
+    fetchTemplates();
   }, []);
 
   React.useEffect(() => {
@@ -125,7 +134,7 @@ export default function TemplatesPage() {
 
   return (
     <TooltipProvider>
-      <main className="flex flex-1 flex-col gap-6 p-6 md:gap-8 md:p-10">
+      <main className="flex flex-1 flex-col gap-6 p-6 md:gap-8 md:p-10 overflow-y-auto">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">Message Templates</h1>

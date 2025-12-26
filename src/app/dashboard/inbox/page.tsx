@@ -569,37 +569,42 @@ function MessageBubble({
   agent,
   assignedToId,
 }: {
-  message: Message,
-  agent: Agent | null | undefined,
-  assignedToId?: string | null
+  message: Message;
+  agent: Agent | null | undefined;
+  assignedToId?: string | null;
 }) {
-    const isOutbound = message.type === 'outbound';
-    const isUnassignedReply = isOutbound && agent && agent.id !== assignedToId;
+  const isOutbound = message.type === 'outbound';
+  const isUnassignedReply = isOutbound && agent && agent.id !== assignedToId;
 
-    return (
-        <div className={cn('flex w-full flex-col', isOutbound ? 'items-end' : 'items-start')}>
-            <div className={cn('relative max-w-[75%] rounded-2xl px-3 py-2 shadow-sm', 
-                isOutbound ? 'bg-green-100' : 'bg-[#E3F2FD]'
-            )}>
-                 {isOutbound && agent && !isUnassignedReply && (
-                     <div className="hidden"></div>
-                 )}
-                 {isOutbound && agent && isUnassignedReply && (
-                    <div className="mb-1 flex items-center gap-2 text-xs font-semibold text-gray-600">
-                       Sent by {agent.name}
-                    </div>
-                )}
-                <p className="max-w-full overflow-hidden whitespace-pre-wrap break-all text-sm md:text-base">
-                    {message.text}
-                </p>
-            </div>
-             <div className="mt-1 flex items-center justify-end gap-1 whitespace-nowrap px-1 text-[11px] text-muted-foreground/80">
-                <span suppressHydrationWarning>
-                    {format(new Date(message.time), 'p')}
-                </span>
-            </div>
-        </div>
-    );
+  return (
+    <div
+      className={cn(
+        'flex w-full flex-col',
+        isOutbound ? 'items-end' : 'items-start'
+      )}
+    >
+      <div
+        className={cn(
+          'relative max-w-[75%] rounded-2xl px-3 py-2 shadow-sm',
+          isOutbound ? 'bg-secondary' : 'bg-[#E3F2FD]'
+        )}
+      >
+        {isOutbound && agent && isUnassignedReply && (
+          <div className="mb-1 flex items-center gap-2 text-xs font-semibold text-gray-600">
+            Sent by {agent.name}
+          </div>
+        )}
+        <p className="max-w-full overflow-hidden whitespace-pre-wrap break-all text-sm md:text-base">
+          {message.text}
+        </p>
+      </div>
+      <div className="mt-1 flex items-center justify-end gap-1 whitespace-nowrap px-1 text-[11px] text-muted-foreground/80">
+        <span suppressHydrationWarning>
+          {format(new Date(message.time), 'p')}
+        </span>
+      </div>
+    </div>
+  );
 }
 
 

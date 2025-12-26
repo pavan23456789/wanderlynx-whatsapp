@@ -1,5 +1,8 @@
 'use client';
-
+// ⚠️ IMPORTANT:
+// Scrolling for this page is intentionally handled here.
+// Do NOT move overflow or height logic to dashboard/layout.tsx.
+// Doing so breaks Inbox and Chat layouts.
 import * as React from 'react';
 import {
   Send,
@@ -477,7 +480,7 @@ function ConversationRow({
               <p className="line-clamp-2">{previewText}</p>
             )}
           </div>
-          <div className="mt-2 flex items-center gap-2">
+          <div className="mt-1 flex items-center gap-2">
             <Badge className={cn('text-xs font-bold', StateBadge.className)}>{c.state}</Badge>
             {c.pinned && <Pin className="h-3 w-3 text-muted-foreground" />}
           </div>
@@ -530,6 +533,9 @@ function MessagePanel({
         onSendMessage(content, 'outbound');
   };
 
+  // ⚠️ STATE BEHAVIOR GUARANTEE
+  // Sending a message in a Resolved conversation MUST reopen it.
+  // This is intentional UX behavior. Do NOT remove this guardrail.
   const ResolveButton = () => (
     <Button
         variant="ghost"
@@ -653,8 +659,8 @@ function MessageBubble({
 
   // ⚠️ CHAT BUBBLE SAFETY — DO NOT TOUCH
   // `w-fit` + `min-w-0` are REQUIRED to prevent flex-end
-  // shrink-to-fit width collapse for long messages.
-  // Do NOT remove or replace with flex-1 or w-full.
+  // shrink-to-fit width collapse for long or repeated messages.
+  // Removing these WILL break message rendering.
   return (
     <div
       className={cn(

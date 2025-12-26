@@ -4,8 +4,6 @@ import * as React from 'react';
 import {
   Send,
   MessageSquare,
-  Check,
-  CheckCheck,
   Paperclip,
   FileText,
   Archive,
@@ -390,7 +388,7 @@ function ConversationRow({
   const lastVisibleMessage = [...c.messages].reverse().find(m => m.type !== 'internal');
   
   const rawPreviewText = lastVisibleMessage?.text || c.lastMessage || '';
-  const previewText = rawPreviewText.length > 10 ? `${rawPreviewText.slice(0, 10)}...` : rawPreviewText;
+  const previewText = rawPreviewText.length > 10 ? `${rawPreviewText.slice(0, 10)}…` : rawPreviewText;
 
   const StateBadge = stateConfig[c.state];
 
@@ -439,19 +437,11 @@ function ConversationRow({
             {isUnread ? (
               <p className="font-bold text-foreground">{previewText}</p>
             ) : (
-              <>
-                {lastVisibleMessage?.type === 'outbound' && (
-                  <ReadStatus
-                    status={lastVisibleMessage.status}
-                    className="mr-1 h-4 w-4 shrink-0"
-                  />
-                )}
-                <p className="line-clamp-1">{previewText}</p>
-              </>
+              <p className="line-clamp-1">{previewText}</p>
             )}
           </div>
           <div className="mt-2 flex items-center gap-2">
-            <Badge className={cn('text-xs', StateBadge.className)}>{c.state}</Badge>
+            <Badge className={cn('text-xs font-bold', StateBadge.className)}>{c.state}</Badge>
             {c.pinned && <Pin className="h-3 w-3 text-muted-foreground" />}
           </div>
         </div>
@@ -496,7 +486,7 @@ function MessagePanel({
         <div className="min-w-0 flex-1">
           <p className="truncate font-semibold">{conversation.name}</p>
           <div className="flex items-center gap-2">
-             <Badge variant={conversation.isWindowOpen ? 'default' : 'secondary'} className={cn(conversation.isWindowOpen ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-600")}>
+             <Badge variant={conversation.isWindowOpen ? 'default' : 'secondary'} className={cn('font-bold', conversation.isWindowOpen ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-600")}>
                 {conversation.isWindowOpen ? 'Window Open' : 'Window Closed'}
              </Badge>
              <p className="truncate text-sm text-muted-foreground">
@@ -546,8 +536,8 @@ function MessagePanel({
        <ReplyBox
         onSend={(text) => console.log('send public', text)}
         onSendInternalNote={(text) => console.log('send internal', text)}
-        isWindowOpen={conversation.isWindowOpen}
         onOpenTemplateDialog={() => console.log('open template')}
+        isWindowOpen={conversation.isWindowOpen}
         assignedAgent={assignedAgent}
         currentUser={currentUser}
       />
@@ -566,49 +556,30 @@ function MessageBubble({
 }) {
     const isOutbound = message.type === 'outbound';
     const isUnassignedReply = isOutbound && agent && agent.id !== assignedToId;
-    const agentRole = agent ? mockAgents.find(a => a.id === agent.id)?.role : '';
 
     return (
-      <div
-        className={cn(
-          'flex items-end gap-2',
-          isOutbound ? 'justify-end' : 'justify-start'
-        )}
-      >
-        <div
-          className={cn(
-            'relative max-w-[75%] rounded-2xl px-3 py-2 shadow-sm',
-            isOutbound ? 'bg-green-100' : 'bg-background'
-          )}
-        >
-          {isOutbound && agent && (
-             <div className="flex items-center gap-2 mb-1 text-xs font-semibold text-gray-600">
-                {agent.name} &bull; {agentRole?.replace('Super ', '')}
-                {isUnassignedReply && (
-                    <TooltipProvider>
-                        <Tooltip>
-                            <TooltipTrigger>
-                                <AlertTriangle className="h-3 w-3 text-orange-500"/>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>This reply was sent by an unassigned agent.</p>
-                            </TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
+      <div className={cn('flex w-full items-end gap-2', isOutbound ? 'justify-end' : 'justify-start')}>
+        <div className="flex flex-col">
+            <div
+                className={cn(
+                    'relative max-w-[75%] rounded-2xl px-3 py-2 shadow-sm',
+                    isOutbound ? 'bg-green-100' : 'bg-background'
                 )}
-             </div>
-          )}
-          <span className="block max-w-full overflow-hidden whitespace-pre-wrap break-all text-sm md:text-base">
-            {message.text}
-          </span>
-          <div className="absolute bottom-1 right-2 flex items-center gap-1 whitespace-nowrap text-[10px] text-muted-foreground/70">
-            <span suppressHydrationWarning>
-              {format(new Date(message.time), 'p')}
-            </span>
-            {isOutbound && (
-              <ReadStatus status={message.status} />
-            )}
-          </div>
+            >
+                {isUnassignedReply && agent && (
+                    <div className="mb-1 text-xs font-semibold text-gray-600">
+                        Sent by {agent.name}
+                    </div>
+                )}
+                <span className="block max-w-full overflow-hidden whitespace-pre-wrap break-all text-sm md:text-base">
+                    {message.text}
+                </span>
+            </div>
+            <div className={cn("mt-1 flex items-center gap-1 whitespace-nowrap text-[11px] text-muted-foreground/80", isOutbound ? 'justify-end' : 'justify-start')}>
+                <span suppressHydrationWarning>
+                    {format(new Date(message.time), 'p')}
+                </span>
+            </div>
         </div>
       </div>
     );
@@ -617,13 +588,12 @@ function MessageBubble({
 
 function InternalNote({ message, agent }: { message: Message; agent: Agent | null | undefined }) {
   if (!agent) return null;
-  const agentRole = agent ? mockAgents.find(a => a.id === agent.id)?.role : '';
   return (
     <div className="my-4 flex items-center justify-center">
       <div className="w-full max-w-md rounded-xl bg-yellow-100/80 p-3 text-center text-xs text-yellow-900 border border-yellow-200">
         <div className="mb-1 flex items-center justify-center gap-2 font-semibold">
           <FileText className="h-3 w-3" />
-          Internal note — {agent.name} ({agentRole?.replace('Super ', '')})
+           Internal Note • {agent.name}
         </div>
         <p className="italic whitespace-pre-wrap break-all">{message.text}</p>
         <p className="mt-1 text-gray-500" suppressHydrationWarning>
@@ -633,27 +603,6 @@ function InternalNote({ message, agent }: { message: Message; agent: Agent | nul
     </div>
   );
 }
-
-const ReadStatus = ({
-  status,
-  className,
-}: {
-  status?: 'sent' | 'delivered' | 'read' | 'failed';
-  className?: string;
-}) => {
-  if (!status || status === 'sent') {
-    return <Check className={cn('inline h-4 w-4', className)} />;
-  }
-  if (status === 'delivered') {
-    return <CheckCheck className={cn('inline h-4 w-4', className)} />;
-  }
-  if (status === 'read') {
-    return (
-      <CheckCheck className={cn('inline h-4 w-4 text-blue-500', className)} />
-    );
-  }
-  return null;
-};
 
 function ReplyBox({
   onSend,
@@ -694,17 +643,25 @@ function ReplyBox({
     ? 'Type a message...'
     : '24-hour window closed. Send template to continue.';
 
+  const getFooterLabel = () => {
+    if (!assignedAgent) {
+        return <span className="font-semibold text-gray-600">Unassigned Conversation</span>
+    }
+    if (assignedAgent.id !== currentUser?.id) {
+        return <span className="font-semibold text-orange-600">Assigned to {assignedAgent.name}</span>
+    }
+    return null; // Don't show anything if assigned to current user
+  };
+
+  const footerLabel = getFooterLabel();
+
   return (
     <div className="border-t bg-secondary/70 p-3">
-       <div className="text-xs text-muted-foreground px-2 pb-1.5">
-          {assignedAgent ? (
-            <span>Assigned to: <span className="font-semibold text-foreground">{assignedAgent.name}</span></span>
-          ) : (
-            <span className="font-semibold text-orange-600">Unassigned</span>
-          )}
-          <span className="mx-2">&bull;</span>
-          <span>Replying as: <span className="font-semibold text-foreground">{currentUser?.name}</span></span>
-       </div>
+       {footerLabel && (
+           <div className="text-xs px-2 pb-1.5">
+             {footerLabel}
+           </div>
+       )}
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full">
           <Paperclip className="h-5 w-5 text-muted-foreground" />
@@ -822,3 +779,5 @@ export default function InboxPage() {
     </>
   );
 }
+
+    

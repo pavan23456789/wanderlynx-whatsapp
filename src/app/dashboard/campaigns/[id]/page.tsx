@@ -47,12 +47,13 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
   const [campaign, setCampaign] = React.useState<Campaign | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const { toast } = useToast();
+  const id = params.id;
 
   const fetchCampaign = React.useCallback(async () => {
     // Don't set loading to true on refetch to avoid flicker
     // setIsLoading(true); 
     try {
-      const response = await fetch(`/api/campaigns/${params.id}`);
+      const response = await fetch(`/api/campaigns/${id}`);
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Failed to fetch campaign details');
@@ -68,7 +69,7 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
     } finally {
       setIsLoading(false);
     }
-  }, [params.id, toast]);
+  }, [id, toast]);
 
   React.useEffect(() => {
     fetchCampaign();

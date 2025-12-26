@@ -346,7 +346,7 @@ function ConversationList({
   onSelect: (id: string) => void;
 }) {
   return (
-    <div className="flex h-full flex-col border-r bg-background">
+    <div className="flex h-full flex-col border-r bg-secondary/30">
       <div className="shrink-0 border-b p-3">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -389,7 +389,7 @@ function ConversationRow({
   const lastVisibleMessage = [...c.messages].reverse().find(m => m.type !== 'internal');
   
   const rawPreviewText = lastVisibleMessage?.text || c.lastMessage || '';
-  const previewText = rawPreviewText.length > 10 ? `${rawPreviewText.slice(0, 10)}…` : rawPreviewText;
+  const previewText = rawPreviewText.length > 100 ? `${rawPreviewText.slice(0, 100)}…` : rawPreviewText;
 
   const StateBadge = stateConfig[c.state];
 
@@ -399,7 +399,7 @@ function ConversationRow({
       onClick={() => onSelect(c.id)}
       className={cn(
         'w-full cursor-pointer border-b p-3',
-        isActive ? 'bg-secondary' : 'hover:bg-secondary/50'
+        isActive ? 'bg-accent' : 'hover:bg-accent/50'
       )}
     >
       <div className="flex w-full items-start">
@@ -436,9 +436,9 @@ function ConversationRow({
           </div>
           <div className="flex items-center text-sm text-muted-foreground">
             {isUnread ? (
-              <p className="font-bold text-foreground">{previewText}</p>
+              <p className="font-bold text-foreground line-clamp-2">{previewText}</p>
             ) : (
-              <p className="line-clamp-1">{previewText}</p>
+              <p className="line-clamp-2">{previewText}</p>
             )}
           </div>
           <div className="mt-2 flex items-center gap-2">
@@ -492,7 +492,7 @@ function MessagePanel({
   };
 
   return (
-    <div className="flex h-full min-w-0 flex-col overflow-hidden bg-slate-50">
+    <div className="flex h-full min-w-0 flex-col overflow-hidden bg-background">
       <div className="flex shrink-0 items-center gap-3 border-b bg-background p-2">
         <Avatar className="h-9 w-9 border" data-ai-hint="person portrait">
           <AvatarImage src={conversation.avatar} />
@@ -577,23 +577,33 @@ function MessageBubble({
     const isUnassignedReply = isOutbound && agent && agent.id !== assignedToId;
 
     return (
-        <div className={cn('flex w-full items-end gap-2', isOutbound ? 'justify-end' : 'justify-start')}>
-            <div className="flex flex-col">
-                <div className={cn('relative max-w-[75%] rounded-2xl px-3 py-2 shadow-sm', isOutbound ? 'bg-green-100' : 'bg-background')}>
-                    {isUnassignedReply && agent && (
-                        <div className="mb-1 text-xs font-semibold text-gray-600">
-                            Sent by {agent.name}
-                        </div>
-                    )}
-                    <p className="max-w-full overflow-hidden whitespace-pre-wrap break-all text-sm md:text-base">
-                        {message.text}
-                    </p>
-                </div>
-                <div className={cn('mt-1 flex items-center justify-end gap-1 whitespace-nowrap text-[11px] text-muted-foreground/80')}>
-                    <span suppressHydrationWarning>
-                        {format(new Date(message.time), 'p')}
-                    </span>
-                </div>
+        <div className={cn('flex w-full flex-col', isOutbound ? 'items-end' : 'items-start')}>
+            <div className={cn('relative max-w-[75%] rounded-2xl px-3 py-2 shadow-sm', 
+                isOutbound ? 'bg-green-100' : 'bg-[#E3F2FD]'
+            )}>
+                {isUnassignedReply && agent && (
+                    <div className="mb-1 flex items-center gap-2 text-xs font-semibold text-gray-600">
+                        <span>Sent by {agent.name}</span>
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger>
+                                    <AlertTriangle className="h-3 w-3 text-orange-500" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>This message was sent by an agent not assigned to this conversation.</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    </div>
+                )}
+                <p className="max-w-full overflow-hidden whitespace-pre-wrap break-all text-sm md:text-base">
+                    {message.text}
+                </p>
+            </div>
+             <div className="mt-1 flex items-center justify-end gap-1 whitespace-nowrap px-1 text-[11px] text-muted-foreground/80">
+                <span suppressHydrationWarning>
+                    {format(new Date(message.time), 'p')}
+                </span>
             </div>
         </div>
     );
@@ -607,7 +617,7 @@ function InternalNote({ message, agent }: { message: Message; agent: Agent | nul
       <div className="w-full max-w-md rounded-xl bg-yellow-100/80 p-3 text-center text-xs text-yellow-900 border border-yellow-200">
         <div className="mb-1 flex items-center justify-center gap-2 font-semibold">
           <FileText className="h-3 w-3" />
-          Internal Note • {agent.name}
+           Internal Note • {agent.name}
         </div>
         <p className="italic whitespace-pre-wrap break-all">{message.text}</p>
         <p className="mt-1 text-gray-500" suppressHydrationWarning>
@@ -664,7 +674,7 @@ function ReplyBox({
     if (assignedAgent.id !== currentUser?.id) {
         return <span className="font-semibold text-orange-600">Assigned to {assignedAgent.name}</span>
     }
-    return null; // Don't show anything if assigned to current user
+    return null;
   };
 
   const footerLabel = getFooterLabel();
@@ -771,6 +781,7 @@ export default function InboxPage() {
             messages: updatedMessages,
             lastMessage: text,
             lastMessageTimestamp: new Date().getTime(),
+             ...(type !== 'internal' && { unread: 0 }),
           };
         }
         return c;

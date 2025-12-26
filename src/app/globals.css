@@ -4,14 +4,12 @@
 
 @layer base {
   :root {
-    /* Updated background colors for rebrand */
-    --background: 207 92% 94%; /* Sky Mist */
+    --background: 0 0% 100%; /* White */
     --foreground: 222.2 84% 4.9%;
 
-    /* Updated component backgrounds */
-    --card: 207 92% 94%; /* Sky Mist */
+    --card: 0 0% 100%; /* White */
     --card-foreground: 222.2 84% 4.9%;
-    --popover: 207 92% 94%; /* Sky Mist */
+    --popover: 0 0% 100%; /* White */
     --popover-foreground: 222.2 84% 4.9%;
 
     /* Standard Shadcn Colors (Primary untouched as per instructions) */
@@ -19,28 +17,28 @@
     --primary-foreground: 210 40% 98%;
     
     /* Updated accent/secondary colors */
-    --secondary: 210 100% 97%; /* Ice Blue */
+    --secondary: 240 4.8% 95.9%; /* Neutral Gray */
     --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 100% 97%; /* Ice Blue */
+    --muted: 240 4.8% 95.9%; /* Neutral Gray */
     --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 100% 97%; /* Ice Blue */
+    --accent: 240 4.8% 95.9%; /* Neutral Gray */
     --accent-foreground: 222.2 47.4% 11.2%;
     
     /* Destructive and Ring colors untouched */
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
-    --input: 210 100% 97%; /* Ice Blue */
+    --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
     --radius: 0.5rem;
 
     /* SIDEBAR VARIABLES (REQUIRED) - Using rebrand colors */
-    --sidebar-background: 207 92% 94%; /* Sky Mist */
+    --sidebar-background: 240 4.8% 95.9%; /* Neutral Gray */
     --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar-primary: 240 5.9% 10%;
     --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 210 100% 97%; /* Ice Blue */
-    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 0 0% 98%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }

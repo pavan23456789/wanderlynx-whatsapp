@@ -610,21 +610,26 @@ function MessagePanel({
           </DropdownMenu>
         </div>
       </div>
-      <ScrollArea className="w-full flex-1" viewportRef={scrollAreaRef}>
-        <div className="space-y-1 p-4 md:p-6">
-          {conversation.messages.map((m) => {
-            const agent = m.agentId
-              ? mockAgents.find((a) => a.id === m.agentId)
-              : null;
-            if (m.type === 'internal') {
-              return <InternalNote key={m.id} message={m} agent={agent} />;
-            }
-            return (
-              <MessageBubble key={m.id} message={m} agent={agent} assignedToId={conversation.assignedTo} onRetry={() => onRetryMessage(m.id)}/>
-            );
-          })}
-        </div>
-      </ScrollArea>
+      {/* ⚠️ CHAT SCROLL INVARIANT */}
+      {/* This wrapper MUST use `min-h-0` so the ScrollArea can calculate height correctly. */}
+      {/* Removing this will break chat scrolling inside flex layouts. */}
+      <div className="w-full flex-1 min-h-0">
+          <ScrollArea className="h-full" viewportRef={scrollAreaRef}>
+            <div className="space-y-1 p-4 md:p-6">
+              {conversation.messages.map((m) => {
+                const agent = m.agentId
+                  ? mockAgents.find((a) => a.id === m.agentId)
+                  : null;
+                if (m.type === 'internal') {
+                  return <InternalNote key={m.id} message={m} agent={agent} />;
+                }
+                return (
+                  <MessageBubble key={m.id} message={m} agent={agent} assignedToId={conversation.assignedTo} onRetry={() => onRetryMessage(m.id)}/>
+                );
+              })}
+            </div>
+          </ScrollArea>
+      </div>
        <ReplyBox
         onSend={(text) => onSendMessage(text, 'outbound')}
         onSendInternalNote={(text) => onSendMessage(text, 'internal')}
@@ -659,8 +664,8 @@ function MessageBubble({
 
   // ⚠️ CHAT BUBBLE SAFETY — DO NOT TOUCH
   // `w-fit` + `min-w-0` are REQUIRED to prevent flex-end
-  // shrink-to-fit width collapse for long or repeated messages.
-  // Removing these WILL break message rendering.
+  // shrink-to-fit width collapse for long messages.
+  // Do NOT remove or replace with flex-1 or w-full.
   return (
     <div
       className={cn(
@@ -679,9 +684,9 @@ function MessageBubble({
             Sent by {agent.name}
           </div>
         )}
-        {/* ⚠️ TEXT RENDERING INVARIANT
-// Do NOT add `overflow-hidden`, `line-clamp`, or truncation here.
-// Chat messages must always render full text with natural wrapping. */}
+        {/* ⚠️ TEXT RENDERING INVARIANT */}
+        {/* Do NOT add `overflow-hidden`, `line-clamp`, or truncation here. */}
+        {/* Chat messages must always render full text with natural wrapping. */}
         <p className="block whitespace-pre-wrap break-words">
           {message.text}
         </p>
@@ -974,10 +979,10 @@ export default function InboxPage() {
             onSetFilter={setActiveFilter}
           />
         </div>
-        {/* ⚠️ LAYOUT INVARIANT — DO NOT MODIFY
-// This panel MUST use `flex-[1_1_0%]` and `min-w-0`.
-// Changing this causes the middle panel to collapse horizontally
-// in a 3-column flex layout with a fixed sidebar. */}
+        {/* ⚠️ LAYOUT INVARIANT — DO NOT MODIFY */}
+        {/* This middle panel MUST use `flex-[1_1_0%]` with `min-w-0`. */}
+        {/* Changing this causes the message panel to shrink or leave unused space */}
+        {/* in a 3-column layout with a fixed-width sidebar. */}
         <div className="flex flex-[1_1_0%] min-w-0 flex-col h-full">
           {selectedConversation ? (
             <MessagePanel

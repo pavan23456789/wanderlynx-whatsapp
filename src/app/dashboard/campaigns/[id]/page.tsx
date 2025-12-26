@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import {
   ArrowLeft,
   FileText,
@@ -43,11 +44,12 @@ const statusConfig = {
 } as const;
 
 
-export default function CampaignDetailPage({ params }: { params: { id: string } }) {
+export default function CampaignDetailPage() {
   const [campaign, setCampaign] = React.useState<Campaign | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const { toast } = useToast();
-  const id = params.id;
+  const params = useParams();
+  const id = params.id as string;
 
   const fetchCampaign = React.useCallback(async () => {
     // Don't set loading to true on refetch to avoid flicker
@@ -72,21 +74,23 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
   }, [id, toast]);
 
   React.useEffect(() => {
-    fetchCampaign();
-    // Poll for updates if the campaign is active
-    const interval = setInterval(() => {
-        // Use a function form of setCampaign to get the latest state
-        // This avoids stale closure issues with `campaign` state variable.
-        setCampaign(currentCampaign => {
-            if(currentCampaign && (currentCampaign.status === 'Sending' || currentCampaign.status === 'Draft')) {
-                fetchCampaign();
-            }
-            return currentCampaign;
-        });
-    }, 5000);
+    if (id) {
+      fetchCampaign();
+      // Poll for updates if the campaign is active
+      const interval = setInterval(() => {
+          // Use a function form of setCampaign to get the latest state
+          // This avoids stale closure issues with `campaign` state variable.
+          setCampaign(currentCampaign => {
+              if(currentCampaign && (currentCampaign.status === 'Sending' || currentCampaign.status === 'Draft')) {
+                  fetchCampaign();
+              }
+              return currentCampaign;
+          });
+      }, 5000);
 
-    return () => clearInterval(interval);
-  }, [fetchCampaign]);
+      return () => clearInterval(interval);
+    }
+  }, [id, fetchCampaign]);
 
   if (isLoading) {
     return <div className="flex justify-center items-center h-full"><Loader className="h-8 w-8 animate-spin" /></div>;

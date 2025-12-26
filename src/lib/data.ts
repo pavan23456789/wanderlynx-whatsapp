@@ -53,13 +53,14 @@ export type Campaign = {
     templateName: string;
     templateContent: string;
     variables: Record<string, unknown>;
-    status: 'Draft' | 'Sending' | 'Completed' | 'Failed';
+    status: 'Draft' | 'Scheduled' | 'Sent' | 'Paused';
     audienceCount: number;
     sent: number;
     failed: number;
     statusMessage: string;
     createdAt: string;
     messages: CampaignMessage[];
+    type: 'Template' | 'Broadcast';
 };
 
 

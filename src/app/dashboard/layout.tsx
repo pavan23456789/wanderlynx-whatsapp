@@ -1,4 +1,8 @@
 'use client';
+// ⚠️ GLOBAL LAYOUT CONTRACT
+// This layout defines structure ONLY.
+// Do NOT add page-specific scrolling, overflow, or height fixes here.
+// All such logic belongs inside individual page files.
 
 import * as React from 'react';
 import Link from 'next/link';

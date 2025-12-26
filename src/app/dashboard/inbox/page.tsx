@@ -1,4 +1,9 @@
 'use client';
+// 🔒 INBOX & CHAT FREEZE
+// This file contains carefully balanced flex + scroll + text-wrap logic.
+// Do NOT modify layout, overflow, min-h-0, or text wrapping unless explicitly requested.
+// Any change here must be scoped, reviewed, and intentional.
+
 // ⚠️ IMPORTANT:
 // Scrolling for this page is intentionally handled here.
 // Do NOT move overflow or height logic to dashboard/layout.tsx.
@@ -475,9 +480,9 @@ function ConversationRow({
           </div>
           <div className="flex items-center text-sm text-muted-foreground">
             {isUnread ? (
-              <p className="font-bold text-foreground line-clamp-2">{previewText}</p>
+              <p className="font-bold text-foreground">{previewText}</p>
             ) : (
-              <p className="line-clamp-2">{previewText}</p>
+              <p>{previewText}</p>
             )}
           </div>
           <div className="mt-1 flex items-center gap-2">
@@ -661,8 +666,8 @@ function MessageBubble({
 
   // ⚠️ CHAT BUBBLE SAFETY — DO NOT TOUCH
   // `w-fit` + `min-w-0` are REQUIRED to prevent flex-end
-  // shrink-to-fit width collapse for long or repeated messages.
-  // Removing these WILL break message rendering.
+  // shrink-to-fit width collapse for long messages.
+  // Do NOT remove or replace with flex-1 or w-full.
   return (
     <div
       className={cn(
@@ -978,8 +983,8 @@ export default function InboxPage() {
         </div>
         {/* ⚠️ LAYOUT INVARIANT — DO NOT MODIFY */}
         {/* This middle panel MUST use `flex-[1_1_0%]` with `min-w-0`. */}
-        {/* Changing this causes the middle panel to collapse horizontally */}
-        {/* in a 3-column flex layout with a fixed-width sidebar. */}
+        {/* Changing this causes the message panel to shrink or leave unused space */}
+        {/* in a 3-column layout with a fixed-width sidebar. */}
         <div className="flex flex-[1_1_0%] min-w-0 flex-col h-full">
           {selectedConversation ? (
             <MessagePanel

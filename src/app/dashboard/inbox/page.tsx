@@ -389,7 +389,7 @@ function ConversationRow({
   const lastVisibleMessage = [...c.messages].reverse().find(m => m.type !== 'internal');
   
   const rawPreviewText = lastVisibleMessage?.text || c.lastMessage || '';
-  const previewText = rawPreviewText.length > 100 ? `${rawPreviewText.slice(0, 100)}…` : rawPreviewText;
+  const previewText = rawPreviewText.length > 10 ? `${rawPreviewText.slice(0, 10)}…` : rawPreviewText;
 
   const StateBadge = stateConfig[c.state];
 
@@ -811,9 +811,8 @@ export default function InboxPage() {
         <div
           className="
             flex
-            flex-1
+            flex-[1_1_0%]
             min-w-0
-            w-full
             flex-col
             h-full
           "

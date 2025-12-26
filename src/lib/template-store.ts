@@ -64,6 +64,13 @@ async function getStore(): Promise<TemplateStore> {
             status: 'Approved',
         },
         {
+            id: 'TPL008',
+            name: 'feedback_request_v3',
+            category: 'Marketing',
+            content: 'Hi {{1}}, thanks for traveling with us! We\'d love to hear your feedback on your recent {{2}} trip. Your opinion helps us improve!',
+            status: 'Approved',
+        },
+        {
             id: 'TPL004',
             name: 'payment_issue',
             category: 'Utility',
@@ -71,10 +78,24 @@ async function getStore(): Promise<TemplateStore> {
             status: 'Pending',
         },
         {
+            id: 'TPL009',
+            name: 'flight_delay_notification',
+            category: 'Utility',
+            content: 'Update on your flight for booking {{1}}: Flight {{2}} is now delayed. The new departure time is {{3}}. We apologize for the inconvenience.',
+            status: 'Pending',
+        },
+        {
             id: 'TPL007',
             name: 'agent_unavailable',
             category: 'Utility',
             content: 'Apologies, but no agents are available right now. We will get back to you as soon as possible. Your reference is {{1}}.',
+            status: 'Rejected',
+        },
+        {
+            id: 'TPL010',
+            name: 'outdated_promo_v1',
+            category: 'Marketing',
+            content: 'Last chance for our winter sale!',
             status: 'Rejected',
         }
       ];

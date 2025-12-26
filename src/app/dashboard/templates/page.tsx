@@ -35,23 +35,33 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { useToast } from '@/hooks/use-toast';
+
+// ⚠️ This page manages TEMPLATE state only.
+// Do not reuse Contact or Campaign selection logic here.
+
+const mockTemplates: Template[] = [
+    { id: 'TPL001', name: 'booking_confirmation_v1', category: 'Utility', content: 'Your booking for {{1}} is confirmed! Your booking ID is {{2}}.', status: 'Approved' },
+    { id: 'TPL002', name: 'payment_pending_v1', category: 'Utility', content: 'Reminder: A payment of {{1}} for your trip is due on {{2}}.', status: 'Approved' },
+    { id: 'TPL003', name: 'summer_promo_2024', category: 'Marketing', content: 'Ready for a new adventure? Get 15% off our new trip to {{1}}! Limited time offer.', status: 'Approved' },
+    { id: 'TPL004', name: 'cancellation_survey', category: 'Marketing', content: 'We are sorry to see you go. Would you mind telling us why you cancelled?', status: 'Pending' },
+    { id: 'TPL005', name: 'document_submission_failed', category: 'Utility', content: 'There was an issue with the document you submitted for booking {{1}}. Please re-upload.', status: 'Rejected' },
+];
 
 
 const statusConfig = {
-  APPROVED: {
+  Approved: {
     variant: 'default',
     icon: CheckCircle,
     className:
       'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300',
   },
-  PENDING: {
+  Pending: {
     variant: 'secondary',
     icon: Clock,
     className:
       'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300',
   },
-  REJECTED: {
+  Rejected: {
     variant: 'destructive',
     icon: XCircle,
     className:
@@ -61,7 +71,7 @@ const statusConfig = {
 
 function TemplatePreviewDialog({ template, open, onOpenChange }: { template: Template | null, open: boolean, onOpenChange: (open: boolean) => void }) {
     if (!template) return null;
-    const config = statusConfig[template.status as keyof typeof statusConfig] || statusConfig.PENDING;
+    const config = statusConfig[template.status] || statusConfig.Pending;
     const Icon = config.icon;
 
     return (
@@ -92,35 +102,17 @@ function TemplatePreviewDialog({ template, open, onOpenChange }: { template: Tem
 }
 
 export default function TemplatesPage() {
-  const [templates, setTemplates] = React.useState<Template[]>([]);
+  const [templates, setTemplates] = React.useState<Template[]>(mockTemplates);
   const [filteredTemplates, setFilteredTemplates] = React.useState<Template[]>([]);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [isLoading, setIsLoading] = React.useState(true);
   const [selectedTemplate, setSelectedTemplate] = React.useState<Template | null>(null);
-  const { toast } = useToast();
 
   React.useEffect(() => {
-    const fetchTemplates = async () => {
-      setIsLoading(true);
-      try {
-        const response = await fetch('/api/templates');
-        if (!response.ok) {
-          throw new Error('Failed to fetch templates');
-        }
-        const data = await response.json();
-        setTemplates(data);
-      } catch (error) {
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: 'Could not load templates. Please try again later.',
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchTemplates();
-  }, [toast]);
+    // Simulate initial loading
+    const timer = setTimeout(() => setIsLoading(false), 500);
+    return () => clearTimeout(timer);
+  }, []);
 
   React.useEffect(() => {
     const results = templates.filter(
@@ -152,7 +144,7 @@ export default function TemplatesPage() {
                 </div>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Templates are managed in your WhatsApp Business Manager.</p>
+                <p>Templates are managed in WhatsApp Business Manager.</p>
               </TooltipContent>
             </Tooltip>
           </div>
@@ -170,66 +162,74 @@ export default function TemplatesPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {isLoading
-            ? Array.from({ length: 3 }).map((_, i) => (
-                <Card key={i} className="flex flex-col">
-                  <CardHeader>
-                    <Skeleton className="h-6 w-1/2" />
-                    <Skeleton className="h-4 w-1/4" />
-                  </CardHeader>
-                  <CardContent className="flex-1">
-                    <Skeleton className="mb-2 h-4 w-full" />
-                    <Skeleton className="h-4 w-3/4" />
-                  </CardContent>
-                </Card>
-              ))
+        {isLoading
+            ? (
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                        <Card key={i} className="flex flex-col">
+                        <CardHeader>
+                            <Skeleton className="h-6 w-1/2" />
+                            <Skeleton className="h-4 w-1/4" />
+                        </CardHeader>
+                        <CardContent className="flex-1">
+                            <Skeleton className="mb-2 h-4 w-full" />
+                            <Skeleton className="h-4 w-3/4" />
+                        </CardContent>
+                        </Card>
+                    ))}
+                </div>
+            )
             : filteredTemplates.length === 0
-            ? <div className="col-span-full py-20 text-center text-muted-foreground">
-                <FileText className="mx-auto h-12 w-12" />
-                <h3 className="mt-4 text-lg font-medium">No templates found</h3>
-                <p className="mt-1 text-sm">Your approved templates will appear here automatically.</p>
-              </div>
-            : filteredTemplates.map((template) => {
-                const config =
-                  statusConfig[template.status as keyof typeof statusConfig] ||
-                  statusConfig.PENDING;
-                const Icon = config.icon;
-                return (
-                  <Card
-                    key={template.id}
-                    className="group relative flex cursor-pointer flex-col"
-                    onClick={() => setSelectedTemplate(template)}
-                  >
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className="rounded-xl bg-secondary p-3">
-                            <FileText className="h-6 w-6 text-muted-foreground" />
-                          </div>
-                          <div>
-                            <CardTitle className="text-xl">{template.name}</CardTitle>
-                            <CardDescription>{template.category}</CardDescription>
-                          </div>
-                        </div>
-                        <Badge
-                          variant={config.variant as any}
-                          className={`flex items-center gap-2 ${config.className}`}
+            ? (
+                <div className="col-span-full py-20 text-center text-muted-foreground">
+                    <FileText className="mx-auto h-12 w-12" />
+                    <h3 className="mt-4 text-lg font-medium">No templates found</h3>
+                    <p className="mt-1 text-sm">Templates are created and approved in WhatsApp Business Manager.</p>
+                </div>
+            )
+            : (
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    {filteredTemplates.map((template) => {
+                        const config =
+                        statusConfig[template.status] ||
+                        statusConfig.Pending;
+                        const Icon = config.icon;
+                        return (
+                        <Card
+                            key={template.id}
+                            className="group relative flex cursor-pointer flex-col"
+                            onClick={() => setSelectedTemplate(template)}
                         >
-                          <Icon className="h-4 w-4" />
-                          <span>{template.status}</span>
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="flex-1">
-                      <p className="line-clamp-3 text-muted-foreground">
-                        {template.content}
-                      </p>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-        </div>
+                            <CardHeader>
+                            <div className="flex items-start justify-between">
+                                <div className="flex items-center gap-4">
+                                <div className="rounded-xl bg-secondary p-3">
+                                    <FileText className="h-6 w-6 text-muted-foreground" />
+                                </div>
+                                <div>
+                                    <CardTitle className="text-xl">{template.name}</CardTitle>
+                                    <CardDescription>{template.category}</CardDescription>
+                                </div>
+                                </div>
+                                <Badge
+                                variant={config.variant as any}
+                                className={`flex items-center gap-2 ${config.className}`}
+                                >
+                                <Icon className="h-4 w-4" />
+                                <span>{template.status}</span>
+                                </Badge>
+                            </div>
+                            </CardHeader>
+                            <CardContent className="flex-1">
+                            <p className="line-clamp-3 text-muted-foreground">
+                                {template.content}
+                            </p>
+                            </CardContent>
+                        </Card>
+                        );
+                    })}
+                </div>
+            )}
         <TemplatePreviewDialog template={selectedTemplate} open={!!selectedTemplate} onOpenChange={() => setSelectedTemplate(null)} />
       </main>
     </TooltipProvider>

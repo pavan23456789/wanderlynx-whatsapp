@@ -393,9 +393,10 @@ function ConversationRow({
   
   const rawPreviewText = lastVisibleMessage?.text || c.lastMessage || '';
   
-  // ⚠️ PREVIEW TEXT RULE
-  // Preview text is intentionally limited to 10 characters + ellipsis.
-  // This is a product decision. Do NOT change length or use CSS truncation.
+  // ⚠️ PRODUCT DECISION — DO NOT CHANGE
+  // Conversation preview text is intentionally limited to
+  // 10 characters + ellipsis. This is enforced by logic,
+  // NOT by CSS truncation.
   const previewText = rawPreviewText.length > 10 ? `${rawPreviewText.slice(0, 10)}…` : rawPreviewText;
 
 
@@ -623,10 +624,10 @@ function MessageBubble({
   const isOutbound = message.type === 'outbound';
   const isUnassignedReply = isOutbound && agent && agent.id !== assignedToId;
 
-  // ⚠️ CHAT BUBBLE SAFETY
+  // ⚠️ CHAT BUBBLE SAFETY — DO NOT TOUCH
   // `w-fit` + `min-w-0` are REQUIRED to prevent flex-end
-  // shrink-to-fit width collapse for long messages.
-  // Do NOT remove or replace with flex-1 or w-full.
+  // shrink-to-fit width collapse for long or repeated messages.
+  // Removing these WILL break message rendering.
   return (
     <div
       className={cn(
@@ -645,7 +646,10 @@ function MessageBubble({
             Sent by {agent.name}
           </div>
         )}
-        <p className="block whitespace-pre-wrap break-words">
+        {/* ⚠️ TEXT RENDERING INVARIANT */}
+        {/* Do NOT add `overflow-hidden`, `line-clamp`, or truncation here. */}
+        {/* Chat messages must always render full text with natural wrapping. */}
+        <p className="block whitespace-pre-wrap break-all">
           {message.text}
         </p>
       </div>
@@ -854,7 +858,9 @@ export default function InboxPage() {
 
             const updatedMessages = [...c.messages, newMessage];
 
-            // Reopen conversation if a message is sent to a resolved one
+            // ⚠️ STATE BEHAVIOR GUARANTEE
+            // Sending a message in a Resolved conversation MUST reopen it.
+            // This is intentional UX behavior. Do NOT remove this guardrail.
             const newState = (isResolved && type !== 'internal') ? 'Open' : c.state;
 
             return { 
@@ -898,10 +904,6 @@ export default function InboxPage() {
 
   return (
     <>
-      {/* ⚠️ LAYOUT INVARIANT — DO NOT MODIFY */}
-      {/* This panel MUST use `flex-[1_1_0%]` and `min-w-0`. */}
-      {/* Changing this causes the middle panel to collapse horizontally */}
-      {/* in a 3-column flex layout with a fixed sidebar. */}
       <div className="flex h-full max-h-[calc(100vh-theme(spacing.14))] min-w-0 items-stretch bg-card md:max-h-full">
         <div className="h-full w-full max-w-sm flex-shrink-0 bg-card">
           <ConversationList
@@ -910,15 +912,11 @@ export default function InboxPage() {
             onSelect={handleSelectConversation}
           />
         </div>
-        <div
-          className="
-            flex
-            flex-[1_1_0%]
-            min-w-0
-            flex-col
-            h-full
-          "
-        >
+        {/* ⚠️ LAYOUT INVARIANT — DO NOT MODIFY */}
+        {/* This middle panel MUST use `flex-[1_1_0%]` with `min-w-0`. */}
+        {/* Changing this causes the message panel to shrink or leave unused space */}
+        {/* in a 3-column flex layout with a fixed-width sidebar. */}
+        <div className="flex flex-[1_1_0%] min-w-0 flex-col h-full">
           {selectedConversation ? (
             <MessagePanel
               conversation={selectedConversation}

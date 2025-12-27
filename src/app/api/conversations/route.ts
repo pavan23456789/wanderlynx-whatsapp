@@ -7,43 +7,32 @@ const supabase = createClient(
 );
 
 export async function GET() {
-  try {
-    const { data, error } = await supabase
-      .from("conversations")
-      .select(`
+  const { data, error } = await supabase
+    .from("conversations")
+    .select(`
+      id,
+      phone,
+      name,
+      status,
+      last_message,
+      last_message_at,
+      updated_at,
+      messages (
         id,
-        status,
-        created_at,
-        messages (
-          id,
-          content,
-          direction,
-          created_at
-        )
-      `)
-      .order("created_at", { ascending: false });
+        content,
+        direction,
+        created_at
+      )
+    `)
+    .order("updated_at", { ascending: false });
 
-    if (error) {
-      console.error("Supabase error:", error);
-      return NextResponse.json(
-        { error: "Failed to fetch conversations" },
-        { status: 500 }
-      );
-    }
-
-    const safeData = (data || []).map((conversation: any) => ({
-      ...conversation,
-      messages: Array.isArray(conversation.messages)
-        ? conversation.messages
-        : [],
-    }));
-
-    return NextResponse.json(safeData);
-  } catch (err) {
-    console.error("API crash:", err);
+  if (error) {
+    console.error("Supabase error:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: error.message },
       { status: 500 }
     );
   }
+
+  return NextResponse.json(data || []);
 }

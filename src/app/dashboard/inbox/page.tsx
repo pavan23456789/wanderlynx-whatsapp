@@ -261,8 +261,10 @@ function TemplateDialog({
   );
 }
 
-const formatFuzzyDate = (timestamp: string | number) => {
+const formatFuzzyDate = (timestamp: string | number | null | undefined) => {
+  if (!timestamp) return '';
   const d = new Date(timestamp);
+  if (isNaN(d.getTime())) return '';
   if (isToday(d)) return format(d, 'p');
   if (isYesterday(d)) return 'Yesterday';
   return format(d, 'MM/dd/yy');
@@ -644,7 +646,7 @@ function MessageBubble({
             </>
         )}
         <span suppressHydrationWarning>
-          {format(new Date(message.time), 'p')}
+        {isNaN(new Date(message.time).getTime()) ? '' : format(new Date(message.time), 'p')}
         </span>
       </div>
     </div>
@@ -662,7 +664,7 @@ function InternalNote({ message, agent }: { message: Message; agent: Agent | nul
         </div>
         <p className="italic whitespace-pre-wrap break-all">{message.text}</p>
         <p className="mt-1 text-gray-500" suppressHydrationWarning>
-          {format(new Date(message.time), 'Pp')}
+        {isNaN(new Date(message.time).getTime()) ? '' : format(new Date(message.time), 'Pp')}
         </p>
       </div>
     </div>
@@ -810,10 +812,17 @@ export default function InboxPage() {
     try {
         const res = await fetch('/api/conversations');
         if (!res.ok) throw new Error('Failed to fetch conversations');
-        const data = await res.json();
-        setConversations(data);
-        if (!selectedId && data.length > 0) {
-            setSelectedId(data[0].id);
+        const raw = await res.json();
+        const list = Array.isArray(raw?.conversations)
+         ? raw.conversations
+         : Array.isArray(raw)
+         ? raw
+         : [];
+
+        setConversations(list);
+
+        if (!selectedId && list.length > 0) {
+          setSelectedId(list[0].id);
         }
     } catch (error: any) {
         toast({ variant: 'destructive', title: 'Error', description: error.message });
@@ -878,7 +887,7 @@ export default function InboxPage() {
         text,
         time: new Date().toISOString(),
         agentId: currentUser.id,
-        status: 'pending',
+        status: 'sent',
     };
     
     setConversations(prev =>
@@ -952,7 +961,10 @@ export default function InboxPage() {
     const messageToRetry = conversations.find(c => c.id === selectedId)?.messages.find(m => m.id === messageId);
     if (!messageToRetry) return;
     
-    handleSendMessage(messageToRetry.text, messageToRetry.type || 'outbound');
+    handleSendMessage(
+      messageToRetry.text,
+      messageToRetry.type === 'internal' ? 'internal' : 'outbound'
+    );
     
     // Remove the failed message
      setConversations(prev =>

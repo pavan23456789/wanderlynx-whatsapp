@@ -34,8 +34,13 @@ export async function GET() {
     );
   }
 
-  // 👇 THIS IS THE IMPORTANT FIX
+  // 🔒 CRITICAL NORMALIZATION (fixes "a is not iterable")
+  const safeConversations = (data || []).map((conv: any) => ({
+    ...conv,
+    messages: Array.isArray(conv.messages) ? conv.messages : [],
+  }));
+
   return NextResponse.json({
-    conversations: data || [],
+    conversations: safeConversations,
   });
 }

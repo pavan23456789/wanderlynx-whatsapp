@@ -1,7 +1,7 @@
 'use client';
 // 🔒 INBOX & CHAT FREEZE
 // UI Layout/CSS remains 100% original.
-// Logic: Hardened Normalization + Date Guards + Type Safety Fixes.
+// Logic: Hardened Normalization + Date Guards + Type Safety + Date Separators.
 
 import * as React from 'react';
 import {
@@ -18,7 +18,8 @@ import {
   Undo2,
   Loader,
 } from 'lucide-react';
-import { format, isToday, isYesterday, differenceInHours } from 'date-fns';
+// ✅ Added 'isSameDay' to imports
+import { format, isToday, isYesterday, differenceInHours, isSameDay } from 'date-fns';
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 
 import { Button } from '@/components/ui/button';
@@ -178,6 +179,24 @@ const normalizeConversation = (apiData: any): Conversation => {
     state: uiState,
   };
 };
+
+// ✅ NEW COMPONENT: Date Separator
+function DateSeparator({ date }: { date: string }) {
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return null;
+
+  let label = format(d, 'MMMM d, yyyy');
+  if (isToday(d)) label = 'Today';
+  if (isYesterday(d)) label = 'Yesterday';
+
+  return (
+    <div className="sticky top-0 z-10 my-4 flex justify-center">
+      <span className="rounded-full bg-secondary/80 px-3 py-1 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur-sm">
+        {label}
+      </span>
+    </div>
+  );
+}
 
 
 function TemplateDialog({
@@ -628,15 +647,30 @@ function MessagePanel({
                   </AlertDescription>
                 </Alert>
               )}
-              {conversation.messages.map((m) => {
+              {/* ✅ UPDATE: Message Loop with Date Separators */}
+              {conversation.messages.map((m, index) => {
+                const prevMessage = conversation.messages[index - 1];
+                const isNewDay = !prevMessage || !isSameDay(new Date(m.time), new Date(prevMessage.time));
+
                 const agent = m.agentId
                   ? mockAgents.find((a) => a.id === m.agentId)
                   : null;
-                if (m.type === 'internal') {
-                  return <InternalNote key={m.id} message={m} agent={agent} />;
-                }
+
                 return (
-                  <MessageBubble key={m.id} message={m} agent={agent} assignedToId={conversation.assignedTo} onRetry={() => onRetryMessage(m.id)}/>
+                  <React.Fragment key={m.id}>
+                    {isNewDay && <DateSeparator date={m.time} />}
+                    
+                    {m.type === 'internal' ? (
+                       <InternalNote message={m} agent={agent} />
+                    ) : (
+                       <MessageBubble 
+                          message={m} 
+                          agent={agent} 
+                          assignedToId={conversation.assignedTo} 
+                          onRetry={() => onRetryMessage(m.id)}
+                       />
+                    )}
+                  </React.Fragment>
                 );
               })}
             </div>
@@ -1052,8 +1086,8 @@ export default function InboxPage() {
     
     const messageToRetry = conversation.messages.find(m => m.id === messageId);
     if (!messageToRetry) return;
-
-    // ✅ FIX 1: Prevent retrying inbound messages (which cannot be sent)
+    
+    // Prevent retrying inbound messages (which cannot be sent)
     if (messageToRetry.type === 'inbound') return;
     
     // Remove the failed message
@@ -1066,7 +1100,7 @@ export default function InboxPage() {
         })
     );
 
-    // ✅ FIX 2: Explicitly narrow the type to satisfy TypeScript
+    // Resend using correct params
     handleSendMessage(
       messageToRetry.text,
       messageToRetry.type === 'internal' ? 'internal' : 'outbound'

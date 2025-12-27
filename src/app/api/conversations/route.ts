@@ -28,19 +28,19 @@ export async function GET() {
 
   if (error) {
     console.error("Supabase error:", error);
-    return NextResponse.json(
-      { error: error.message },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // 🔒 CRITICAL NORMALIZATION (fixes "a is not iterable")
-  const safeConversations = (data || []).map((conv: any) => ({
-    ...conv,
-    messages: Array.isArray(conv.messages) ? conv.messages : [],
+  // Normalize messages
+  const safe = (data || []).map((c: any) => ({
+    ...c,
+    messages: Array.isArray(c.messages) ? c.messages : [],
   }));
 
-  return NextResponse.json({
-    conversations: safeConversations,
-  });
+  // 🔥 CRITICAL COMPATIBILITY FIX
+  // Return an array, but ALSO expose conversations on it
+  const response: any = [...safe];
+  response.conversations = response;
+
+  return NextResponse.json(response);
 }

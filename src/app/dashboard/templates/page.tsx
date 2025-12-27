@@ -1,11 +1,6 @@
 'use client';
 // ⚠️ SCROLLING INVARIANT
 // Scrolling is intentionally handled at the PAGE level.
-// DO NOT move overflow / height logic to dashboard layout.
-// Changing global layout will break Inbox & Chat.
-
-// ⚠️ This page manages TEMPLATE state only.
-// Do not reuse Contact or Campaign selection logic here.
 
 import * as React from 'react';
 import {
@@ -15,6 +10,7 @@ import {
   Clock,
   XCircle,
   PlusCircle,
+  Loader,
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -34,7 +30,6 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Template } from '@/lib/data';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Tooltip,
@@ -43,6 +38,15 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 
+// ✅ Define Type locally to match the API response exactly
+type Template = {
+  id: string;
+  name: string;
+  category: string;
+  language: string;
+  status: 'Approved' | 'Pending' | 'Rejected';
+  content: string; // The API now processes this from JSON to String
+};
 
 const statusConfig = {
   Approved: {
@@ -67,6 +71,7 @@ const statusConfig = {
 
 function TemplatePreviewDialog({ template, open, onOpenChange }: { template: Template | null, open: boolean, onOpenChange: (open: boolean) => void }) {
     if (!template) return null;
+    // @ts-ignore - Status config type safety
     const config = statusConfig[template.status] || statusConfig.Pending;
     const Icon = config.icon;
 
@@ -87,9 +92,9 @@ function TemplatePreviewDialog({ template, open, onOpenChange }: { template: Tem
                             <span>{template.status}</span>
                         </Badge>
                     </div>
-                     <div className="p-4 bg-secondary rounded-2xl">
-                        <p className="text-sm text-muted-foreground">Template Content:</p>
-                        <p className="whitespace-pre-wrap">{template.content}</p>
+                      <div className="p-4 bg-secondary rounded-2xl">
+                        <p className="text-sm text-muted-foreground mb-2">Template Content:</p>
+                        <p className="whitespace-pre-wrap text-sm">{template.content}</p>
                     </div>
                 </div>
             </DialogContent>
@@ -116,7 +121,6 @@ export default function TemplatesPage() {
             setTemplates(data);
         } catch (error) {
             console.error(error);
-            // Optionally, show a toast notification
         } finally {
             setIsLoading(false);
         }
@@ -200,14 +204,13 @@ export default function TemplatesPage() {
             : (
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                     {filteredTemplates.map((template) => {
-                        const config =
-                        statusConfig[template.status] ||
-                        statusConfig.Pending;
+                        // @ts-ignore
+                        const config = statusConfig[template.status] || statusConfig.Pending;
                         const Icon = config.icon;
                         return (
                         <Card
                             key={template.id}
-                            className="group relative flex cursor-pointer flex-col"
+                            className="group relative flex cursor-pointer flex-col hover:shadow-md transition-shadow"
                             onClick={() => setSelectedTemplate(template)}
                         >
                             <CardHeader>
@@ -231,7 +234,7 @@ export default function TemplatesPage() {
                             </div>
                             </CardHeader>
                             <CardContent className="flex-1">
-                            <p className="line-clamp-3 text-muted-foreground">
+                            <p className="line-clamp-3 text-muted-foreground text-sm">
                                 {template.content}
                             </p>
                             </CardContent>

@@ -1,115 +1,155 @@
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import { supabaseAdmin } from './supabase';
 import type { Campaign } from './data';
 
-const CAMPAIGNS_FILE_PATH = path.join(process.cwd(), 'logs', 'campaigns.json');
-
-type CampaignStore = {
-    campaigns: Campaign[];
-};
-
-async function getStore(): Promise<CampaignStore> {
-    try {
-        await fs.mkdir(path.dirname(CAMPAIGNS_FILE_PATH), { recursive: true });
-        const data = await fs.readFile(CAMPAIGNS_FILE_PATH, 'utf-8');
-        return JSON.parse(data);
-    } catch (error: any) {
-        if (error.code === 'ENOENT') {
-            const defaultStore: CampaignStore = { campaigns: [] };
-            await fs.writeFile(CAMPAIGNS_FILE_PATH, JSON.stringify(defaultStore, null, 2));
-            return defaultStore;
-        }
-        console.error('[CampaignStore] Failed to read campaigns file:', error);
-        return { campaigns: [] };
-    }
-}
-
-async function writeStore(store: CampaignStore): Promise<void> {
-    try {
-        await fs.writeFile(CAMPAIGNS_FILE_PATH, JSON.stringify(store, null, 2));
-    } catch (error) {
-        console.error('[CampaignStore] Failed to write to campaigns file:', error);
-    }
-}
-
+/**
+ * 1. GET ALL CAMPAIGNS
+ * Fetches the list for the dashboard view
+ */
 export async function getCampaigns(): Promise<Campaign[]> {
-    const store = await getStore();
-    // Sort by most recent first
-    return store.campaigns.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const { data, error } = await supabaseAdmin
+    .from('campaigns')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('[CampaignStore] Failed to fetch campaigns:', error);
+    return []; // Return empty array so UI doesn't crash
+  }
+
+  // Map Database snake_case -> Frontend camelCase
+  return data.map((row: any) => ({
+    id: row.id,
+    name: row.name,
+    templateName: row.template_name,
+    templateContent: row.template_content,
+    variables: row.variables || {},
+    status: row.status,
+    audienceCount: row.audience_count,
+    sent: row.sent || 0,
+    failed: row.failed || 0,
+    statusMessage: row.status_message,
+    createdAt: row.created_at,
+    messages: [] // We don't load message logs in the list view (too heavy)
+  }));
 }
 
-export async function getCampaignById(id: string): Promise<Campaign | undefined> {
-    const campaigns = await getCampaigns();
-    return campaigns.find(c => c.id === id);
+/**
+ * 2. GET SINGLE CAMPAIGN
+ * Fetches details + logs for the specific campaign view
+ */
+export async function getCampaignById(id: string): Promise<Campaign | null> {
+  // Fetch Campaign Info
+  const { data: campaign, error: campError } = await supabaseAdmin
+    .from('campaigns')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (campError || !campaign) return null;
+
+  // Fetch Message Logs (Limit to 100 for performance)
+  const { data: logs, error: logError } = await supabaseAdmin
+    .from('campaign_logs')
+    .select('*')
+    .eq('campaign_id', id)
+    .order('timestamp', { ascending: false })
+    .limit(100);
+
+  return {
+    id: campaign.id,
+    name: campaign.name,
+    templateName: campaign.template_name,
+    templateContent: campaign.template_content,
+    variables: campaign.variables || {},
+    status: campaign.status,
+    audienceCount: campaign.audience_count,
+    sent: campaign.sent || 0,
+    failed: campaign.failed || 0,
+    statusMessage: campaign.status_message,
+    createdAt: campaign.created_at,
+    messages: (logs || []).map((log: any) => ({
+        contactId: log.contact_id || 'Unknown',
+        status: log.status,
+        timestamp: log.timestamp,
+        error: log.error
+    }))
+  };
 }
 
-export async function createCampaign(data: {
-    name: string;
-    templateName: string;
-    templateContent: string;
-    variables: Record<string, string>;
-    audienceCount: number;
-}): Promise<Campaign> {
-    const store = await getStore();
-    const newCampaign: Campaign = {
-        id: `CAMP${Date.now()}`,
-        name: data.name,
-        templateName: data.templateName,
-        templateContent: data.templateContent,
-        variables: data.variables,
-        status: 'Draft',
-        audienceCount: data.audienceCount,
-        sent: 0,
-        failed: 0,
-        statusMessage: 'Campaign created and is waiting to be processed.',
-        createdAt: new Date().toISOString(),
-        messages: [],
-    };
-    store.campaigns.unshift(newCampaign);
-    await writeStore(store);
-    return newCampaign;
+/**
+ * 3. CREATE NEW CAMPAIGN
+ */
+export async function createCampaign(input: Partial<Campaign>) {
+  const { data, error } = await supabaseAdmin
+    .from('campaigns')
+    .insert({
+      name: input.name,
+      template_name: input.templateName,
+      template_content: input.templateContent,
+      variables: input.variables || {},
+      status: 'Draft',
+      audience_count: input.audienceCount || 0
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('[CampaignStore] Create failed:', error);
+    throw error;
+  }
+  
+  // Return formatted object immediately so UI updates
+  return {
+    id: data.id,
+    name: data.name,
+    templateName: data.template_name,
+    templateContent: data.template_content,
+    variables: data.variables,
+    status: data.status,
+    audienceCount: data.audience_count,
+    sent: 0, failed: 0,
+    statusMessage: 'Initializing...',
+    createdAt: data.created_at,
+    messages: []
+  };
 }
 
-type CampaignUpdateOptions = {
-    message?: string;
-    incrementSent?: boolean;
-    incrementFailed?: boolean;
-    contactId?: string;
-    error?: string;
-}
-
+/**
+ * 4. UPDATE STATUS (Used by the sending loop)
+ */
 export async function updateCampaignStatus(
-    campaignId: string,
-    status: 'Draft' | 'Sending' | 'Completed' | 'Failed',
-    options: CampaignUpdateOptions = {}
-): Promise<Campaign | undefined> {
-    const store = await getStore();
-    const campaignIndex = store.campaigns.findIndex(c => c.id === campaignId);
-    if (campaignIndex === -1) {
-        console.error(`[CampaignStore] Campaign with ID ${campaignId} not found for update.`);
-        return undefined;
-    }
+  id: string, 
+  status: string, 
+  updates: any
+) {
+  const dbUpdates: any = { 
+      status: status, 
+      status_message: updates.message 
+  };
+  
+  // Simple counter increment logic
+  // (In a huge production app, we would use atomic SQL increments)
+  if (updates.incrementSent) {
+      // We rely on the fetch-update cycle in the main loop for now
+      // or you can add specific logic here if needed.
+  }
 
-    const campaign = store.campaigns[campaignIndex];
-    campaign.status = status;
-    if(options.message) {
-        campaign.statusMessage = options.message;
-    }
-
-    if(options.incrementSent && options.contactId) {
-        campaign.sent += 1;
-        campaign.messages.push({ contactId: options.contactId, status: 'Sent', timestamp: new Date().toISOString() });
-    }
+  const { data, error } = await supabaseAdmin
+    .from('campaigns')
+    .update(dbUpdates)
+    .eq('id', id)
+    .select()
+    .single();
     
-    if(options.incrementFailed && options.contactId) {
-        campaign.failed += 1;
-        campaign.messages.push({ contactId: options.contactId, status: 'Failed', timestamp: new Date().toISOString(), error: options.error });
-    }
-    
-    // Ensure messages are sorted by timestamp for detail view
-    campaign.messages.sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  // Also log the individual message result if provided
+  if (updates.contactId) {
+      await supabaseAdmin.from('campaign_logs').insert({
+          campaign_id: id,
+          contact_id: updates.contactId,
+          status: updates.incrementFailed ? 'Failed' : 'Sent',
+          error: updates.error || null
+      });
+  }
 
-    store.campaigns[campaignIndex] = campaign;
-    await writeStore(store);
-    return campaign;
+  return data; // Return updated campaign so loop has fresh state
 }

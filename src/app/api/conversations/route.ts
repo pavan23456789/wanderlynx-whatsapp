@@ -1,18 +1,15 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
+// Ensure you have these env vars set in .env.local
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-function safeDate(value: any) {
-  if (!value) return null;
-  const d = new Date(value);
-  return isNaN(d.getTime()) ? null : d.toISOString();
-}
-
 export async function GET() {
+  // We select specific columns and rename them to match the Frontend
+  // Example: 'agent_id' becomes 'agentId'
   const { data, error } = await supabase
     .from("conversations")
     .select(`
@@ -22,37 +19,33 @@ export async function GET() {
       status,
       last_message,
       last_message_at,
-      updated_at,
+      pinned,
+      unread,
+      assignedTo:assigned_to,
       messages (
         id,
         content,
         direction,
-        created_at
+        created_at,
+        status,
+        type,
+        agentId:agent_id
       )
     `)
-    .order("updated_at", { ascending: false });
+    // 1. Sort conversations: Newest messages at the top of the list
+    .order("last_message_at", { ascending: false })
+    // 2. Sort messages: Oldest at the top (so you read down)
+    .order("created_at", { foreignTable: "messages", ascending: true });
 
   if (error) {
+    console.error("Supabase Error:", error);
     return NextResponse.json(
       { conversations: [], error: error.message },
       { status: 500 }
     );
   }
 
-  const conversations = (data || []).map((c: any) => ({
-    ...c,
-    last_message_at: safeDate(c.last_message_at),
-    updated_at: safeDate(c.updated_at),
-    messages: Array.isArray(c.messages)
-      ? c.messages.map((m: any) => ({
-          ...m,
-          created_at: safeDate(m.created_at),
-        }))
-      : [],
-  }));
-
-  // 🔒 STRICT CONTRACT — what Inbox expects
   return NextResponse.json({
-    conversations,
+    conversations: data ?? [],
   });
 }

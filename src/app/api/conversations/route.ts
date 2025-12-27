@@ -6,6 +6,12 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+// helper to safely handle dates
+function safeDate(value: any) {
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d.toISOString();
+}
+
 export async function GET() {
   const { data, error } = await supabase
     .from("conversations")
@@ -31,16 +37,19 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Normalize messages
-  const safe = (data || []).map((c: any) => ({
+  const safeConversations = (data || []).map((c: any) => ({
     ...c,
-    messages: Array.isArray(c.messages) ? c.messages : [],
+    last_message_at: safeDate(c.last_message_at),
+    updated_at: safeDate(c.updated_at),
+    messages: Array.isArray(c.messages)
+      ? c.messages.map((m: any) => ({
+          ...m,
+          created_at: safeDate(m.created_at),
+        }))
+      : [],
   }));
 
-  // 🔥 CRITICAL COMPATIBILITY FIX
-  // Return an array, but ALSO expose conversations on it
-  const response: any = [...safe];
-  response.conversations = response;
-
-  return NextResponse.json(response);
+  return NextResponse.json({
+    conversations: safeConversations,
+  });
 }

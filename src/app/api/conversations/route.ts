@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-// IMPORTANT:
-// - Uses service role key (server-side only)
-// - Uses NEXT_PUBLIC_SUPABASE_URL (correct env var for Vercel)
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -17,7 +14,6 @@ export async function GET() {
         id,
         status,
         created_at,
-        updated_at,
         messages (
           id,
           content,
@@ -25,7 +21,7 @@ export async function GET() {
           created_at
         )
       `)
-      .order("updated_at", { ascending: false });
+      .order("created_at", { ascending: false });
 
     if (error) {
       console.error("Supabase error:", error);
@@ -35,7 +31,6 @@ export async function GET() {
       );
     }
 
-    // UI SAFETY: always return messages as an array
     const safeData = (data || []).map((conversation: any) => ({
       ...conversation,
       messages: Array.isArray(conversation.messages)

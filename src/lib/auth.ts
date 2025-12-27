@@ -5,7 +5,7 @@ export type User = {
   id: string;
   name: string;
   email: string;
-  role: 'Super Admin' | 'Internal Staff';
+  role: 'Super Admin' | 'Marketing' | 'Customer Support';
   avatar: string;
 };
 
@@ -21,21 +21,21 @@ const mockUsers: User[] = [
   {
     id: '2',
     name: 'John Doe',
-    email: 'john.doe@travonex.com',
-    role: 'Internal Staff',
+    email: 'support@travonex.com',
+    role: 'Customer Support',
     avatar: 'https://picsum.photos/seed/9/40/40',
   },
     {
     id: '3',
     name: 'Jane Appleseed',
-    email: 'jane.a@travonex.com',
-    role: 'Internal Staff',
+    email: 'marketing@travonex.com',
+    role: 'Marketing',
     avatar: 'https://picsum.photos/seed/10/40/40',
   }
 ];
 
 export function getTeamMembers(): User[] {
-    return mockUsers.filter(u => u.role === 'Internal Staff');
+    return mockUsers;
 }
 
 export function login(email: string, password: string): Promise<User | null> {

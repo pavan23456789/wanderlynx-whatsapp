@@ -1,13 +1,48 @@
-import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { NextResponse, type NextRequest } from 'next/server';
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const getSupabaseServerClient = (cookieStore: ReturnType<typeof cookies>) => {
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value
+        },
+        set(name: string, value: string, options: CookieOptions) {
+          cookieStore.set({ name, value, ...options })
+        },
+        remove(name: string, options: CookieOptions) {
+          cookieStore.delete({ name, ...options })
+        },
+      },
+    }
+  )
+}
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const cookieStore = cookies()
+  const supabase = getSupabaseServerClient(cookieStore);
+
   try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      console.warn('[API/Conversations] Unauthorized: No user session found.');
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const userRole = user.app_metadata?.role;
+    const allowedRoles = ['Super Admin', 'Customer Support', 'Marketing'];
+
+    if (!userRole || !allowedRoles.includes(userRole)) {
+      console.warn(`[API/Conversations] Forbidden: User with role '${userRole}' attempted to access.`);
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    
+    // Original logic starts here
     const { data: conversations, error } = await supabase
       .from('conversations')
       .select('*')
@@ -47,6 +82,6 @@ export async function GET() {
     return NextResponse.json(formatted);
   } catch (err) {
     console.error('Conversations API crashed:', err);
-    return NextResponse.json([]);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }

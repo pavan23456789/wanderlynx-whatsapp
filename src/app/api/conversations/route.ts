@@ -34,5 +34,8 @@ export async function GET() {
     );
   }
 
-  return NextResponse.json(data || []);
+  // 👇 THIS IS THE IMPORTANT FIX
+  return NextResponse.json({
+    conversations: data || [],
+  });
 }

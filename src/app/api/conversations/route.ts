@@ -6,8 +6,8 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// helper to safely handle dates
 function safeDate(value: any) {
+  if (!value) return null;
   const d = new Date(value);
   return isNaN(d.getTime()) ? null : d.toISOString();
 }
@@ -33,11 +33,13 @@ export async function GET() {
     .order("updated_at", { ascending: false });
 
   if (error) {
-    console.error("Supabase error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(
+      { conversations: [], error: error.message },
+      { status: 500 }
+    );
   }
 
-  const safeConversations = (data || []).map((c: any) => ({
+  const conversations = (data || []).map((c: any) => ({
     ...c,
     last_message_at: safeDate(c.last_message_at),
     updated_at: safeDate(c.updated_at),
@@ -49,7 +51,8 @@ export async function GET() {
       : [],
   }));
 
+  // 🔒 STRICT CONTRACT — what Inbox expects
   return NextResponse.json({
-    conversations: safeConversations,
+    conversations,
   });
 }

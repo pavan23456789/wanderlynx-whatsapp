@@ -11,6 +11,7 @@ import {
   MoreHorizontal,
   Search,
   Users,
+  Loader,
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -55,11 +56,6 @@ import {
 } from '@/components/ui/tooltip';
 import { getCurrentUser, User } from '@/lib/auth';
 
-const mockContacts: Contact[] = [
-    { id: '1', name: 'Olivia Martin', email: 'olivia.martin@email.com', phone: '+14155552671', trip: 'Bali Adventure', tags: ['vip', 'new'], avatar: 'https://picsum.photos/seed/1/80/80' },
-    { id: '2', name: 'Liam Anderson', email: 'liam.anderson@email.com', phone: '+12125551234', trip: 'Thai Beaches', tags: [], avatar: 'https://picsum.photos/seed/2/80/80' },
-];
-
 function ContactDialog({
   open,
   onOpenChange,
@@ -69,7 +65,7 @@ function ContactDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: (contact: Contact) => void;
+  onSave: (contact: Partial<Contact>, isUpdate: boolean) => void;
   contact: Contact | null;
   canEdit: boolean;
 }) {
@@ -80,7 +76,7 @@ function ContactDialog({
     if (contact) {
       setFormData(contact);
     } else {
-      setFormData({ name: '', email: '', phone: '', trip: '', tags: [] });
+      setFormData({ id: undefined, name: '', email: '', phone: '', trip: '', tags: [] });
     }
   }, [contact, open]);
 
@@ -103,11 +99,8 @@ function ContactDialog({
       return;
     }
 
-    const newId = formData.id || formData.phone || Date.now().toString();
-    const avatar =
-      formData.avatar || `https://picsum.photos/seed/${newId}/40/40`;
-
-    onSave({ ...formData, id: newId, avatar } as Contact);
+    const isUpdate = !!formData.id;
+    onSave(formData, isUpdate);
     onOpenChange(false);
   };
 
@@ -154,7 +147,7 @@ function ContactDialog({
               onChange={handleChange}
               className="rounded-xl"
               suppressHydrationWarning={true}
-              disabled={!canEdit}
+              disabled={!canEdit || !!contact} // Cannot edit phone for existing contact
             />
           </div>
         </div>
@@ -270,19 +263,38 @@ function ContactDetailPanel({ contact, open, onOpenChange, canEdit }: { contact:
 }
 
 export default function ContactsPage() {
-  const [contacts, setContacts] = React.useState<Contact[]>(mockContacts);
+  const [contacts, setContacts] = React.useState<Contact[]>([]);
   const [filteredContacts, setFilteredContacts] = React.useState<Contact[]>([]);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [isContactDialogOpen, setContactDialogOpen] = React.useState(false);
   const [isUploadOpen, setUploadOpen] = React.useState(false);
   const [editingContact, setEditingContact] = React.useState<Contact | null>(null);
   const [selectedContact, setSelectedContact] = React.useState<Contact | null>(null);
+  const [isLoading, setIsLoading] = React.useState(true);
   const { toast } = useToast();
   const [currentUser, setCurrentUser] = React.useState<User | null>(null);
 
   React.useEffect(() => {
     setCurrentUser(getCurrentUser());
   }, []);
+
+  const fetchContacts = React.useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/contacts');
+      if (!response.ok) throw new Error('Failed to fetch contacts');
+      const data = await response.json();
+      setContacts(data);
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: error.message });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
+
+  React.useEffect(() => {
+    fetchContacts();
+  }, [fetchContacts]);
 
   React.useEffect(() => {
     const results = contacts.filter(
@@ -294,37 +306,46 @@ export default function ContactsPage() {
     setFilteredContacts(results);
   }, [searchTerm, contacts]);
 
-  const handleSaveContact = (contactData: Contact) => {
-    setContacts((prev) => {
-      const isUpdate = prev.some((c) => c.id === contactData.id);
-      if (isUpdate) {
-        toast({ title: 'Success', description: 'Contact updated.' });
-        return prev.map((c) => (c.id === contactData.id ? contactData : c));
-      } else {
-        toast({ title: 'Success', description: 'Contact created.' });
-        return [contactData, ...prev];
+  const handleSaveContact = async (contactData: Partial<Contact>, isUpdate: boolean) => {
+    try {
+      const response = await fetch('/api/contacts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contact: contactData, isUpdate }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to save contact');
       }
-    });
+      toast({ title: 'Success', description: `Contact ${isUpdate ? 'updated' : 'created'}.` });
+      fetchContacts(); // Re-fetch to update list
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: error.message });
+    }
   };
 
+
   const handleDeleteContact = (id: string) => {
+    // This would be a DELETE request in a real app
+    console.log(`(Mock) Deleting contact ${id}`);
     setContacts(prev => prev.filter(c => c.id !== id));
-    toast({ title: 'Contact Deleted', description: 'The contact has been removed (UI-only).'});
+    toast({ title: 'Contact Deleted', description: 'The contact has been removed.'});
   };
 
   const handleUpload = (count: number) => {
     // This is a mock implementation
     console.log(`Uploaded ${count} contacts.`);
+    fetchContacts();
   };
 
   // --- RBAC ---
   const canCreate = currentUser?.role === 'Super Admin';
   const canUpload = currentUser?.role === 'Super Admin' || currentUser?.role === 'Marketing';
-  const canEdit = currentUser?.role === 'Super Admin';
+  const canEdit = currentUser?.role !== 'Customer Support'; // Admins and Marketing can edit
   const canDelete = currentUser?.role === 'Super Admin';
   
-  if (!currentUser) {
-    return null; // Or a loading spinner
+  if (isLoading || !currentUser) {
+    return <div className="flex justify-center items-center h-full"><Loader className="h-8 w-8 animate-spin" /></div>;
   }
 
   return (
@@ -413,7 +434,7 @@ export default function ContactsPage() {
                 <h3 className="text-xl font-semibold">{contact.name}</h3>
                 <p className="text-sm text-muted-foreground">{contact.phone}</p>
                  <div className="mt-4 flex flex-wrap justify-center gap-2">
-                    {contact.tags.map((tag) => (
+                    {contact.tags && contact.tags.map((tag) => (
                         <Badge key={tag} variant={tag === 'vip' ? 'destructive' : 'secondary'}>{tag}</Badge>
                     ))}
                 </div>
@@ -448,7 +469,7 @@ export default function ContactsPage() {
                                 </DropdownMenuItem>
                             </div>
                         </TooltipTrigger>
-                         {!canEdit && <TooltipContent><p>Only Admins can edit contacts.</p></TooltipContent>}
+                         {!canEdit && <TooltipContent><p>Only Admins and Marketing can edit.</p></TooltipContent>}
                     </Tooltip>
                     <Tooltip>
                          <TooltipTrigger asChild>

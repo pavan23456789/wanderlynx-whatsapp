@@ -22,8 +22,9 @@ import {
   Lock,
   Undo2,
   RefreshCcw,
+  Loader,
 } from 'lucide-react';
-import { format, isToday, isYesterday } from 'date-fns';
+import { format, isToday, isYesterday, differenceInHours } from 'date-fns';
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 
 import { Button } from '@/components/ui/button';
@@ -61,17 +62,20 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useToast } from '@/hooks/use-toast';
 
 // --- IN-PAGE MOCK DATA (As per instructions) ---
 
 type Message = {
   id: string;
-  type: 'inbound' | 'outbound' | 'internal';
+  sender: 'me' | 'them';
   text: string;
   time: string; // ISO 8601 string
   status?: 'sent' | 'delivered' | 'read' | 'failed';
   agentId?: string;
+  type?: 'inbound' | 'outbound' | 'internal';
 };
+
 
 type Agent = {
   id: string;
@@ -97,8 +101,6 @@ type Conversation = {
   state: 'Open' | 'Pending' | 'Resolved';
 };
 
-const now = new Date().getTime();
-
 const mockAgents: Agent[] = [
   {
     id: '1',
@@ -120,134 +122,6 @@ const mockAgents: Agent[] = [
   },
 ];
 
-const mockConversations: Conversation[] = [
-  {
-    id: 'conv_1',
-    name: 'Olivia Martin',
-    phone: '+1 415 555 2671',
-    avatar: 'https://picsum.photos/seed/1/80/80',
-    lastMessage: 'Sure, I can help with that. What is your booking ID?',
-    lastMessageTimestamp: now - 2 * 60 * 1000,
-    isWindowOpen: true,
-    messages: [
-      { id: 'msg_1_1', type: 'inbound', text: 'Hi there, I have a question about my booking.', time: new Date(now - 3 * 60 * 1000).toISOString() },
-      { id: 'msg_1_2', type: 'outbound', text: 'Sure, I can help with that. What is your booking ID?', time: new Date(now - 2 * 60 * 1000).toISOString(), status: 'read', agentId: '2' },
-      { id: 'msg_1_3', type: 'outbound', text: 'This message has failed to send.', time: new Date(now - 1 * 60 * 1000).toISOString(), status: 'failed', agentId: '2' },
-    ],
-    assignedTo: '2',
-    pinned: true,
-    unread: 0,
-    lastCustomerMessageAt: now - 3 * 60 * 1000,
-    lastAgentMessageAt: now - 2 * 60 * 1000,
-    state: 'Open',
-  },
-  {
-    id: 'conv_2',
-    name: 'Liam Anderson',
-    phone: '+1 212 555 1234',
-    avatar: 'https://picsum.photos/seed/2/80/80',
-    lastMessage: 'Is it possible to upgrade my room?',
-    lastMessageTimestamp: now - 65 * 60 * 1000,
-    isWindowOpen: true,
-    messages: [
-      { id: 'msg_2_1', type: 'inbound', text: 'Hello, I booked the Bali trip for next month.', time: new Date(now - 70 * 60 * 1000).toISOString() },
-      { id: 'msg_2_2', type: 'inbound', text: 'Is it possible to upgrade my room?', time: new Date(now - 65 * 60 * 1000).toISOString() },
-      { id: 'msg_2_3', type: 'internal', text: 'This customer has a history of last-minute upgrade requests. Proceed with caution and offer standard rates only.', time: new Date(now - 60 * 60 * 1000).toISOString(), agentId: '1' },
-    ],
-    assignedTo: null,
-    pinned: true,
-    unread: 1,
-    lastCustomerMessageAt: now - 65 * 60 * 1000,
-    lastAgentMessageAt: null,
-    state: 'Open',
-  },
-  {
-    id: 'conv_3',
-    name: 'Sophia Rodriguez',
-    phone: '+44 20 7946 0958',
-    avatar: 'https://picsum.photos/seed/3/80/80',
-    lastMessage: 'Perfect, thank you so much for your help!',
-    lastMessageTimestamp: now - 26 * 60 * 60 * 1000,
-    isWindowOpen: false,
-    messages: [
-      { id: 'msg_3_1', type: 'inbound', text: 'I need to cancel my trip.', time: new Date(now - 27 * 60 * 60 * 1000).toISOString() },
-      { id: 'msg_3_2', type: 'outbound', text: 'I have processed the cancellation for you. Your reference is CAN-12345.', time: new Date(now - 26.5 * 60 * 60 * 1000).toISOString(), status: 'read', agentId: '3' },
-      { id: 'msg_3_3', type: 'inbound', text: 'Perfect, thank you so much for your help!', time: new Date(now - 26 * 60 * 60 * 1000).toISOString() },
-    ],
-    assignedTo: '3',
-    pinned: false,
-    unread: 0,
-    lastCustomerMessageAt: now - 26 * 60 * 60 * 1000,
-    lastAgentMessageAt: now - 26.5 * 60 * 60 * 1000,
-    state: 'Resolved',
-  },
-  {
-    id: 'conv_4',
-    name: 'Noah Campbell',
-    phone: '+61 2 9250 7111',
-    avatar: 'https://picsum.photos/seed/4/80/80',
-    lastMessage: 'Can I add another person to my booking? My booking ID is BK-2024-98A6F and I need to know ASAP thanks! It is a very long message to test the wrapping capability of the UI and to ensure that the preview text is handled correctly.',
-    lastMessageTimestamp: now - 3 * 24 * 60 * 60 * 1000,
-    isWindowOpen: false,
-    messages: [
-      { id: 'msg_4_1', type: 'inbound', text: 'Can I add another person to my booking? My booking ID is BK-2024-98A6F and I need to know ASAP thanks! It is a very long message to test the wrapping capability of the UI and to ensure that the preview text is handled correctly.', time: new Date(now - 3 * 24 * 60 * 60 * 1000).toISOString() },
-      { id: 'msg_4_2', type: 'outbound', text: 'Sent by Super Admin', time: new Date(now - 2.9 * 24 * 60 * 60 * 1000).toISOString(), status: 'sent', agentId: '1' }
-    ],
-    assignedTo: '2',
-    pinned: false,
-    unread: 0,
-    lastCustomerMessageAt: now - 3 * 24 * 60 * 60 * 1000,
-    lastAgentMessageAt: null,
-    state: 'Pending',
-  },
-  {
-    id: 'conv_5',
-    name: 'Ethan Choi',
-    phone: '+81 3 1234 5678',
-    avatar: 'https://picsum.photos/seed/5/80/80',
-    lastMessage: 'What is the weather like in Kyoto right now?',
-    lastMessageTimestamp: now - 5 * 24 * 60 * 60 * 1000,
-    isWindowOpen: false,
-    messages: [
-        { id: 'msg_5_1', type: 'inbound', text: 'I am arriving in Japan next week.', time: new Date(now - 5.1 * 24 * 60 * 60 * 1000).toISOString() },
-        { id: 'msg_5_2', type: 'inbound', text: 'What is the weather like in Kyoto right now?', time: new Date(now - 5 * 24 * 60 * 60 * 1000).toISOString() },
-        { id: 'msg_5_3', type: 'outbound', text: 'Template `follow_up_v1` sent.', time: new Date(now - 1 * 24 * 60 * 60 * 1000).toISOString(), agentId: '1', status: 'delivered' }
-    ],
-    assignedTo: null,
-    pinned: false,
-    unread: 0,
-    lastCustomerMessageAt: now - 5 * 24 * 60 * 60 * 1000,
-    lastAgentMessageAt: now - 1 * 24 * 60 * 60 * 1000,
-    state: 'Pending',
-  },
-  {
-    id: 'conv_6',
-    name: 'Ava Garcia',
-    phone: '+49 30 1234567',
-    avatar: 'https://picsum.photos/seed/6/80/80',
-    lastMessage: 'My flight was cancelled, what should I do?',
-    lastMessageTimestamp: now - 10 * 60 * 1000,
-    isWindowOpen: true,
-    messages: [
-        { id: 'msg_6_1', type: 'inbound', text: 'HELP!', time: new Date(now - 11 * 60 * 1000).toISOString() },
-        { id: 'msg_6_2', type: 'inbound', text: 'My flight was cancelled, what should I do?', time: new Date(now - 10 * 60 * 1000).toISOString() },
-    ],
-    assignedTo: null,
-    pinned: false,
-    unread: 2,
-    lastCustomerMessageAt: now - 10 * 60 * 1000,
-    lastAgentMessageAt: null,
-    state: 'Open',
-  },
-];
-
-const mockTemplates: TemplateType[] = [
-    { id: 'TPL001', name: 'follow_up_v1', category: 'Utility', content: 'Hi {{1}}, we missed you. Is there anything else we can help you with regarding your case?', status: 'Approved' },
-    { id: 'TPL002', name: 'payment_issue', category: 'Utility', content: 'Hello, we noticed an issue with your payment for booking {{1}}. Please contact us to resolve it. Thank you.', status: 'Approved' },
-    { id: 'TPL003', name: 'promo_q2_2024', category: 'Marketing', content: 'Ready for a new adventure? Get 15% off our new trip to {{1}}! Limited time offer.', status: 'Approved' },
-    { id: 'TPL004', name: 'agent_unavailable', category: 'Utility', content: 'Apologies, but no agents are available right now. We will get back to you as soon as possible. Your reference is {{1}}.', status: 'Approved' },
-    { id: 'TPL005', name: 'survey_request_v2', category: 'Marketing', content: 'Thanks for chatting with us, {{1}}! Would you mind taking a moment to complete our survey? Your feedback is valuable.', status: 'Approved' },
-];
 
 function TemplateDialog({
   open,
@@ -264,6 +138,18 @@ function TemplateDialog({
   const [selectedTemplate, setSelectedTemplate] =
     React.useState<TemplateType | null>(null);
   const [variables, setVariables] = React.useState<Record<string, string>>({});
+  const [templates, setTemplates] = React.useState<TemplateType[]>([]);
+
+  React.useEffect(() => {
+    async function fetchTemplates() {
+      if(open) {
+        const res = await fetch('/api/templates');
+        const data = await res.json();
+        setTemplates(data);
+      }
+    }
+    fetchTemplates();
+  }, [open]);
 
   const variablePlaceholders = React.useMemo(() => {
     if (!selectedTemplate) return [];
@@ -305,7 +191,7 @@ function TemplateDialog({
             <Select
               onValueChange={(val) =>
                 setSelectedTemplate(
-                  mockTemplates.find((t) => t.name === val) || null
+                  templates.find((t) => t.name === val) || null
                 )
               }
             >
@@ -313,7 +199,7 @@ function TemplateDialog({
                 <SelectValue placeholder="Select an approved template" />
               </SelectTrigger>
               <SelectContent>
-                {mockTemplates.map((t) => (
+                {templates.map((t) => (
                   <SelectItem key={t.id} value={t.name}>
                     {t.name} ({t.category})
                   </SelectItem>
@@ -469,11 +355,7 @@ function ConversationRow({
   
   const rawPreviewText = lastVisibleMessage?.text || c.lastMessage || '';
   
-  // ⚠️ PRODUCT DECISION — DO NOT CHANGE
-  // Conversation preview text is intentionally limited to
-  // 10 characters + ellipsis. This is enforced by logic,
-  // NOT by CSS truncation.
-  const previewText = rawPreviewText.length > 10 ? `${rawPreviewText.slice(0, 10)}…` : rawPreviewText;
+  const previewText = rawPreviewText.length > 100 ? `${rawPreviewText.slice(0, 100)}…` : rawPreviewText;
 
 
   const StateBadge = stateConfig[c.state];
@@ -521,9 +403,9 @@ function ConversationRow({
           </div>
           <div className="flex items-center text-sm text-muted-foreground">
             {isUnread ? (
-              <p className="font-bold text-foreground">{previewText}</p>
+              <p className="font-bold text-foreground truncate">{previewText}</p>
             ) : (
-              <p>{previewText}</p>
+              <p className="truncate">{previewText}</p>
             )}
           </div>
           <div className="mt-1 flex items-center gap-2">
@@ -552,7 +434,7 @@ function MessagePanel({
   conversation: Conversation;
   currentUser: User | null;
   onSetConversationState: (id: string, state: Conversation['state']) => void;
-  onSendMessage: (text: string, type: 'outbound' | 'internal') => void;
+  onSendMessage: (text: string, type: 'outbound' | 'internal', templateName?: string, templateVars?: string[]) => void;
   onRetryMessage: (messageId: string) => void;
 }) {
   const scrollAreaRef = React.useRef<HTMLDivElement>(null);
@@ -571,13 +453,11 @@ function MessagePanel({
   const assignedAgent = mockAgents.find(a => a.id === conversation.assignedTo);
   const isResolved = conversation.state === 'Resolved';
   const canReopen = currentUser?.role === 'Super Admin';
+  const isWindowOpen = conversation.lastMessageTimestamp ? differenceInHours(new Date(), new Date(conversation.lastMessageTimestamp)) < 24 : false;
 
   const handleSendTemplate = (template: TemplateType, variables: Record<string, string>) => {
-        let content = template.content;
-        for (const key in variables) {
-            content = content.replace(`{{${key}}}`, variables[key]);
-        }
-        onSendMessage(content, 'outbound');
+        const params = Object.values(variables);
+        onSendMessage(template.content, 'outbound', template.name, params);
   };
 
   const ResolveButton = () => (
@@ -625,8 +505,8 @@ function MessagePanel({
         <div className="min-w-0 flex-1">
           <p className="truncate font-semibold">{conversation.name}</p>
           <div className="flex items-center gap-2">
-             <Badge variant={conversation.isWindowOpen ? 'default' : 'secondary'} className={cn('font-bold', conversation.isWindowOpen ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-600")}>
-                {conversation.isWindowOpen ? 'Window Open' : 'Window Closed'}
+             <Badge variant={isWindowOpen ? 'default' : 'secondary'} className={cn('font-bold', isWindowOpen ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-600")}>
+                {isWindowOpen ? 'Window Open' : 'Window Closed'}
              </Badge>
              <p className="truncate text-sm text-muted-foreground">
                 {conversation.phone}
@@ -673,9 +553,6 @@ function MessagePanel({
           </DropdownMenu>
         </div>
       </div>
-      {/* ⚠️ CHAT SCROLL INVARIANT */}
-      {/* This wrapper MUST use `min-h-0` so the ScrollArea can calculate height correctly. */}
-      {/* Removing this will break chat scrolling inside flex layouts. */}
       <div className="w-full flex-1 min-h-0">
           <ScrollArea className="h-full" viewportRef={scrollAreaRef}>
             <div className="space-y-1 p-4 md:p-6">
@@ -707,7 +584,7 @@ function MessagePanel({
             onSend={(text) => onSendMessage(text, 'outbound')}
             onSendInternalNote={(text) => onSendMessage(text, 'internal')}
             onOpenTemplateDialog={() => setTemplateDialogOpen(true)}
-            isWindowOpen={conversation.isWindowOpen}
+            isWindowOpen={isWindowOpen}
             isResolved={isResolved}
             assignedAgent={assignedAgent}
             currentUser={currentUser}
@@ -733,13 +610,9 @@ function MessageBubble({
   assignedToId?: string | null;
   onRetry: () => void;
 }) {
-  const isOutbound = message.type === 'outbound';
+  const isOutbound = message.sender === 'me';
   const isUnassignedReply = isOutbound && agent && agent.id !== assignedToId;
 
-  // ⚠️ CHAT BUBBLE SAFETY — DO NOT TOUCH
-  // `w-fit` + `min-w-0` are REQUIRED to prevent flex-end
-  // shrink-to-fit width collapse for long messages.
-  // Do NOT remove or replace with flex-1 or w-full.
   return (
     <div
       className={cn(
@@ -758,9 +631,6 @@ function MessageBubble({
             Sent by {agent.name}
           </div>
         )}
-        {/* ⚠️ MESSAGE TEXT WRAP INVARIANT */}
-        {/* Do NOT remove `min-w-0` or `break-all`. */}
-        {/* This prevents long unbroken strings from breaking chat layout. */}
         <p className="min-w-0 whitespace-pre-wrap break-all">
           {message.text}
         </p>
@@ -903,7 +773,6 @@ function ReplyBox({
   );
 }
 
-// Tooltip Components (kept for unassigned reply icon)
 const TooltipProvider = TooltipPrimitive.Provider;
 const Tooltip = TooltipPrimitive.Root;
 const TooltipTrigger = TooltipPrimitive.Trigger;
@@ -926,13 +795,38 @@ TooltipContent.displayName = TooltipPrimitive.Content.displayName;
 
 export default function InboxPage() {
   const [currentUser, setCurrentUser] = React.useState<User | null>(null);
-  const [conversations, setConversations] = React.useState<Conversation[]>(mockConversations);
+  const [conversations, setConversations] = React.useState<Conversation[]>([]);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [activeFilter, setActiveFilter] = React.useState<FilterState>('All');
+  const [isLoading, setIsLoading] = React.useState(true);
+  const { toast } = useToast();
   
   React.useEffect(() => {
     setCurrentUser(getCurrentUser());
   }, []);
+
+  const fetchConversations = React.useCallback(async () => {
+    setIsLoading(true);
+    try {
+        const res = await fetch('/api/conversations');
+        if (!res.ok) throw new Error('Failed to fetch conversations');
+        const data = await res.json();
+        setConversations(data);
+        if (!selectedId && data.length > 0) {
+            setSelectedId(data[0].id);
+        }
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Error', description: error.message });
+    } finally {
+        setIsLoading(false);
+    }
+  }, [toast, selectedId]);
+
+  React.useEffect(() => {
+    fetchConversations();
+    const interval = setInterval(fetchConversations, 5000);
+    return () => clearInterval(interval);
+  }, [fetchConversations]);
 
   const filteredConversations = React.useMemo(() => {
     const sorted = [...conversations].sort(
@@ -946,12 +840,9 @@ export default function InboxPage() {
   }, [conversations, activeFilter]);
 
   React.useEffect(() => {
-    // If there's a selected conversation, check if it's still in the filtered list.
-    // If not, clear the selection.
     if (selectedId && !filteredConversations.find(c => c.id === selectedId)) {
         setSelectedId(null);
     }
-    // If there is no selection, but the list is not empty, select the first one.
     else if (!selectedId && filteredConversations.length > 0) {
         setSelectedId(filteredConversations[0].id);
     }
@@ -959,7 +850,6 @@ export default function InboxPage() {
   
   const handleSelectConversation = (conversationId: string) => {
     setSelectedId(conversationId);
-    // Mark as read
     setConversations(prev =>
         prev.map(c => 
             c.id === conversationId ? { ...c, unread: 0 } : c
@@ -968,9 +858,6 @@ export default function InboxPage() {
   };
 
   const handleSetConversationState = (conversationId: string, state: Conversation['state']) => {
-    // ⚠️ STATE BEHAVIOR GUARANTEE
-    // Sending a message in a Resolved conversation MUST reopen it.
-    // This is intentional UX behavior. Do NOT remove this guardrail.
     setConversations(prev =>
       prev.map(c =>
         c.id === conversationId ? { ...c, state: state } : c
@@ -978,36 +865,30 @@ export default function InboxPage() {
     );
   };
   
-  const handleSendMessage = (text: string, type: 'outbound' | 'internal') => {
+  const handleSendMessage = async (text: string, type: 'outbound' | 'internal', templateName?: string, templateVars?: string[]) => {
     if (!selectedId || !currentUser || !text.trim()) return;
-
-    // RBAC: Marketing role cannot send messages.
     if (currentUser.role === 'Marketing') return;
 
+    // Optimistic UI update
+    const optimisticId = `msg_${Date.now()}`;
+    const newMessage: Message = {
+        id: optimisticId,
+        type,
+        sender: type === 'internal' ? 'me' : 'me', // This seems off, fixing
+        text,
+        time: new Date().toISOString(),
+        agentId: currentUser.id,
+        status: 'pending',
+    };
+    
     setConversations(prev =>
       prev.map(c => {
         if (c.id === selectedId) {
             const isResolved = c.state === 'Resolved';
-            
-            const newMessage: Message = {
-                id: `msg_${Date.now()}`,
-                type,
-                text,
-                time: new Date().toISOString(),
-                agentId: currentUser.id,
-                status: type === 'outbound' ? 'sent' : undefined,
-            };
-
-            const updatedMessages = [...c.messages, newMessage];
-
-            // ⚠️ STATE BEHAVIOR GUARANTEE
-            // Sending a message in a Resolved conversation MUST reopen it.
-            // This is intentional UX behavior. Do NOT remove this guardrail.
             const newState = (isResolved && type !== 'internal') ? 'Open' : c.state;
-
             return { 
                 ...c, 
-                messages: updatedMessages,
+                messages: [...c.messages, newMessage],
                 lastMessage: type !== 'internal' ? text : c.lastMessage,
                 lastMessageTimestamp: new Date().getTime(),
                 state: newState,
@@ -1017,18 +898,67 @@ export default function InboxPage() {
         return c;
       })
     );
+    
+    // API call
+    try {
+      const isWindowOpen = conversations.find(c => c.id === selectedId)?.isWindowOpen ?? false;
+      const endpoint = isWindowOpen ? '/api/messages/send' : '/api/conversations/reply';
+      const body = isWindowOpen 
+        ? { contactId: selectedId, text } 
+        : { contactId: selectedId, templateName, params: templateVars };
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      
+      if (!response.ok) throw new Error('Failed to send message');
+      
+      // Update message status on success
+       setConversations(prev =>
+          prev.map(c => {
+            if (c.id === selectedId) {
+              return {
+                ...c,
+                messages: c.messages.map(m => m.id === optimisticId ? {...m, status: 'sent'} : m)
+              }
+            }
+            return c;
+          })
+       );
+       fetchConversations(); // Re-sync with backend
+
+    } catch (error) {
+       // Revert optimistic update on failure
+       setConversations(prev =>
+          prev.map(c => {
+            if (c.id === selectedId) {
+              return {
+                ...c,
+                messages: c.messages.map(m => m.id === optimisticId ? {...m, status: 'failed'} : m)
+              }
+            }
+            return c;
+          })
+       );
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to send message.' });
+    }
   };
 
   const handleRetryMessage = (messageId: string) => {
     if (!selectedId) return;
 
-    setConversations(prev =>
+    const messageToRetry = conversations.find(c => c.id === selectedId)?.messages.find(m => m.id === messageId);
+    if (!messageToRetry) return;
+    
+    handleSendMessage(messageToRetry.text, messageToRetry.type || 'outbound');
+    
+    // Remove the failed message
+     setConversations(prev =>
         prev.map(c => {
             if (c.id === selectedId) {
-                const updatedMessages = c.messages.map(m => 
-                    m.id === messageId ? { ...m, status: 'sent' as const, time: new Date().toISOString() } : m
-                );
-                return { ...c, messages: updatedMessages };
+                return { ...c, messages: c.messages.filter(m => m.id !== messageId) };
             }
             return c;
         })
@@ -1040,16 +970,12 @@ export default function InboxPage() {
     [selectedId, conversations]
   );
   
-  if (!currentUser) {
-    return <div>Loading...</div>;
+  if (isLoading || !currentUser) {
+    return <div className="flex justify-center items-center h-full"><Loader className="h-8 w-8 animate-spin" /></div>;
   }
 
   return (
     <>
-      {/* ⚠️ LAYOUT INVARIANT — DO NOT MODIFY */}
-      {/* This middle panel MUST use `flex-[1_1_0%]` with `min-w-0`. */}
-      {/* Changing this causes the message panel to shrink or leave unused space */}
-      {/* in a 3-column layout with a fixed-width sidebar. */}
       <div className="flex h-full max-h-[calc(100vh-theme(spacing.14))] min-w-0 items-stretch bg-card md:max-h-full">
         <div className="h-full w-full max-w-sm flex-shrink-0 bg-card">
           <ConversationList

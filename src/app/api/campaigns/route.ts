@@ -6,7 +6,6 @@ import {
 } from '@/lib/campaign-store';
 import { sendWhatsAppTemplateMessage } from '@/lib/whatsapp';
 import { getContacts } from '@/lib/contact-store';
-import type { Campaign } from '@/lib/data';
 
 export async function GET(request: Request) {
     try {
@@ -32,16 +31,17 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: 'No contacts to send to' }, { status: 400 });
         }
         
+        // 1. Create the campaign entry in DB
         const newCampaign = await createCampaign({
             name,
             templateName,
             templateContent,
-            variables,
+            variables: variables || {}, // Fix: Ensure variables object exists
             audienceCount: contacts.length
         });
         
-        // Start sending in the background, don't block the response
-        processCampaign(newCampaign.id);
+        // 2. CRITICAL FIX: We must AWAIT this, or Vercel will kill the process immediately.
+        await processCampaign(newCampaign.id);
 
         return NextResponse.json(newCampaign, { status: 201 });
 
@@ -57,6 +57,8 @@ async function processCampaign(campaignId: string) {
     await updateCampaignStatus(campaignId, 'Sending', { message: 'Fetching contacts...' });
     
     const contacts = await getContacts();
+    
+    // Safety check: if campaign failed to create or fetch
     const campaign = await updateCampaignStatus(campaignId, 'Sending', { 
         message: `Sending to ${contacts.length} contacts...` 
     });
@@ -68,14 +70,12 @@ async function processCampaign(campaignId: string) {
 
     for (const contact of contacts) {
         try {
-            // Replace template variables
-            let messageBody = campaign.templateContent;
-            
+            // Replace template variables logic
+            let messageBody = campaign.templateContent || "";
             const params: string[] = [];
             
-            // This logic assumes variables are provided for numbered placeholders like {{1}}, {{2}}
+            // Handle {{1}}, {{2}} variables
             if(campaign.variables) {
-                 // Sort keys numerically to ensure order for params array
                 const sortedVarKeys = Object.keys(campaign.variables).sort((a, b) => parseInt(a) - parseInt(b));
                 for(const key of sortedVarKeys) {
                     const value = campaign.variables[key] as string;
@@ -84,8 +84,10 @@ async function processCampaign(campaignId: string) {
                 }
             }
             
+            // Send the actual message via WhatsApp API
             await sendWhatsAppTemplateMessage(contact.phone, campaign.templateName, params);
             
+            // Update stats
             await updateCampaignStatus(campaignId, 'Sending', {
                 incrementSent: true,
                 message: `Sent to ${contact.phone}`,
@@ -93,7 +95,7 @@ async function processCampaign(campaignId: string) {
             });
 
         } catch (error: any) {
-            console.error(`[Campaigns] Failed to send to ${contact.phone} for campaign ${campaignId}:`, error.message);
+            console.error(`[Campaigns] Failed to send to ${contact.phone}:`, error.message);
             await updateCampaignStatus(campaignId, 'Sending', {
                 incrementFailed: true,
                 message: `Failed to send to ${contact.phone}: ${error.message}`,

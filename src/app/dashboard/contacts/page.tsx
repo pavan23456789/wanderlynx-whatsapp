@@ -1,8 +1,6 @@
 'use client';
 // ⚠️ SCROLLING INVARIANT
 // Scrolling is intentionally handled at the PAGE level.
-// DO NOT move overflow / height logic to dashboard layout.
-// Changing global layout will break Inbox & Chat.
 
 import * as React from 'react';
 import {
@@ -55,6 +53,8 @@ import {
   TooltipContent,
 } from '@/components/ui/tooltip';
 import { getCurrentUser, User } from '@/lib/auth';
+
+// --- COMPONENTS ---
 
 function ContactDialog({
   open,
@@ -121,18 +121,6 @@ function ContactDialog({
             <Input
               id="name"
               value={formData.name || ''}
-              onChange={handleChange}
-              className="rounded-xl"
-              suppressHydrationWarning={true}
-              disabled={!canEdit}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              value={formData.email || ''}
               onChange={handleChange}
               className="rounded-xl"
               suppressHydrationWarning={true}
@@ -233,27 +221,19 @@ function ContactDetailPanel({ contact, open, onOpenChange, canEdit }: { contact:
                             <span className="text-muted-foreground">Trip</span>
                             <span className="col-span-2">{contact.trip || '-'}</span>
                         </div>
-                        <div className="grid grid-cols-3 items-center">
-                            <span className="text-muted-foreground">Tags</span>
-                            <div className="col-span-2 flex flex-wrap gap-2">
-                                {contact.tags && contact.tags.length > 0 ? contact.tags.map(tag => (
-                                    <Badge key={tag} variant={tag === 'vip' ? 'destructive' : 'secondary'}>{tag}</Badge>
-                                )) : <span className="text-muted-foreground">-</span>}
-                            </div>
-                        </div>
                     </div>
                 </div>
                  <SheetFooter className="p-6 border-t bg-background">
                      <TooltipProvider>
                          <Tooltip>
-                            <TooltipTrigger asChild>
-                                <div>
-                                    <Button variant="outline" className="w-full rounded-full" disabled={!canEdit}>
-                                        Edit Contact
-                                    </Button>
-                                </div>
-                            </TooltipTrigger>
-                            {!canEdit && <TooltipContent><p>Only Admins and Marketing can edit contacts.</p></TooltipContent>}
+                           <TooltipTrigger asChild>
+                               <div>
+                                   <Button variant="outline" className="w-full rounded-full" disabled={!canEdit}>
+                                       Edit Contact
+                                   </Button>
+                               </div>
+                           </TooltipTrigger>
+                           {!canEdit && <TooltipContent><p>Only Admins and Marketing can edit contacts.</p></TooltipContent>}
                          </Tooltip>
                      </TooltipProvider>
                  </SheetFooter>
@@ -318,7 +298,8 @@ export default function ContactsPage() {
         throw new Error(errorData.message || 'Failed to save contact');
       }
       toast({ title: 'Success', description: `Contact ${isUpdate ? 'updated' : 'created'}.` });
-      fetchContacts(); // Re-fetch to update list
+      setContactDialogOpen(false);
+      fetchContacts(); 
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Error', description: error.message });
     }
@@ -326,14 +307,11 @@ export default function ContactsPage() {
 
 
   const handleDeleteContact = (id: string) => {
-    // This would be a DELETE request in a real app
-    console.log(`(Mock) Deleting contact ${id}`);
-    setContacts(prev => prev.filter(c => c.id !== id));
-    toast({ title: 'Contact Deleted', description: 'The contact has been removed.'});
+    // Mock delete for now as we don't want to accidentally delete conversations
+    toast({ title: 'Contact Deleted (Mock)', description: 'To delete a contact, archive their conversation.'});
   };
 
   const handleUpload = (count: number) => {
-    // This is a mock implementation
     console.log(`Uploaded ${count} contacts.`);
     fetchContacts();
   };
@@ -341,7 +319,7 @@ export default function ContactsPage() {
   // --- RBAC ---
   const canCreate = currentUser?.role === 'Super Admin';
   const canUpload = currentUser?.role === 'Super Admin' || currentUser?.role === 'Marketing';
-  const canEdit = currentUser?.role !== 'Customer Support'; // Admins and Marketing can edit
+  const canEdit = currentUser?.role !== 'Customer Support';
   const canDelete = currentUser?.role === 'Super Admin';
   
   if (isLoading || !currentUser) {
@@ -422,7 +400,7 @@ export default function ContactsPage() {
       ) : (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filteredContacts.map((contact) => (
-            <Card key={contact.id} className="group relative cursor-pointer" onClick={() => setSelectedContact(contact)}>
+            <Card key={contact.id} className="group relative cursor-pointer hover:shadow-md transition-shadow" onClick={() => setSelectedContact(contact)}>
               <CardContent className="flex flex-col items-center p-6 text-center">
                 <Avatar
                   className="mb-4 h-24 w-24"
@@ -433,11 +411,6 @@ export default function ContactsPage() {
                 </Avatar>
                 <h3 className="text-xl font-semibold">{contact.name}</h3>
                 <p className="text-sm text-muted-foreground">{contact.phone}</p>
-                 <div className="mt-4 flex flex-wrap justify-center gap-2">
-                    {contact.tags && contact.tags.map((tag) => (
-                        <Badge key={tag} variant={tag === 'vip' ? 'destructive' : 'secondary'}>{tag}</Badge>
-                    ))}
-                </div>
               </CardContent>
               <div className="absolute right-4 top-4">
                 <DropdownMenu>

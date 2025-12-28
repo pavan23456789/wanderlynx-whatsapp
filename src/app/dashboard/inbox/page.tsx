@@ -207,147 +207,161 @@ function DateSeparator({ date }: { date: string }) {
 }
 
 function TemplateDialog({
-  open,
-  onOpenChange,
-  onSendTemplate,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSendTemplate: (
-    template: TemplateType,
-    variables: Record<string, string>
-  ) => void;
-}) {
-  const [selectedTemplate, setSelectedTemplate] =
-    React.useState<TemplateType | null>(null);
-  const [variables, setVariables] = React.useState<Record<string, string>>({});
-  const [templates, setTemplates] = React.useState<TemplateType[]>([]);
-
-  React.useEffect(() => {
-    async function fetchTemplates() {
-      if(open) {
-        try {
-            const res = await fetch('/api/templates');
-            if(res.ok) {
-                const data = await res.json();
-                setTemplates(data);
-            }
-        } catch(e) { console.error("Failed to fetch templates", e); }
-      }
-    }
-    fetchTemplates();
-  }, [open]);
-
-  const variablePlaceholders = React.useMemo(() => {
-    if (!selectedTemplate) return [];
-    const regex = /\{\{(\d+)\}\}/g;
-    const matches = new Set<string>();
-    let match;
-    while ((match = regex.exec(selectedTemplate.content)) !== null) {
-      matches.add(match[1]);
-    }
-    return Array.from(matches).sort((a, b) => parseInt(a) - parseInt(b));
-  }, [selectedTemplate]);
-
-  const handleVariableChange = (key: string, value: string) => {
-    setVariables((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const handleSend = () => {
-    if (selectedTemplate) {
-      onSendTemplate(selectedTemplate, variables);
-      onOpenChange(false);
-      setSelectedTemplate(null);
-      setVariables({});
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl">
-        <DialogHeader>
-          <DialogTitle>Send Template Message</DialogTitle>
-          <DialogDescription>
-            The 24-hour window is closed. You must send a template message to
-            re-open the conversation.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-6 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="template">Message Template</Label>
-            <Select
-              onValueChange={(val) =>
-                setSelectedTemplate(
-                  templates.find((t) => t.name === val) || null
-                )
+    open,
+    onOpenChange,
+    onSendTemplate,
+  }: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    onSendTemplate: (
+      template: TemplateType,
+      variables: Record<string, string>
+    ) => void;
+  }) {
+    const [selectedTemplate, setSelectedTemplate] =
+      React.useState<TemplateType | null>(null);
+    const [variables, setVariables] = React.useState<Record<string, string>>({});
+    const [templates, setTemplates] = React.useState<TemplateType[]>([]);
+  
+    React.useEffect(() => {
+      async function fetchTemplates() {
+        if(open) {
+          try {
+              const res = await fetch('/api/templates');
+              if(res.ok) {
+                  const data = await res.json();
+                  setTemplates(data);
               }
-            >
-              <SelectTrigger className="rounded-xl">
-                <SelectValue placeholder="Select an approved template" />
-              </SelectTrigger>
-              <SelectContent>
-                {templates.map((t) => (
-                  <SelectItem key={t.id} value={t.name}>
-                    {t.name} ({t.category})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          {selectedTemplate && (
-            <div className="space-y-4 rounded-2xl bg-secondary/50 p-4">
+          } catch(e) { console.error("Failed to fetch templates", e); }
+        }
+      }
+      fetchTemplates();
+    }, [open]);
+  
+    const variablePlaceholders = React.useMemo(() => {
+      if (!selectedTemplate) return [];
+      const regex = /\{\{(\d+)\}\}/g;
+      const matches = new Set<string>();
+      let match;
+      while ((match = regex.exec(selectedTemplate.content)) !== null) {
+        matches.add(match[1]);
+      }
+      return Array.from(matches).sort((a, b) => parseInt(a) - parseInt(b));
+    }, [selectedTemplate]);
+  
+    const handleVariableChange = (key: string, value: string) => {
+      setVariables((prev) => ({ ...prev, [key]: value }));
+    };
+  
+    const handleSend = () => {
+      if (selectedTemplate) {
+        onSendTemplate(selectedTemplate, variables);
+        onOpenChange(false);
+        setSelectedTemplate(null);
+        setVariables({});
+      }
+    };
+  
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        {/* ✅ FIX: Added 'max-h-[85vh]', 'flex-col', and 'overflow-hidden'
+           This ensures the dialog never exceeds 85% of screen height.
+        */}
+        <DialogContent className="sm:max-w-xl max-h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
+          
+          {/* Header (Fixed at Top) */}
+          <DialogHeader className="p-6 pb-2 shrink-0">
+            <DialogTitle>Send Template Message</DialogTitle>
+            <DialogDescription>
+              The 24-hour window is closed. You must send a template message to
+              re-open the conversation.
+            </DialogDescription>
+          </DialogHeader>
+  
+          {/* ✅ FIX: Added 'overflow-y-auto' and 'flex-1'
+             This makes the middle section scrollable if content is too long.
+          */}
+          <div className="flex-1 overflow-y-auto p-6 pt-2">
+            <div className="grid gap-6">
               <div className="space-y-2">
-                <Label className="text-muted-foreground">Template Preview</Label>
-                <p className="whitespace-pre-wrap rounded-xl bg-background p-3 text-sm">
-                  {selectedTemplate.content}
-                </p>
+                <Label htmlFor="template">Message Template</Label>
+                <Select
+                  onValueChange={(val) =>
+                    setSelectedTemplate(
+                      templates.find((t) => t.name === val) || null
+                    )
+                  }
+                >
+                  <SelectTrigger className="rounded-xl">
+                    <SelectValue placeholder="Select an approved template" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {templates.map((t) => (
+                      <SelectItem key={t.id} value={t.name}>
+                        {t.name} ({t.category})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              {variablePlaceholders.length > 0 && (
-                <div className="space-y-4">
-                  <Label className="text-muted-foreground">
-                    Template Variables
-                  </Label>
-                  {variablePlaceholders.map((key) => (
-                    <div key={key} className="space-y-2">
-                      <Label
-                        htmlFor={`var-${key}`}
-                        className="font-mono text-sm"
-                      >{`{{${key}}}`}</Label>
-                      <Input
-                        id={`var-${key}`}
-                        value={variables[key] || ''}
-                        onChange={(e) =>
-                          handleVariableChange(key, e.target.value)
-                        }
-                        className="rounded-xl"
-                        placeholder={`Enter value for variable ${key}`}
-                        suppressHydrationWarning={true}
-                      />
+  
+              {selectedTemplate && (
+                <div className="space-y-4 rounded-2xl bg-secondary/50 p-4">
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground">Template Preview</Label>
+                    <p className="whitespace-pre-wrap rounded-xl bg-background p-3 text-sm">
+                      {selectedTemplate.content}
+                    </p>
+                  </div>
+                  {variablePlaceholders.length > 0 && (
+                    <div className="space-y-4">
+                      <Label className="text-muted-foreground">
+                        Template Variables
+                      </Label>
+                      {variablePlaceholders.map((key) => (
+                        <div key={key} className="space-y-2">
+                          <Label
+                            htmlFor={`var-${key}`}
+                            className="font-mono text-sm"
+                          >{`{{${key}}}`}</Label>
+                          <Input
+                            id={`var-${key}`}
+                            value={variables[key] || ''}
+                            onChange={(e) =>
+                              handleVariableChange(key, e.target.value)
+                            }
+                            className="rounded-xl"
+                            placeholder={`Enter value for variable ${key}`}
+                            suppressHydrationWarning={true}
+                          />
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
                 </div>
               )}
             </div>
-          )}
-        </div>
-        <DialogFooter>
-          <Button
-            onClick={handleSend}
-            className="rounded-full"
-            size="lg"
-            disabled={
-              !selectedTemplate ||
-              variablePlaceholders.length !== Object.keys(variables).length
-            }
-          >
-            Send Template
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
+          </div>
+  
+          {/* Footer (Fixed at Bottom) */}
+          <DialogFooter className="p-6 pt-2 border-t bg-background shrink-0">
+            <Button
+              onClick={handleSend}
+              className="rounded-full w-full sm:w-auto"
+              size="lg"
+              disabled={
+                !selectedTemplate ||
+                variablePlaceholders.length !== Object.keys(variables).length
+              }
+            >
+              Send Template
+            </Button>
+          </DialogFooter>
+  
+        </DialogContent>
+      </Dialog>
+    );
+  }
 const formatFuzzyDate = (timestamp: string | number | null | undefined) => {
   if (!timestamp) return '';
   const d = new Date(timestamp);

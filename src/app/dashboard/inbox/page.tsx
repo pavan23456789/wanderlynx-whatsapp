@@ -1,8 +1,6 @@
 'use client';
-// 🔒 INBOX & CHAT FREEZE
-// UI Layout/CSS remains 100% original.
-// Logic: Hardened Normalization + Date Guards + Type Safety + Date Separators.
-// ✅ UPDATE: Added Supabase Realtime (No more 5-second refresh loops)
+// 🔒 INBOX & CHAT FREEZE - FULL PRODUCTION VERSION
+// Features: Realtime, Internal Notes, Template Button, Role Access.
 
 import * as React from 'react';
 import {
@@ -19,7 +17,6 @@ import {
   Undo2,
   Loader,
 } from 'lucide-react';
-// ✅ Added 'isSameDay' to imports
 import { format, isToday, isYesterday, differenceInHours, isSameDay } from 'date-fns';
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 
@@ -60,7 +57,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 
 // --- SUPABASE CLIENT ---
-// ✅ We initialize this here to listen for Realtime events
+// ✅ FIX 1: Initialize Realtime Client
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -138,7 +135,7 @@ const normalizeConversation = (apiData: any): Conversation => {
         return {
           id: m.id,
           sender: sender,
-          // ✅ FIX: Check BOTH 'content' (new DB) and 'body' (old DB) to prevent empty bubbles
+          // ✅ FIX 2: Check BOTH 'content' (new DB) and 'body' (old DB)
           text: m.content || m.body || '', 
           time: m.created_at || new Date().toISOString(),
           status: m.status ?? 'sent', // Safe default
@@ -190,7 +187,8 @@ const normalizeConversation = (apiData: any): Conversation => {
   };
 };
 
-// ✅ NEW COMPONENT: Date Separator
+// --- COMPONENTS ---
+
 function DateSeparator({ date }: { date: string }) {
   const d = new Date(date);
   if (isNaN(d.getTime())) return null;
@@ -207,7 +205,6 @@ function DateSeparator({ date }: { date: string }) {
     </div>
   );
 }
-
 
 function TemplateDialog({
   open,
@@ -657,7 +654,7 @@ function MessagePanel({
                   </AlertDescription>
                 </Alert>
               )}
-              {/* ✅ UPDATE: Message Loop with Date Separators */}
+              {/* Message Loop */}
               {conversation.messages.map((m, index) => {
                 const prevMessage = conversation.messages[index - 1];
                 const isNewDay = !prevMessage || !isSameDay(new Date(m.time), new Date(prevMessage.time));
@@ -776,6 +773,7 @@ function InternalNote({ message, agent }: { message: Message; agent: Agent | nul
   );
 }
 
+// ✅ FIX 3: REPLY BOX WITH BUTTON
 function ReplyBox({
   onSend,
   onSendInternalNote,
@@ -801,11 +799,7 @@ function ReplyBox({
     if (isInternal) {
       onSendInternalNote(text);
     } else {
-      if (!isWindowOpen) {
-        onOpenTemplateDialog();
-      } else {
-        onSend(text);
-      }
+      onSend(text);
     }
     setText('');
     setInternal(false);
@@ -840,27 +834,41 @@ function ReplyBox({
            </div>
        )}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full">
+        <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full" onClick={onOpenTemplateDialog}>
           <Paperclip className="h-5 w-5 text-muted-foreground" />
         </Button>
-        <Input
-          placeholder={placeholderText}
-          className="h-11 flex-1 rounded-full"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-             if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSend();
-            }
-          }}
-          suppressHydrationWarning
-          disabled={!isWindowOpen && !isInternal}
-        />
+
+        {/* ✅ THE FIX: Button Logic */}
+        {(!isWindowOpen && !isInternal) ? (
+            <Button 
+                variant="outline" 
+                className="h-11 flex-1 rounded-full justify-start text-muted-foreground font-normal border-dashed border-2 hover:bg-white"
+                onClick={onOpenTemplateDialog}
+            >
+                <span className="mr-2">🔒</span> Window Closed. Click here to send a Template...
+            </Button>
+        ) : (
+            <Input
+              placeholder={placeholderText}
+              className="h-11 flex-1 rounded-full"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => {
+                 if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                }
+              }}
+              suppressHydrationWarning
+              disabled={!isWindowOpen && !isInternal}
+            />
+        )}
+
         <Button
           size="icon"
           className="h-10 w-10 rounded-full"
           onClick={handleSend}
+          disabled={!isInternal && !isWindowOpen}
         >
           <Send className="h-5 w-5" />
         </Button>
@@ -913,21 +921,15 @@ export default function InboxPage() {
   }, []);
 
   const fetchConversations = React.useCallback(async () => {
-    // Only set loading on initial fetch to prevent flicker
     if (conversations.length === 0) setIsLoading(true);
     try {
         const res = await fetch('/api/conversations');
         if (!res.ok) throw new Error('Failed to fetch conversations');
         const raw = await res.json();
-        const rawList = Array.isArray(raw?.conversations)
-         ? raw.conversations
-         : Array.isArray(raw)
-         ? raw
-         : [];
+        const rawList = Array.isArray(raw?.conversations) ? raw.conversations : [];
 
-        // ✅ NORMALIZATION applied here.
+        // ✅ Normalization
         const normalizedList = rawList.map(normalizeConversation);
-
         setConversations(normalizedList);
 
         if (!selectedId && normalizedList.length > 0) {
@@ -938,36 +940,23 @@ export default function InboxPage() {
     } finally {
         setIsLoading(false);
     }
-  }, [toast, selectedId]); // removed conversations.length dependency to avoid loops
+  }, [toast, selectedId]); 
 
-  // ✅ SUPABASE REALTIME SUBSCRIPTION
-  // Replaces the old setInterval polling
+  // ✅ FIX 2: SUPABASE REALTIME SUBSCRIPTION
   React.useEffect(() => {
-    // 1. Initial Fetch
     fetchConversations();
-
-    // 2. Setup Realtime Listener
     const channel = supabase
       .channel('inbox-realtime')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages' },
-        () => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
            console.log('[Realtime] New message detected. Refreshing...');
-           fetchConversations(); // Re-fetch to get the new message + updated conversation order
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'conversations' },
-        () => {
+           fetchConversations();
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations' }, () => {
            console.log('[Realtime] Conversation updated. Refreshing...');
            fetchConversations();
-        }
-      )
+      })
       .subscribe();
 
-    // 3. Cleanup on unmount
     return () => {
       supabase.removeChannel(channel);
     };
@@ -977,10 +966,7 @@ export default function InboxPage() {
     const sorted = [...conversations].sort(
       (a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || b.lastMessageTimestamp - a.lastMessageTimestamp
     );
-
-    if (activeFilter === 'All') {
-      return sorted;
-    }
+    if (activeFilter === 'All') return sorted;
     return sorted.filter((c) => c.state === activeFilter);
   }, [conversations, activeFilter]);
 
@@ -1002,35 +988,25 @@ export default function InboxPage() {
     );
   };
 
-  // ✅ Added API call for state persistence
   const handleSetConversationState = async (conversationId: string, state: Conversation['state']) => {
-    // 1. Optimistic Update
+    // Optimistic Update
     setConversations(prev =>
       prev.map(c =>
         c.id === conversationId ? { ...c, state: state } : c
       )
     );
-
-    // 2. Sync with Backend
+    // Sync with Backend
     try {
-        // Map UI state to API status
         const apiStatus = state === 'Resolved' ? 'closed' : 'open';
-        
-        // Assuming your backend supports a status update endpoint. 
         const res = await fetch(`/api/conversations/${conversationId}/status`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status: apiStatus })
         });
-        
         if (!res.ok) throw new Error("Failed to sync state");
     } catch(e) {
         console.error("State sync failed", e);
-        toast({ 
-            variant: 'destructive', 
-            title: 'Sync Error', 
-            description: 'Could not update conversation status on server.' 
-        });
+        toast({ variant: 'destructive', title: 'Sync Error', description: 'Could not update conversation status on server.' });
     }
   };
   
@@ -1097,10 +1073,10 @@ export default function InboxPage() {
            return c;
          })
        );
-       fetchConversations(); // Re-sync with backend (May overwrite optimistic state briefly)
+       fetchConversations(); 
 
     } catch (error) {
-       // Revert optimistic update on failure
+       // Revert optimistic update
        setConversations(prev =>
          prev.map(c => {
            if (c.id === selectedId) {
@@ -1118,17 +1094,12 @@ export default function InboxPage() {
 
   const handleRetryMessage = (messageId: string) => {
     if (!selectedId) return;
-
     const conversation = conversations.find(c => c.id === selectedId);
     if (!conversation) return;
-    
     const messageToRetry = conversation.messages.find(m => m.id === messageId);
     if (!messageToRetry) return;
-    
-    // Prevent retrying inbound messages (which cannot be sent)
     if (messageToRetry.type === 'inbound') return;
     
-    // Remove the failed message
      setConversations(prev =>
         prev.map(c => {
             if (c.id === selectedId) {
@@ -1137,8 +1108,6 @@ export default function InboxPage() {
             return c;
         })
     );
-
-    // Resend using correct params
     handleSendMessage(
       messageToRetry.text,
       messageToRetry.type === 'internal' ? 'internal' : 'outbound'
@@ -1178,12 +1147,8 @@ export default function InboxPage() {
           ) : (
             <div className="flex h-full flex-col items-center justify-center bg-background p-4 text-center">
               <MessageSquare className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-              <h3 className="text-xl font-semibold">
-                Select a conversation
-              </h3>
-              <p className="mt-2 text-muted-foreground">
-                Choose from an existing conversation to start chatting.
-              </p>
+              <h3 className="text-xl font-semibold">Select a conversation</h3>
+              <p className="mt-2 text-muted-foreground">Choose from an existing conversation to start chatting.</p>
             </div>
           )}
         </div>

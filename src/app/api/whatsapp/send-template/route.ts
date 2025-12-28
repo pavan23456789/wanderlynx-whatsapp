@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
-// 1. Define interfaces for type safety
+// Define the shape of the incoming request
 interface SendMessageRequest {
   phone: string;
   template_name: string;
@@ -10,22 +10,22 @@ interface SendMessageRequest {
 
 export async function POST(request: Request) {
   try {
-    // 2. Validate Environment Variables exist before running logic
+    // 1. Check for API Keys
     if (!process.env.WHATSAPP_ACCESS_TOKEN || !process.env.WHATSAPP_PHONE_NUMBER_ID) {
       console.error('Missing WhatsApp Environment Variables');
       return NextResponse.json(
-        { message: 'Server configuration error' },
+        { message: 'Server configuration error: Missing Env Vars' },
         { status: 500 }
       );
     }
 
-    // 3. Initialize Supabase (AWAIT is required here now)
+    // 2. Initialize Supabase
     const supabase = await createClient();
 
+    // 3. Parse the Request Body
     const body: SendMessageRequest = await request.json();
     const { phone, template_name, variables } = body;
 
-    // 4. Basic Input Validation
     if (!phone || !template_name) {
       return NextResponse.json(
         { message: 'Phone and template_name are required' },
@@ -33,7 +33,10 @@ export async function POST(request: Request) {
       );
     }
 
-    // 5. Get template from Supabase
+    console.log(`[API] Attempting to send template: ${template_name} to ${phone}`);
+
+    // 4. Validate Template against Database
+    // (This is where your 404 error was coming from!)
     const { data: template, error: dbError } = await supabase
       .from('templates')
       .select('*')
@@ -42,29 +45,32 @@ export async function POST(request: Request) {
       .single();
 
     if (dbError || !template) {
+      console.error('[API] Template lookup failed:', dbError);
       return NextResponse.json(
-        { message: 'Template not found or not approved' },
+        { message: `Template '${template_name}' not found or not approved in DB` },
         { status: 404 }
       );
     }
 
-    // 6. Build WhatsApp template payload
+    // 5. Build the Payload for Meta
     const components = template.components
-      .map((component: any) => {
-        if (component.type === 'BODY' && variables && variables.length > 0) {
-          return {
-            type: 'body',
-            parameters: variables.map((value: string) => ({
-              type: 'text',
-              text: value,
-            })),
-          };
-        }
-        return null;
-      })
-      .filter(Boolean);
+      ? template.components
+          .map((component: any) => {
+            if (component.type === 'BODY' && variables && variables.length > 0) {
+              return {
+                type: 'body',
+                parameters: variables.map((value: string) => ({
+                  type: 'text',
+                  text: value,
+                })),
+              };
+            }
+            return null;
+          })
+          .filter(Boolean)
+      : [];
 
-    // 7. Send message to Meta WhatsApp API
+    // 6. Send to Meta API
     const metaResponse = await fetch(
       `https://graph.facebook.com/v19.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
       {
@@ -88,34 +94,27 @@ export async function POST(request: Request) {
 
     const metaResult = await metaResponse.json();
 
-    if (!metaResponse.ok || metaResult.error) {
-      console.error('Meta API Error:', metaResult);
+    if (!metaResponse.ok) {
+      console.error('[Meta API Error]', metaResult);
       return NextResponse.json(
-        { message: 'Failed to send message via WhatsApp', details: metaResult },
-        { status: metaResponse.status || 400 }
+        { message: 'Meta API rejected the request', details: metaResult },
+        { status: metaResponse.status }
       );
     }
 
-    // 8. Save outgoing message in DB
-    const { error: logError } = await supabase.from('messages').insert({
+    // 7. Log Success to DB (Optional but recommended)
+    await supabase.from('messages').insert({
       direction: 'outbound',
       body: `Template sent: ${template.name}`,
       meta_response: metaResult,
     });
 
-    if (logError) {
-      console.error('Failed to log message to DB:', logError);
-    }
+    return NextResponse.json({ success: true, meta_response: metaResult });
 
-    return NextResponse.json({
-      success: true,
-      meta_response: metaResult,
-    });
-
-  } catch (err) {
-    console.error('[send-template API error]', err);
+  } catch (err: any) {
+    console.error('[Fatal Error]', err);
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { message: 'Internal Server Error', error: err.message },
       { status: 500 }
     );
   }

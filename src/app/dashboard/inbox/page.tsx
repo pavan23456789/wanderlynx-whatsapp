@@ -2,6 +2,7 @@
 // 🔒 INBOX & CHAT FREEZE
 // UI Layout/CSS remains 100% original.
 // Logic: Hardened Normalization + Date Guards + Type Safety + Date Separators.
+// ✅ UPDATE: Added Supabase Realtime (No more 5-second refresh loops)
 
 import * as React from 'react';
 import {
@@ -30,6 +31,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { type Template as TemplateType } from '@/lib/data';
 import { User, getCurrentUser } from '@/lib/auth';
+import { createClient } from '@supabase/supabase-js'; // ✅ Import Supabase Client
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,6 +58,13 @@ import {
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
+
+// --- SUPABASE CLIENT ---
+// ✅ We initialize this here to listen for Realtime events
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 // --- TYPES ---
 
@@ -129,7 +138,8 @@ const normalizeConversation = (apiData: any): Conversation => {
         return {
           id: m.id,
           sender: sender,
-          text: m.content || '',
+          // ✅ FIX: Check BOTH 'content' (new DB) and 'body' (old DB) to prevent empty bubbles
+          text: m.content || m.body || '', 
           time: m.created_at || new Date().toISOString(),
           status: m.status ?? 'sent', // Safe default
           agentId: m.agentId,
@@ -624,12 +634,12 @@ function MessagePanel({
                 </TooltipProvider>
                ) : (
                  <DropdownMenuItem 
-                    className="text-yellow-600 focus:text-yellow-600 focus:bg-yellow-50"
-                    onClick={() => onSetConversationState(conversation.id, 'Resolved')}
-                  >
-                    <Archive className="mr-2 h-4 w-4" />
-                    <span>Mark as Resolved</span>
-                  </DropdownMenuItem>
+                   className="text-yellow-600 focus:text-yellow-600 focus:bg-yellow-50"
+                   onClick={() => onSetConversationState(conversation.id, 'Resolved')}
+                 >
+                   <Archive className="mr-2 h-4 w-4" />
+                   <span>Mark as Resolved</span>
+                 </DropdownMenuItem>
                )}
             </DropdownMenuContent>
           </DropdownMenu>
@@ -678,13 +688,13 @@ function MessagePanel({
       </div>
        {currentUser?.role !== 'Marketing' && (
          <ReplyBox
-            onSend={(text) => onSendMessage(text, 'outbound')}
-            onSendInternalNote={(text) => onSendMessage(text, 'internal')}
-            onOpenTemplateDialog={() => setTemplateDialogOpen(true)}
-            isWindowOpen={isWindowOpen}
-            isResolved={isResolved}
-            assignedAgent={assignedAgent}
-            currentUser={currentUser}
+           onSend={(text) => onSendMessage(text, 'outbound')}
+           onSendInternalNote={(text) => onSendMessage(text, 'internal')}
+           onOpenTemplateDialog={() => setTemplateDialogOpen(true)}
+           isWindowOpen={isWindowOpen}
+           isResolved={isResolved}
+           assignedAgent={assignedAgent}
+           currentUser={currentUser}
         />
        )}
        <TemplateDialog
@@ -903,7 +913,8 @@ export default function InboxPage() {
   }, []);
 
   const fetchConversations = React.useCallback(async () => {
-    setIsLoading(true);
+    // Only set loading on initial fetch to prevent flicker
+    if (conversations.length === 0) setIsLoading(true);
     try {
         const res = await fetch('/api/conversations');
         if (!res.ok) throw new Error('Failed to fetch conversations');
@@ -927,12 +938,39 @@ export default function InboxPage() {
     } finally {
         setIsLoading(false);
     }
-  }, [toast, selectedId]);
+  }, [toast, selectedId]); // removed conversations.length dependency to avoid loops
 
+  // ✅ SUPABASE REALTIME SUBSCRIPTION
+  // Replaces the old setInterval polling
   React.useEffect(() => {
+    // 1. Initial Fetch
     fetchConversations();
-    const interval = setInterval(fetchConversations, 5000);
-    return () => clearInterval(interval);
+
+    // 2. Setup Realtime Listener
+    const channel = supabase
+      .channel('inbox-realtime')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages' },
+        () => {
+           console.log('[Realtime] New message detected. Refreshing...');
+           fetchConversations(); // Re-fetch to get the new message + updated conversation order
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'conversations' },
+        () => {
+           console.log('[Realtime] Conversation updated. Refreshing...');
+           fetchConversations();
+        }
+      )
+      .subscribe();
+
+    // 3. Cleanup on unmount
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [fetchConversations]);
 
   const filteredConversations = React.useMemo(() => {

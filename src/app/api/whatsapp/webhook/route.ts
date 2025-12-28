@@ -1,44 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-/**
- * Supabase client
- * Uses SERVICE ROLE because webhook must write to DB
- */
+// 1. Setup Supabase Client
+// We use the SERVICE_ROLE key because the webhook needs "Admin" rights 
+// to write to the DB without being a logged-in user.
 const supabase = createClient(
-  process.env.SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-/**
- * ---------------------------------------------------
- * GET → Meta webhook verification
- * ---------------------------------------------------
- */
+// 2. GET Request: Used by Meta to verify your webhook URL
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-
+  
   const mode = searchParams.get('hub.mode');
   const token = searchParams.get('hub.verify_token');
   const challenge = searchParams.get('hub.challenge');
 
-  if (
-    mode === 'subscribe' &&
-    token === process.env.WHATSAPP_VERIFY_TOKEN
-  ) {
+  // Check if the token matches what you set in Vercel & Meta
+  if (mode === 'subscribe' && token === process.env.WHATSAPP_VERIFY_TOKEN) {
     console.log('[Webhook] Verification successful');
     return new NextResponse(challenge, { status: 200 });
   }
 
-  console.error('[Webhook] Verification failed');
+  console.error('[Webhook] Verification failed: Token mismatch');
   return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 }
 
-/**
- * ---------------------------------------------------
- * POST → Incoming WhatsApp messages
- * ---------------------------------------------------
- */
+// 3. POST Request: Used by Meta to send you new messages
 export async function POST(req: NextRequest) {
   try {
     const payload = await req.json();
@@ -47,24 +36,20 @@ export async function POST(req: NextRequest) {
     const entry = payload.entry?.[0];
     const change = entry?.changes?.[0];
     const value = change?.value;
-
     const message = value?.messages?.[0];
+
+    // If it's not a message (e.g., status update), just say OK
     if (!message) {
-      // Delivery receipts, status updates, etc.
       return NextResponse.json({ ok: true });
     }
 
-    const from = message.from; // phone number WITHOUT +
-    const phone = `+${from}`;
+    const from = message.from; // Phone number without +
+    const phone = `+${from}`;  // Phone number with + (Standard format)
+    
+    // Extract text from text message or button reply
+    const text = message.text?.body || message.button?.text || '[Media/Other]';
 
-    const text =
-      message.text?.body ||
-      message.button?.text ||
-      '[Unsupported message]';
-
-    /**
-     * 1️⃣ Find or create conversation
-     */
+    // A. Find or Create the Conversation
     let { data: conversation } = await supabase
       .from('conversations')
       .select('*')
@@ -76,7 +61,7 @@ export async function POST(req: NextRequest) {
         .from('conversations')
         .insert({
           phone,
-          name: `WhatsApp ${phone}`,
+          name: `User ${from.slice(-4)}`, // Default name
           last_message: text,
           last_message_at: new Date().toISOString(),
         })
@@ -87,9 +72,9 @@ export async function POST(req: NextRequest) {
         console.error('[Webhook] Conversation insert failed', error);
         return NextResponse.json({ error: 'DB error' }, { status: 500 });
       }
-
       conversation = data;
     } else {
+      // Update existing conversation timestamp
       await supabase
         .from('conversations')
         .update({
@@ -99,22 +84,23 @@ export async function POST(req: NextRequest) {
         .eq('id', conversation.id);
     }
 
-    /**
-     * 2️⃣ Store inbound message
-     */
-    await supabase.from('messages').insert({
+    // B. Save the Message (THE FIX IS HERE: 'content' instead of 'body')
+    const { error: msgError } = await supabase.from('messages').insert({
       conversation_id: conversation.id,
       direction: 'inbound',
-      body: text,
+      content: text, // <--- MATCHES YOUR DATABASE COLUMN NAME
     });
 
-    console.log('[Webhook] Message saved');
+    if (msgError) {
+      console.error('[Webhook] Message insert failed', msgError);
+    } else {
+      console.log('[Webhook] Message saved successfully');
+    }
+
     return NextResponse.json({ success: true });
+
   } catch (error) {
-    console.error('[Webhook] Error:', error);
-    return NextResponse.json(
-      { error: 'Webhook processing failed' },
-      { status: 500 }
-    );
+    console.error('[Webhook] Critical Error:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }

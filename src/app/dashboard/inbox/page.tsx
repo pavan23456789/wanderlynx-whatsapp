@@ -1062,7 +1062,7 @@ export default function InboxPage() {
     // API call
     try {
       const isWindowOpen = conversations.find(c => c.id === selectedId)?.isWindowOpen ?? false;
-      const endpoint = isWindowOpen ? '/api/messages/send' : '/api/conversations/reply';
+      const endpoint = '/api/messages/send';
       const body = isWindowOpen 
         ? { contactId: selectedId, text } 
         : { contactId: selectedId, templateName, params: templateVars };

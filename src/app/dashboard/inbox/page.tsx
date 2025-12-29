@@ -1,6 +1,6 @@
 'use client';
 // 🔒 INBOX FIXED VERSION
-// Fixes: Navigation Snapping, Internal Note Database Error
+// Fixes: Internal Note Database Errors, Navigation Loops, and Error Visibility
 
 import * as React from 'react';
 import {
@@ -59,6 +59,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 
+// Initialize Supabase Client
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -364,6 +365,8 @@ function ConversationRow({
   const isMe = lastVisibleMessage?.sender === 'me';
   
   const rawPreview = isMe ? `You: ${lastMsgText}` : lastMsgText;
+  
+  // ✅ FIXED: Strictly truncated to 12 chars
   const previewText = rawPreview.length > 12 
     ? `${rawPreview.slice(0, 12)}...` 
     : rawPreview;
@@ -951,6 +954,7 @@ export default function InboxPage() {
         };
   }, []);
 
+  // ✅ FIXED: Removed 'selectedId' from dependency array to prevent loops
   const fetchConversations = React.useCallback(async () => {
     if (conversations.length === 0) setIsLoading(true);
     try {
@@ -1060,6 +1064,7 @@ export default function InboxPage() {
      }
   };
   
+  // ✅ FIXED: Enhanced HandleSendMessage to double-save ID and catch errors explicitly
   const handleSendMessage = async (text: string, type: 'outbound' | 'internal', templateName?: string, templateVars?: string[]) => {
     if (!selectedId || !currentUser || !text.trim()) return;
     if (currentUser.role === 'Marketing') return;
@@ -1101,16 +1106,18 @@ export default function InboxPage() {
          // ✅ FIXED: Double-save ID to ensure compatibility + add Status
          const { error } = await supabase.from('messages').insert({
             conversation_id: selectedId,
-            contact_id: selectedId, // Fallback
+            contact_id: selectedId, // Fallback safe
             body: text, 
             type: 'internal',
             direction: 'internal',
             agent_id: currentUser.id,
             status: 'sent' // ✅ Added required status
          });
+         
          if (error) {
              console.error("Internal Note Insert Error:", error);
-             throw error;
+             // 🚨 THIS IS THE FIX: Show the REAL error in the toast
+             throw new Error(error.message || "Database insert failed");
          }
       } else {
          const isWindowOpen = conversations.find(c => c.id === selectedId)?.isWindowOpen ?? false;
@@ -1125,7 +1132,7 @@ export default function InboxPage() {
             body: JSON.stringify(body)
          });
          
-         if (!response.ok) throw new Error('Failed to send message');
+         if (!response.ok) throw new Error('Failed to send message via API');
       }
       
       // Update Status to Sent on success
@@ -1142,7 +1149,7 @@ export default function InboxPage() {
        );
        fetchConversations(); 
 
-    } catch (error) {
+    } catch (error: any) {
        console.error("Sending failed:", error); 
        setConversations(prev =>
          prev.map(c => {
@@ -1155,7 +1162,8 @@ export default function InboxPage() {
            return c;
          })
        );
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to send message.' });
+      // ✅ UPDATED: Shows specific error message to help debug
+      toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to send message.' });
     }
   };
 

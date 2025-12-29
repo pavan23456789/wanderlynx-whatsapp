@@ -1,106 +1,118 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// 1. Setup Supabase Client
-// We use the SERVICE_ROLE key because the webhook needs "Admin" rights 
-// to write to the DB without being a logged-in user.
+// 1. Setup Supabase
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// 2. GET Request: Used by Meta to verify your webhook URL
+const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
+
+// --- GET: Verification ---
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  
+  const searchParams = req.nextUrl.searchParams;
   const mode = searchParams.get('hub.mode');
   const token = searchParams.get('hub.verify_token');
   const challenge = searchParams.get('hub.challenge');
 
-  // Check if the token matches what you set in Vercel & Meta
-  if (mode === 'subscribe' && token === process.env.WHATSAPP_VERIFY_TOKEN) {
-    console.log('[Webhook] Verification successful');
+  if (mode === 'subscribe' && token === VERIFY_TOKEN) {
     return new NextResponse(challenge, { status: 200 });
   }
-
-  console.error('[Webhook] Verification failed: Token mismatch');
   return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 }
 
-// 3. POST Request: Used by Meta to send you new messages
+// --- POST: Handle Incoming Messages ---
 export async function POST(req: NextRequest) {
   try {
-    const payload = await req.json();
-    console.log('[Webhook] Incoming payload:', JSON.stringify(payload));
+    const body = await req.json();
 
-    const entry = payload.entry?.[0];
-    const change = entry?.changes?.[0];
-    const value = change?.value;
-    const message = value?.messages?.[0];
+    // 1. Check if it's a message
+    if (body.object === 'whatsapp_business_account') {
+      const entry = body.entry?.[0];
+      const changes = entry?.changes?.[0];
+      const value = changes?.value;
+      const message = value?.messages?.[0];
 
-    // If it's not a message (e.g., status update), just say OK
-    if (!message) {
-      return NextResponse.json({ ok: true });
-    }
+      if (message) {
+        // --- 2. Extract Data ---
+        // Meta sends number WITHOUT + (e.g., 919988776655)
+        const rawPhone = message.from; 
+        const senderPhone = `+${rawPhone}`; 
+        
+        const textBody = message.text?.body || message.button?.text || '[Media/Other]';
+        const senderName = value.contacts?.[0]?.profile?.name || senderPhone;
+        const whatsappMsgId = message.id;
 
-    const from = message.from; // Phone number without +
-    const phone = `+${from}`;  // Phone number with + (Standard format)
-    
-    // Extract text from text message or button reply
-    const text = message.text?.body || message.button?.text || '[Media/Other]';
+        console.log(`[Webhook] Received from ${senderPhone}: ${textBody}`);
 
-    // A. Find or Create the Conversation
-    let { data: conversation } = await supabase
-      .from('conversations')
-      .select('*')
-      .eq('phone', phone)
-      .single();
+        // --- 3. Find or Create Conversation ---
+        let { data: conversation } = await supabase
+          .from('conversations')
+          .select('id')
+          .eq('phone', senderPhone)
+          .single();
 
-    if (!conversation) {
-      const { data, error } = await supabase
-        .from('conversations')
-        .insert({
-          phone,
-          name: `User ${from.slice(-4)}`, // Default name
-          last_message: text,
-          last_message_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
+        let conversationId = conversation?.id;
 
-      if (error) {
-        console.error('[Webhook] Conversation insert failed', error);
-        return NextResponse.json({ error: 'DB error' }, { status: 500 });
+        if (!conversationId) {
+          console.log('[Webhook] New Contact! Creating conversation...');
+          const { data: newConv, error: createError } = await supabase
+            .from('conversations')
+            .insert({
+              phone: senderPhone,
+              name: senderName,
+              unread: 1,
+              last_message: textBody,
+              last_message_at: new Date().toISOString(),
+              status: 'open',
+            })
+            .select()
+            .single();
+          
+          if (createError) {
+             console.error('[Webhook] Failed to create conversation:', createError);
+             return NextResponse.json({ status: 'error' }, { status: 500 });
+          }
+          conversationId = newConv.id;
+        } else {
+          // ✅ FIXED: Correctly handle RPC errors without .catch()
+          const { error: rpcError } = await supabase.rpc('increment_unread', { row_id: conversationId });
+          
+          if (rpcError) {
+             // Fallback: If RPC fails, just set unread to 1 manually
+             console.warn('[Webhook] RPC failed, using fallback:', rpcError.message);
+             await supabase.from('conversations').update({ unread: 1 }).eq('id', conversationId);
+          }
+
+          // Update last message timestamp
+          await supabase
+            .from('conversations')
+            .update({
+              last_message: textBody,
+              last_message_at: new Date().toISOString(),
+            })
+            .eq('id', conversationId);
+        }
+
+        // --- 4. Save Message to DB ---
+        const { error: msgError } = await supabase.from('messages').insert({
+          conversation_id: conversationId,
+          direction: 'inbound', // Left Side
+          content: textBody,
+          status: 'delivered',
+          whatsapp_id: whatsappMsgId,
+          created_at: new Date().toISOString(),
+        });
+
+        if (msgError) console.error('[Webhook] Msg Insert Error:', msgError);
       }
-      conversation = data;
-    } else {
-      // Update existing conversation timestamp
-      await supabase
-        .from('conversations')
-        .update({
-          last_message: text,
-          last_message_at: new Date().toISOString(),
-        })
-        .eq('id', conversation.id);
     }
 
-    // B. Save the Message (THE FIX IS HERE: 'content' instead of 'body')
-    const { error: msgError } = await supabase.from('messages').insert({
-      conversation_id: conversation.id,
-      direction: 'inbound',
-      content: text, // <--- MATCHES YOUR DATABASE COLUMN NAME
-    });
+    return NextResponse.json({ status: 'success' }, { status: 200 });
 
-    if (msgError) {
-      console.error('[Webhook] Message insert failed', msgError);
-    } else {
-      console.log('[Webhook] Message saved successfully');
-    }
-
-    return NextResponse.json({ success: true });
-
-  } catch (error) {
-    console.error('[Webhook] Critical Error:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  } catch (error: any) {
+    console.error('[Webhook] Error:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

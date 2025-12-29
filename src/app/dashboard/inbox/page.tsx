@@ -1,6 +1,6 @@
 'use client';
 // 🔒 INBOX & CHAT FREEZE - FINAL PRODUCTION VERSION
-// Features: Realtime, Internal Notes, Template Button, Role Access, Auto-Assign.
+// Features: Realtime, Internal Notes, Template Button, Role Access, Auto-Assign, UI Polish.
 
 import * as React from 'react';
 import {
@@ -18,7 +18,7 @@ import {
   Loader,
   UserPlus,
   CheckCircle2,
-  Users, // ✅ Icon Added
+  Users,
 } from 'lucide-react';
 import { format, isToday, isYesterday, differenceInHours, isSameDay } from 'date-fns';
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
@@ -425,6 +425,7 @@ function ConversationList({
   );
 }
 
+// ✅ FIXED: Better UI logic to show who sent the message
 function ConversationRow({
   conversation,
   isActive,
@@ -437,14 +438,15 @@ function ConversationRow({
   const c = conversation;
   const isUnread = c.unread && c.unread > 0;
   const assignedAgent = mockAgents.find((a) => a.id === c.assignedTo);
-  const isOnline = assignedAgent?.name !== 'Jane Appleseed'; 
-
+  
+  // Logic to find the last message and who sent it
   const lastVisibleMessage = [...c.messages].reverse().find(m => m.type !== 'internal');
+  const lastMsgText = lastVisibleMessage?.text || c.lastMessage || '';
+  const isMe = lastVisibleMessage?.sender === 'me';
   
-  const rawPreviewText = lastVisibleMessage?.text || c.lastMessage || '';
-  
-  const previewText = rawPreviewText.length > 100 ? `${rawPreviewText.slice(0, 100)}…` : rawPreviewText;
-
+  // Create the preview text (e.g., "You: Hello")
+  const previewText = isMe ? `You: ${lastMsgText}` : lastMsgText;
+  const truncatedPreview = previewText.length > 60 ? `${previewText.slice(0, 60)}…` : previewText;
 
   const StateBadge = stateConfig[c.state];
 
@@ -453,60 +455,66 @@ function ConversationRow({
       data-conv-id={c.id}
       onClick={() => onSelect(c.id)}
       className={cn(
-        'w-full cursor-pointer border-b p-3',
-        isActive ? 'bg-accent' : 'hover:bg-accent/50'
+        'w-full cursor-pointer border-b p-3 transition-colors',
+        isActive ? 'bg-accent' : 'hover:bg-accent/50',
+        isUnread ? 'bg-blue-50/50' : ''
       )}
     >
-      <div className="flex w-full items-start">
+      <div className="flex w-full items-start gap-3">
          <div className="relative shrink-0 pt-1">
-          <Avatar className="h-12 w-12">
+          <Avatar className="h-12 w-12 border shadow-sm">
             <AvatarImage src={c.avatar} />
             <AvatarFallback>{c.name[0]}</AvatarFallback>
           </Avatar>
           {assignedAgent && (
             <div className="absolute -bottom-1 -right-1">
-              <Avatar className="h-5 w-5 border-2 border-background">
+              <Avatar className="h-5 w-5 border-2 border-background" title={`Assigned to ${assignedAgent.name}`}>
                 <AvatarImage src={assignedAgent.avatar} />
-                <AvatarFallback>{assignedAgent.name[0]}</AvatarFallback>
+                <AvatarFallback className="text-[8px]">{assignedAgent.name[0]}</AvatarFallback>
               </Avatar>
-              <span
-                className={cn(
-                  'absolute -bottom-px -right-px block h-2 w-2 rounded-full border-2 border-background',
-                  isOnline ? 'bg-green-500' : 'bg-slate-400'
-                )}
-              />
             </div>
           )}
         </div>
 
-        <div className="min-w-0 flex-1 pl-3">
-          <div className="flex justify-between">
-            <p className="truncate font-semibold">{c.name}</p>
+        <div className="min-w-0 flex-1">
+          <div className="flex justify-between items-baseline mb-1">
+            <p className={cn("truncate font-semibold text-sm", isUnread ? "text-black" : "text-gray-700")}>
+                {c.name}
+            </p>
             <span
-              className="shrink-0 whitespace-nowrap pl-2 text-xs text-muted-foreground"
+              className={cn("shrink-0 whitespace-nowrap text-[10px]", isUnread ? "font-bold text-blue-600" : "text-muted-foreground")}
               suppressHydrationWarning
             >
               {formatFuzzyDate(c.lastMessageTimestamp)}
             </span>
           </div>
-          <div className="flex items-center text-sm text-muted-foreground">
-            {isUnread ? (
-              <p className="font-bold text-foreground truncate">{previewText}</p>
-            ) : (
-              <p className="truncate">{previewText}</p>
-            )}
-          </div>
-          <div className="mt-1 flex items-center gap-2">
-            <Badge className={cn('text-xs font-bold', StateBadge.className)}>{c.state}</Badge>
-            {c.pinned && <Pin className="h-3 w-3 text-muted-foreground" />}
-          </div>
-        </div>
 
-        {c.unread !== undefined && c.unread > 0 && (
-          <div className="ml-2 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-            {c.unread}
+          <div className="flex items-center justify-between gap-2">
+            <p className={cn("truncate text-sm", isUnread ? "font-bold text-gray-900" : "text-muted-foreground")}>
+                {isMe && <CheckCircle2 className="inline mr-1 h-3 w-3 text-blue-500" />}
+                {truncatedPreview}
+            </p>
+            
+            {/* Badge Area */}
+            <div className="flex items-center gap-1 shrink-0">
+                {c.pinned && <Pin className="h-3 w-3 text-gray-400 rotate-45" />}
+                {isUnread && (
+                <div className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-blue-600 px-1.5 text-[10px] font-bold text-white">
+                    {c.unread}
+                </div>
+                )}
+            </div>
           </div>
-        )}
+          
+          {/* Status Label (Optional) */}
+          {c.state !== 'Open' && (
+              <div className="mt-1">
+                 <Badge variant="outline" className="text-[10px] h-5 py-0 px-2 text-muted-foreground border-gray-200">
+                    {c.state}
+                 </Badge>
+              </div>
+          )}
+        </div>
       </div>
     </div>
   );

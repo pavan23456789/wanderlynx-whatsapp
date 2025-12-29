@@ -23,22 +23,55 @@ import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
-import { getCurrentUser, User, getTeamMembers } from '@/lib/auth';
-import { Lock } from 'lucide-react';
+// 1. Remove getTeamMembers from here
+import { getCurrentUser, User } from '@/lib/auth'; 
+import { Lock, Loader2 } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js'; // 2. Add Supabase
+
+// Initialize Supabase
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export default function SettingsPage() {
     const { toast } = useToast();
     const [user, setUser] = React.useState<User | null>(null);
-    const [teamMembers, setTeamMembers] = React.useState<User[]>([]);
+    const [teamMembers, setTeamMembers] = React.useState<any[]>([]); // Changed type to accept DB rows
+    const [isLoading, setIsLoading] = React.useState(true);
+    
+    // Automation States
     const [welcomeMessage, setWelcomeMessage] = React.useState("Thanks for contacting Wanderlynx! An agent will be with you shortly.");
     const [isWelcomeEnabled, setWelcomeEnabled] = React.useState(true);
 
     React.useEffect(() => {
-        const currentUser = getCurrentUser();
-        setUser(currentUser);
-        if (currentUser?.role === 'Super Admin') {
-            setTeamMembers(getTeamMembers());
+        async function loadData() {
+            // 1. Load Current User
+            const currentUser = await getCurrentUser();
+            setUser(currentUser);
+
+            // 2. If Admin, Load Team from Database
+            if (currentUser?.role === 'Super Admin') {
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('*');
+                
+                if (data) {
+                    setTeamMembers(data);
+                } else if (error) {
+                    console.error("Error loading team:", error);
+                }
+            }
+            
+            // 3. Load Automations (Simulated for now, can be moved to DB later)
+            const savedEnabled = localStorage.getItem('automations_welcome_enabled');
+            const savedMessage = localStorage.getItem('automations_welcome_message');
+            if (savedEnabled !== null) setWelcomeEnabled(JSON.parse(savedEnabled));
+            if (savedMessage !== null) setWelcomeMessage(savedMessage);
+
+            setIsLoading(false);
         }
+        loadData();
     }, []);
 
     const handleSaveChanges = () => {
@@ -49,7 +82,6 @@ export default function SettingsPage() {
     };
 
     const handleSaveAutomations = () => {
-        // In a real app, this would save to a backend
         localStorage.setItem('automations_welcome_enabled', JSON.stringify(isWelcomeEnabled));
         localStorage.setItem('automations_welcome_message', welcomeMessage);
         toast({
@@ -58,22 +90,15 @@ export default function SettingsPage() {
         });
     };
     
-    React.useEffect(() => {
-        const savedEnabled = localStorage.getItem('automations_welcome_enabled');
-        const savedMessage = localStorage.getItem('automations_welcome_message');
-        if (savedEnabled !== null) {
-            setWelcomeEnabled(JSON.parse(savedEnabled));
-        }
-        if (savedMessage !== null) {
-            setWelcomeMessage(savedMessage);
-        }
-    }, []);
-
-    if (!user) {
-        return <div>Loading...</div>;
+    if (isLoading) {
+        return <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary"/></div>;
     }
 
-    // RBAC check
+    if (!user) {
+        return <div>Error loading user profile.</div>;
+    }
+
+    // RBAC check: Lock out non-Admins
     if (user.role !== 'Super Admin') {
         return (
              <main className="flex flex-1 flex-col items-center justify-center gap-6 p-6 md:gap-8 md:p-10 text-center">
@@ -101,6 +126,8 @@ export default function SettingsPage() {
                         <TabsTrigger value="automations">Automations</TabsTrigger>
                         {user.role === 'Super Admin' && <TabsTrigger value="team">Team</TabsTrigger>}
                     </TabsList>
+                    
+                    {/* ACCOUNT TAB */}
                     <TabsContent value="account">
                         <Card className="max-w-4xl">
                             <CardHeader>
@@ -135,6 +162,8 @@ export default function SettingsPage() {
                             </CardContent>
                         </Card>
                     </TabsContent>
+
+                    {/* AUTOMATIONS TAB */}
                     <TabsContent value="automations">
                          <Card className="max-w-4xl">
                             <CardHeader>
@@ -172,6 +201,8 @@ export default function SettingsPage() {
                             </CardContent>
                         </Card>
                     </TabsContent>
+
+                    {/* TEAM TAB - Connected to Supabase */}
                     <TabsContent value="team">
                         <Card className="max-w-4xl">
                             <CardHeader>
@@ -183,21 +214,25 @@ export default function SettingsPage() {
                             <CardContent>
                                  <Button className="mb-6 rounded-full" disabled>Invite Member</Button>
                                 <div className="space-y-6">
-                                     {teamMembers.map(member => (
-                                        <div key={member.id} className="flex items-center justify-between">
-                                            <div className="flex items-center gap-4">
-                                                <Avatar className="h-12 w-12">
-                                                    <AvatarImage src={member.avatar} data-ai-hint="person portrait" />
-                                                    <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
-                                                </Avatar>
-                                                <div>
-                                                    <p className="font-semibold text-base">{member.name}</p>
-                                                    <p className="text-sm text-muted-foreground">{member.email}</p>
+                                     {teamMembers.length > 0 ? (
+                                        teamMembers.map(member => (
+                                            <div key={member.id} className="flex items-center justify-between border-b pb-4 last:border-0">
+                                                <div className="flex items-center gap-4">
+                                                    <Avatar className="h-12 w-12">
+                                                        <AvatarImage src={member.avatar_url} />
+                                                        <AvatarFallback>{member.full_name ? member.full_name.charAt(0) : 'U'}</AvatarFallback>
+                                                    </Avatar>
+                                                    <div>
+                                                        <p className="font-semibold text-base">{member.full_name || 'Unknown User'}</p>
+                                                        <p className="text-sm text-muted-foreground">{member.email}</p>
+                                                    </div>
                                                 </div>
+                                                <Badge variant="outline" className="capitalize">{member.role}</Badge>
                                             </div>
-                                            <Badge>{member.role}</Badge>
-                                        </div>
-                                     ))}
+                                         ))
+                                     ) : (
+                                         <p className="text-sm text-muted-foreground">No team members found.</p>
+                                     )}
                                 </div>
                             </CardContent>
                         </Card>

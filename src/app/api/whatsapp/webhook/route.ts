@@ -24,9 +24,8 @@ export async function GET(req: NextRequest) {
 
 // --- POST: Handle Incoming Messages ---
 export async function POST(req: NextRequest) {
-  // 🔥🔥🔥 INSERTED DEBUG LOGS HERE 🔥🔥🔥
-  console.log("🔥🔥🔥 CRITICAL DEBUG: I AM THE ACTIVE FILE !!! 🔥🔥🔥");
-  console.log("🔥🔥🔥 IF YOU SEE THIS, THE CODE IS UPDATED 🔥🔥🔥");
+  // Debug Log to prove new code is active
+  console.log("✅✅✅ FIX DEPLOYED: Using .in() filter ✅✅✅");
 
   try {
     const body = await req.json();
@@ -40,7 +39,6 @@ export async function POST(req: NextRequest) {
 
       if (message) {
         // --- 2. Extract Data ---
-        // Meta sends number strictly as digits (e.g. 919988776655)
         const rawPhone = message.from; 
         
         // Prepare variations to search for
@@ -53,12 +51,12 @@ export async function POST(req: NextRequest) {
 
         console.log(`[Webhook] Processing message from ${rawPhone}. Searching DB...`);
 
-        // --- 3. Find Conversation (FUZZY SEARCH FIX) ---
-        // We search for EITHER "+91..." OR "91..." to be 100% sure we match.
+        // --- 3. Find Conversation (THE FIX) ---
+        // We use .in() to safely check both formats.
         const { data: existingConvs, error: findError } = await supabase
           .from('conversations')
           .select('id, unread')
-          .or(`phone.eq.${phoneWithPlus},phone.eq.${phoneWithoutPlus}`) 
+          .in('phone', [phoneWithPlus, phoneWithoutPlus]) // <--- THIS IS THE FIX
           .order('created_at', { ascending: false })
           .limit(1);
 

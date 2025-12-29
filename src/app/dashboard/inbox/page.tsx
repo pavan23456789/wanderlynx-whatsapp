@@ -115,7 +115,6 @@ function DateSeparator({ date }: { date: string }) {
   );
 }
 
-// ... TemplateDialog (Standard) ...
 function TemplateDialog({
     open,
     onOpenChange,
@@ -365,7 +364,6 @@ function ConversationRow({
   const isMe = lastVisibleMessage?.sender === 'me';
   
   const rawPreview = isMe ? `You: ${lastMsgText}` : lastMsgText;
-  
   const previewText = rawPreview.length > 12 
     ? `${rawPreview.slice(0, 12)}...` 
     : rawPreview;
@@ -676,7 +674,6 @@ function MessageBubble({
           isOutbound ? 'bg-secondary' : 'bg-[#E3F2FD]'
         )}
       >
-        {/* ✅ FIXED: Always show agent name for outbound messages */}
         {isOutbound && agent && (
           <div className="mb-1 text-[10px] font-bold text-primary/80 flex items-center gap-1">
              {agent.name}
@@ -895,7 +892,6 @@ export default function InboxPage() {
     fetchAgents();
   }, []);
 
-  // Normalization 
   const normalizeConversation = React.useCallback((apiData: any): Conversation => {
         const messages: Message[] = Array.isArray(apiData.messages)
             ? apiData.messages.map((m: any) => {
@@ -966,10 +962,8 @@ export default function InboxPage() {
         const normalizedList = rawList.map(normalizeConversation);
         setConversations(normalizedList);
 
-        // ✅ FIXED: Initial Load only. Does NOT force reset if selectedId is already set.
         if (!selectedId && normalizedList.length > 0) {
-          // Only select the first one if NOTHING is selected yet.
-          // This prevents the "snap back" loop.
+          // Do NOT force selectedId here to prevent loops
         }
     } catch (error: any) {
         toast({ variant: 'destructive', title: 'Error', description: error.message });
@@ -1006,12 +1000,12 @@ export default function InboxPage() {
     return sorted.filter((c) => c.state === activeFilter);
   }, [conversations, activeFilter]);
 
-  // ✅ FIXED: Auto-select only on first load
+  // ✅ FIXED: Only auto-select on very first load
   React.useEffect(() => {
     if (!selectedId && filteredConversations.length > 0) {
         setSelectedId(filteredConversations[0].id);
     }
-  }, [filteredConversations]); // Removed selectedId to break loop
+  }, [filteredConversations]); 
   
   const handleSelectConversation = (conversationId: string) => {
     setSelectedId(conversationId);
@@ -1104,16 +1098,18 @@ export default function InboxPage() {
     
     try {
       if (type === 'internal') {
-         // ✅ FIXED: Use 'conversation_id' matching the SQL fix
+         // ✅ FIXED: Double-save ID to ensure compatibility + add Status
          const { error } = await supabase.from('messages').insert({
             conversation_id: selectedId,
+            contact_id: selectedId, // Fallback
             body: text, 
             type: 'internal',
             direction: 'internal',
-            agent_id: currentUser.id
+            agent_id: currentUser.id,
+            status: 'sent' // ✅ Added required status
          });
          if (error) {
-             console.error("Internal Note Error:", error);
+             console.error("Internal Note Insert Error:", error);
              throw error;
          }
       } else {

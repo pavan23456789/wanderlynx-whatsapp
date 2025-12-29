@@ -8,33 +8,34 @@ const supabase = createClient(
 );
 
 const WHATSAPP_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
-// ✅ FIX: Match the exact name in your Vercel Settings
-const WHATSAPP_PHONE_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
+const WHATSAPP_PHONE_ID = process.env.WHATSAPP_PHONE_NUMBER_ID; // ✅ Correct Variable
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { contactId, text, templateName, params } = body;
 
-    // 2. Get the Recipient Phone Number
-    const { data: conversation } = await supabase
+    console.log('[API] Sending message to:', contactId);
+
+    // 2. Get Recipient Phone
+    const { data: conversation, error: fetchError } = await supabase
       .from('conversations')
       .select('phone')
       .eq('id', contactId)
       .single();
 
-    if (!conversation) {
+    if (fetchError || !conversation) {
+      console.error('[API] Conversation Error:', fetchError);
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
     }
 
-    // 3. Prepare the Meta Payload
+    // 3. Prepare Payload
     let metaPayload: any = {
       messaging_product: 'whatsapp',
       to: conversation.phone,
     };
 
     if (templateName) {
-      // --- TEMPLATE MODE ---
       metaPayload.type = 'template';
       metaPayload.template = {
         name: templateName,
@@ -47,13 +48,11 @@ export async function POST(req: NextRequest) {
         ],
       };
     } else {
-      // --- TEXT MODE ---
       metaPayload.type = 'text';
       metaPayload.text = { body: text };
     }
 
-    // 4. Send to Meta
-    // Note: We use the WHATSAPP_PHONE_ID variable we fixed above
+    // 4. Send to Meta (This part is working!)
     const metaRes = await fetch(
       `https://graph.facebook.com/v21.0/${WHATSAPP_PHONE_ID}/messages`,
       {
@@ -69,31 +68,44 @@ export async function POST(req: NextRequest) {
     const metaData = await metaRes.json();
 
     if (!metaRes.ok) {
+      console.error('[API] Meta Error:', metaData);
       return NextResponse.json({ error: metaData.error?.message }, { status: 500 });
     }
 
-    // 5. Save to Supabase
-    const contentToSave = templateName 
-      ? `Template sent: ${templateName}` 
-      : text;
+    // 5. SAVE TO DB (The Safe Block)
+    // We try to save. If it fails, we log the error but still tell the frontend "Success"
+    // because the message WAS actually sent to the customer.
+    try {
+        const contentToSave = templateName ? `Template sent: ${templateName}` : text;
+        const whatsappId = metaData.messages?.[0]?.id || null;
 
-    await supabase.from('messages').insert({
-      conversation_id: contactId,
-      direction: 'outbound',
-      content: contentToSave,
-      status: 'sent',
-      whatsapp_id: metaData.messages?.[0]?.id,
-    });
+        const { error: dbError } = await supabase.from('messages').insert({
+          conversation_id: contactId,
+          direction: 'outbound',
+          content: contentToSave,
+          status: 'sent',
+          whatsapp_id: whatsappId,
+        });
 
-    // 6. Update Conversation Timestamp
-    await supabase.from('conversations').update({
-        last_message: contentToSave,
-        last_message_at: new Date().toISOString(),
-    }).eq('id', contactId);
+        if (dbError) {
+            console.error('[API] DB Insert FAILED:', dbError);
+            // DO NOT THROW. Just log it so we know why the UI isn't updating.
+        } else {
+            // Only update the conversation timestamp if the message saved successfully
+            await supabase.from('conversations').update({
+                last_message: contentToSave,
+                last_message_at: new Date().toISOString(),
+            }).eq('id', contactId);
+        }
+
+    } catch (dbCrash) {
+        console.error('[API] DB Critical Crash:', dbCrash);
+    }
 
     return NextResponse.json({ success: true });
 
   } catch (error: any) {
+    console.error('[API] General Error:', error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

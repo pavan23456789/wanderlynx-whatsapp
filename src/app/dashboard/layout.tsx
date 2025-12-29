@@ -180,7 +180,7 @@ export default function DashboardLayout({
         </Sidebar>
 
         {/* MAIN CONTENT (can shrink safely now) */}
-        <SidebarInset className="flex-1 min-w-0">
+        <SidebarInset className="flex min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-10 flex h-14 items-center justify-between gap-4 border-b bg-background/80 px-4 backdrop-blur-sm md:hidden">
             <div className="flex items-center gap-2">
               <TravonexLogo className="size-7 text-primary" />
@@ -195,7 +195,14 @@ export default function DashboardLayout({
             </SidebarTrigger>
           </header>
 
-          {children}
+          <div className="flex-1 overflow-auto">{children}</div>
+          
+          <footer className="shrink-0 border-t bg-background p-4 text-center text-xs text-muted-foreground">
+            © {new Date().getFullYear()} Wanderlynx Labs LLP. All rights reserved. {' | '}
+            <Link href="/privacy" className="hover:text-primary hover:underline">
+              Privacy Policy
+            </Link>
+          </footer>
         </SidebarInset>
       </div>
     </SidebarProvider>

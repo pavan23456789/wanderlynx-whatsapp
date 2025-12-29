@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
@@ -50,10 +51,10 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-secondary/50 p-4">
-      <Card className="w-full max-w-sm shadow-lg rounded-3xl border-0">
-        <CardHeader className="space-y-2 text-center p-8">
-          <div className="flex justify-center mb-4">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-secondary/50 p-4">
+      <Card className="w-full max-w-sm rounded-3xl border-0 shadow-lg">
+        <CardHeader className="space-y-2 p-8 text-center">
+          <div className="mb-4 flex justify-center">
             <TravonexLogo className="h-14 w-14 text-primary" />
           </div>
           <CardTitle className="text-3xl font-bold">Wanderlynx</CardTitle>
@@ -72,7 +73,7 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="rounded-xl h-12"
+                className="h-12 rounded-xl"
                 suppressHydrationWarning={true}
               />
             </div>
@@ -87,23 +88,33 @@ export default function LoginPage() {
                   Forgot password?
                 </a>
               </div>
-              <Input 
-                id="password" 
-                type="password" 
-                required 
+              <Input
+                id="password"
+                type="password"
+                required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="rounded-xl h-12"
+                className="h-12 rounded-xl"
                 placeholder="••••••••"
                 suppressHydrationWarning={true}
               />
             </div>
-            <Button type="submit" className="w-full h-12 rounded-xl text-base font-bold" disabled={isLoading} suppressHydrationWarning={true}>
+            <Button
+              type="submit"
+              className="h-12 w-full rounded-xl text-base font-bold"
+              disabled={isLoading}
+              suppressHydrationWarning={true}
+            >
               {isLoading ? 'Signing In...' : 'Sign In'}
             </Button>
           </form>
         </CardContent>
       </Card>
+      <footer className="mt-8 text-center text-sm text-muted-foreground">
+        <Link href="/privacy" className="hover:text-primary hover:underline">
+          Privacy Policy
+        </Link>
+      </footer>
     </div>
   );
 }

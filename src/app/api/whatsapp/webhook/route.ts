@@ -24,6 +24,10 @@ export async function GET(req: NextRequest) {
 
 // --- POST: Handle Incoming Messages ---
 export async function POST(req: NextRequest) {
+  // 🔥🔥🔥 INSERTED DEBUG LOGS HERE 🔥🔥🔥
+  console.log("🔥🔥🔥 CRITICAL DEBUG: I AM THE ACTIVE FILE !!! 🔥🔥🔥");
+  console.log("🔥🔥🔥 IF YOU SEE THIS, THE CODE IS UPDATED 🔥🔥🔥");
+
   try {
     const body = await req.json();
 

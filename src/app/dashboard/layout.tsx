@@ -1,8 +1,6 @@
 'use client';
 // ⚠️ GLOBAL LAYOUT CONTRACT
-// This layout defines structure ONLY.
-// Do NOT add page-specific scrolling, overflow, or height fixes here.
-// All such logic belongs inside individual page files.
+// Fixed: Handles Async Auth correctly to prevent "charAt" crashes.
 
 import * as React from 'react';
 import Link from 'next/link';
@@ -17,6 +15,7 @@ import {
   LogOut,
   History,
   Menu,
+  Loader2 // Added Loader icon
 } from 'lucide-react';
 
 import {
@@ -64,26 +63,39 @@ export default function DashboardLayout({
   const [user, setUser] = React.useState<User | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
 
+  // ✅ FIX: Use async/await to handle the real database response
   React.useEffect(() => {
-    const currentUser = getCurrentUser();
-    if (!currentUser) {
-      router.push('/login');
-    } else {
-      setUser(currentUser);
-      setIsLoading(false);
+    async function checkAuth() {
+        try {
+            const currentUser = await getCurrentUser(); // Wait for Supabase
+            if (!currentUser) {
+                router.push('/login');
+            } else {
+                setUser(currentUser);
+            }
+        } catch (error) {
+            console.error("Auth check failed", error);
+            router.push('/login');
+        } finally {
+            setIsLoading(false);
+        }
     }
+    checkAuth();
   }, [router]);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     router.push('/login');
   };
 
   if (isLoading) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
-        <div className="text-2xl font-semibold animate-pulse">
-          Loading Platform...
+        <div className="flex flex-col items-center gap-4">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+            <div className="text-lg font-semibold text-muted-foreground">
+            Loading Platform...
+            </div>
         </div>
       </div>
     );
@@ -159,7 +171,8 @@ export default function DashboardLayout({
             <div className="flex items-center gap-3 rounded-2xl p-2 bg-secondary/50">
               <Avatar className="h-11 w-11 border">
                 <AvatarImage src={user.avatar} alt={user.name} />
-                <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+                {/* ✅ SAFE FALLBACK: Prevents crash if name is loading/empty */}
+                <AvatarFallback>{user.name?.[0] || 'U'}</AvatarFallback>
               </Avatar>
               <div className="flex-1 overflow-hidden">
                 <p className="truncate font-semibold">{user.name}</p>

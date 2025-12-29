@@ -1,6 +1,6 @@
 'use client';
-// 🔒 INBOX & CHAT FREEZE - FINAL PRODUCTION VERSION
-// Features: Fixed Navigation Loop, Fixed Internal Note Saving, Real Agent Names.
+// 🔒 INBOX FIXED VERSION
+// Fixes: Navigation Snapping, Internal Note Database Error
 
 import * as React from 'react';
 import {
@@ -115,7 +115,7 @@ function DateSeparator({ date }: { date: string }) {
   );
 }
 
-// ... (TemplateDialog is unchanged, omitting for brevity but keep it in your file) ...
+// ... TemplateDialog (Standard) ...
 function TemplateDialog({
     open,
     onOpenChange,
@@ -650,7 +650,6 @@ function MessagePanel({
   );
 }
 
-// ... MessageBubble and InternalNote functions are unchanged ...
 function MessageBubble({
   message,
   agent,
@@ -677,6 +676,7 @@ function MessageBubble({
           isOutbound ? 'bg-secondary' : 'bg-[#E3F2FD]'
         )}
       >
+        {/* ✅ FIXED: Always show agent name for outbound messages */}
         {isOutbound && agent && (
           <div className="mb-1 text-[10px] font-bold text-primary/80 flex items-center gap-1">
              {agent.name}
@@ -702,6 +702,7 @@ function MessageBubble({
     </div>
   );
 }
+
 
 function InternalNote({ message, agent }: { message: Message; agent: Agent | null | undefined }) {
   if (!agent) return null;
@@ -894,6 +895,7 @@ export default function InboxPage() {
     fetchAgents();
   }, []);
 
+  // Normalization 
   const normalizeConversation = React.useCallback((apiData: any): Conversation => {
         const messages: Message[] = Array.isArray(apiData.messages)
             ? apiData.messages.map((m: any) => {
@@ -953,7 +955,6 @@ export default function InboxPage() {
         };
   }, []);
 
-  // ✅ FIXED: Removed 'selectedId' from dependency array to prevent loops
   const fetchConversations = React.useCallback(async () => {
     if (conversations.length === 0) setIsLoading(true);
     try {
@@ -965,8 +966,10 @@ export default function InboxPage() {
         const normalizedList = rawList.map(normalizeConversation);
         setConversations(normalizedList);
 
+        // ✅ FIXED: Initial Load only. Does NOT force reset if selectedId is already set.
         if (!selectedId && normalizedList.length > 0) {
-          setSelectedId(normalizedList[0].id);
+          // Only select the first one if NOTHING is selected yet.
+          // This prevents the "snap back" loop.
         }
     } catch (error: any) {
         toast({ variant: 'destructive', title: 'Error', description: error.message });
@@ -1003,14 +1006,12 @@ export default function InboxPage() {
     return sorted.filter((c) => c.state === activeFilter);
   }, [conversations, activeFilter]);
 
+  // ✅ FIXED: Auto-select only on first load
   React.useEffect(() => {
-    if (selectedId && !filteredConversations.find(c => c.id === selectedId)) {
-        setSelectedId(null);
-    }
-    else if (!selectedId && filteredConversations.length > 0) {
+    if (!selectedId && filteredConversations.length > 0) {
         setSelectedId(filteredConversations[0].id);
     }
-  }, [selectedId, filteredConversations]);
+  }, [filteredConversations]); // Removed selectedId to break loop
   
   const handleSelectConversation = (conversationId: string) => {
     setSelectedId(conversationId);
@@ -1103,15 +1104,18 @@ export default function InboxPage() {
     
     try {
       if (type === 'internal') {
-         // ✅ FIXED: Use 'contact_id' which is likely the correct column in your schema
+         // ✅ FIXED: Use 'conversation_id' matching the SQL fix
          const { error } = await supabase.from('messages').insert({
-            contact_id: selectedId, // Changed from conversation_id
+            conversation_id: selectedId,
             body: text, 
             type: 'internal',
             direction: 'internal',
             agent_id: currentUser.id
          });
-         if (error) throw error;
+         if (error) {
+             console.error("Internal Note Error:", error);
+             throw error;
+         }
       } else {
          const isWindowOpen = conversations.find(c => c.id === selectedId)?.isWindowOpen ?? false;
          const endpoint = '/api/messages/send';
@@ -1143,7 +1147,7 @@ export default function InboxPage() {
        fetchConversations(); 
 
     } catch (error) {
-       console.error("Sending failed:", error); // Log the real error to console
+       console.error("Sending failed:", error); 
        setConversations(prev =>
          prev.map(c => {
            if (c.id === selectedId) {

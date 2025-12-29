@@ -366,8 +366,13 @@ function ConversationRow({
   const lastMsgText = lastVisibleMessage?.text || c.lastMessage || '';
   const isMe = lastVisibleMessage?.sender === 'me';
   
-  const previewText = isMe ? `You: ${lastMsgText}` : lastMsgText;
-  const truncatedPreview = previewText.length > 60 ? `${previewText.slice(0, 60)}…` : previewText;
+  const rawPreview = isMe ? `You: ${lastMsgText}` : lastMsgText;
+  
+  // ✅ FIX: STRICTLY LIMIT TO 12 CHARACTERS
+  // If longer than 12, cut it and add "..."
+  const previewText = rawPreview.length > 12 
+    ? `${rawPreview.slice(0, 12)}...` 
+    : rawPreview;
 
   const StateBadge = stateConfig[c.state];
 
@@ -413,7 +418,7 @@ function ConversationRow({
           <div className="flex items-center justify-between gap-2">
             <p className={cn("truncate text-sm", isUnread ? "font-bold text-gray-900" : "text-muted-foreground")}>
                 {isMe && <CheckCircle2 className="inline mr-1 h-3 w-3 text-blue-500" />}
-                {truncatedPreview}
+                {previewText}
             </p>
             
             {/* Badge Area */}

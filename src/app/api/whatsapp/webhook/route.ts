@@ -26,6 +26,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+    console.log('[Webhook] Received POST:', JSON.stringify(body, null, 2)); // LOG EVERYTHING
 
     // 1. Check if it's a message
     if (body.object === 'whatsapp_business_account') {
@@ -44,19 +45,20 @@ export async function POST(req: NextRequest) {
         const senderName = value.contacts?.[0]?.profile?.name || senderPhone;
         const whatsappMsgId = message.id;
 
-        console.log(`[Webhook] Received from ${senderPhone}: ${textBody}`);
+        console.log(`[Webhook] Processing message from ${senderPhone}: ${textBody}`);
 
-        // --- 3. Find or Create Conversation ---
+        // --- 3. Find Conversation ---
         let { data: conversation } = await supabase
           .from('conversations')
-          .select('id')
+          .select('id, unread')
           .eq('phone', senderPhone)
           .single();
 
         let conversationId = conversation?.id;
 
         if (!conversationId) {
-          console.log('[Webhook] New Contact! Creating conversation...');
+          // CREATE NEW CONVERSATION
+          console.log('[Webhook] Creating NEW conversation...');
           const { data: newConv, error: createError } = await supabase
             .from('conversations')
             .insert({
@@ -65,7 +67,7 @@ export async function POST(req: NextRequest) {
               unread: 1,
               last_message: textBody,
               last_message_at: new Date().toISOString(),
-              status: 'open',
+              status: 'open', // OPEN THE WINDOW
             })
             .select()
             .single();
@@ -75,24 +77,26 @@ export async function POST(req: NextRequest) {
              return NextResponse.json({ status: 'error' }, { status: 500 });
           }
           conversationId = newConv.id;
-        } else {
-          // ✅ FIXED: Correctly handle RPC errors without .catch()
-          const { error: rpcError } = await supabase.rpc('increment_unread', { row_id: conversationId });
-          
-          if (rpcError) {
-             // Fallback: If RPC fails, just set unread to 1 manually
-             console.warn('[Webhook] RPC failed, using fallback:', rpcError.message);
-             await supabase.from('conversations').update({ unread: 1 }).eq('id', conversationId);
-          }
 
-          // Update last message timestamp
-          await supabase
+        } else {
+          // UPDATE EXISTING CONVERSATION
+          console.log('[Webhook] Updating EXISTING conversation...');
+          
+          // Calculate new unread count safely
+          const currentUnread = conversation?.unread || 0;
+          const newUnread = currentUnread + 1;
+
+          const { error: updateError } = await supabase
             .from('conversations')
             .update({
               last_message: textBody,
               last_message_at: new Date().toISOString(),
+              unread: newUnread,
+              status: 'open', // <--- CRITICAL FIX: RE-OPEN WINDOW
             })
             .eq('id', conversationId);
+
+           if (updateError) console.error('[Webhook] Update Error:', updateError);
         }
 
         // --- 4. Save Message to DB ---
@@ -112,7 +116,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ status: 'success' }, { status: 200 });
 
   } catch (error: any) {
-    console.error('[Webhook] Error:', error);
+    console.error('[Webhook] Crash Error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

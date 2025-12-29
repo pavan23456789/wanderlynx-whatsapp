@@ -24,8 +24,7 @@ export async function GET(req: NextRequest) {
 
 // --- POST: Handle Incoming Messages ---
 export async function POST(req: NextRequest) {
-  // Debug Log to prove new code is active
-  console.log("✅✅✅ FIX DEPLOYED: Using .in() filter ✅✅✅");
+  console.log("✅✅✅ FIX DEPLOYED: Switched to updated_at sorting ✅✅✅");
 
   try {
     const body = await req.json();
@@ -52,12 +51,12 @@ export async function POST(req: NextRequest) {
         console.log(`[Webhook] Processing message from ${rawPhone}. Searching DB...`);
 
         // --- 3. Find Conversation (THE FIX) ---
-        // We use .in() to safely check both formats.
+        // We use .in() filter AND sort by 'updated_at' instead of 'created_at'
         const { data: existingConvs, error: findError } = await supabase
           .from('conversations')
           .select('id, unread')
-          .in('phone', [phoneWithPlus, phoneWithoutPlus]) // <--- THIS IS THE FIX
-          .order('created_at', { ascending: false })
+          .in('phone', [phoneWithPlus, phoneWithoutPlus]) 
+          .order('updated_at', { ascending: false }) // <--- CHANGED THIS LINE
           .limit(1);
 
         if (findError) {

@@ -8,7 +8,8 @@ const supabase = createClient(
 );
 
 const WHATSAPP_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
-const WHATSAPP_PHONE_ID = process.env.WHATSAPP_PHONE_ID;
+// ✅ FIX: Match the exact name in your Vercel Settings
+const WHATSAPP_PHONE_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
 
 export async function POST(req: NextRequest) {
   try {
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
     }
 
-    // 3. Prepare the Meta Payload (Universal: Handles Text & Templates)
+    // 3. Prepare the Meta Payload
     let metaPayload: any = {
       messaging_product: 'whatsapp',
       to: conversation.phone,
@@ -52,6 +53,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 4. Send to Meta
+    // Note: We use the WHATSAPP_PHONE_ID variable we fixed above
     const metaRes = await fetch(
       `https://graph.facebook.com/v21.0/${WHATSAPP_PHONE_ID}/messages`,
       {
@@ -67,11 +69,10 @@ export async function POST(req: NextRequest) {
     const metaData = await metaRes.json();
 
     if (!metaRes.ok) {
-      // Return the exact error from Meta so you know what went wrong (e.g., "Template not found")
       return NextResponse.json({ error: metaData.error?.message }, { status: 500 });
     }
 
-    // 5. Save to Supabase (So it appears in your Dashboard)
+    // 5. Save to Supabase
     const contentToSave = templateName 
       ? `Template sent: ${templateName}` 
       : text;

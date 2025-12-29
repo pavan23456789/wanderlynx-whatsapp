@@ -1,6 +1,6 @@
 'use client';
 // 🔒 INBOX & CHAT FREEZE - FINAL PRODUCTION VERSION
-// Features: Realtime, Internal Notes, Template Button, Role Access, Auto-Assign, UI Polish, Real Agent Names.
+// Features: Realtime, Internal Notes (Fixed), Template Button, Role Access, Auto-Assign, UI Polish, Real Agent Names.
 
 import * as React from 'react';
 import {
@@ -289,7 +289,7 @@ function ConversationList({
   onSelect,
   activeFilter,
   onSetFilter,
-  agents, // ✅ Received agents
+  agents,
 }: {
   conversations: Conversation[];
   selectedId: string | null;
@@ -368,8 +368,7 @@ function ConversationRow({
   
   const rawPreview = isMe ? `You: ${lastMsgText}` : lastMsgText;
   
-  // ✅ FIX: STRICTLY LIMIT TO 12 CHARACTERS
-  // If longer than 12, cut it and add "..."
+  // Strict 12-char limit
   const previewText = rawPreview.length > 12 
     ? `${rawPreview.slice(0, 12)}...` 
     : rawPreview;
@@ -421,7 +420,6 @@ function ConversationRow({
                 {previewText}
             </p>
             
-            {/* Badge Area */}
             <div className="flex items-center gap-1 shrink-0">
                 {c.pinned && <Pin className="h-3 w-3 text-gray-400 rotate-45" />}
                 {isUnread && (
@@ -681,7 +679,6 @@ function MessageBubble({
           isOutbound ? 'bg-secondary' : 'bg-[#E3F2FD]'
         )}
       >
-        {/* ✅ FIXED: Always show agent name for outbound messages */}
         {isOutbound && agent && (
           <div className="mb-1 text-[10px] font-bold text-primary/80 flex items-center gap-1">
              {agent.name}
@@ -873,7 +870,7 @@ export default function InboxPage() {
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [activeFilter, setActiveFilter] = React.useState<FilterState>('All');
   const [isLoading, setIsLoading] = React.useState(true);
-  const [agents, setAgents] = React.useState<Agent[]>([]); // ✅ State for real agents
+  const [agents, setAgents] = React.useState<Agent[]>([]); 
   const { toast } = useToast();
   
   React.useEffect(() => {
@@ -884,7 +881,6 @@ export default function InboxPage() {
     loadUser();
   }, []);
 
-  // ✅ NEW: Fetch Real Agents from Supabase on Load
   React.useEffect(() => {
     async function fetchAgents() {
         const { data: profiles } = await supabase.from('profiles').select('*');
@@ -901,7 +897,7 @@ export default function InboxPage() {
     fetchAgents();
   }, []);
 
-  // Normalization needs the real agents too, but we can rely on ID matching in render
+  // Normalization 
   const normalizeConversation = React.useCallback((apiData: any): Conversation => {
         const messages: Message[] = Array.isArray(apiData.messages)
             ? apiData.messages.map((m: any) => {
@@ -918,7 +914,7 @@ export default function InboxPage() {
                 text: m.content || m.body || '', 
                 time: m.created_at || new Date().toISOString(),
                 status: m.status ?? 'sent', 
-                agentId: m.agentId, // This is the real UUID now
+                agentId: m.agentId, 
                 type: msgType, 
                 };
             })
@@ -969,7 +965,6 @@ export default function InboxPage() {
         const raw = await res.json();
         const rawList = Array.isArray(raw?.conversations) ? raw.conversations : [];
 
-        // Normalization
         const normalizedList = rawList.map(normalizeConversation);
         setConversations(normalizedList);
 
@@ -983,7 +978,7 @@ export default function InboxPage() {
     }
   }, [toast, selectedId, normalizeConversation]); 
 
-  // ✅ FIX: Stable Realtime Subscription
+  // Realtime Subscription
   React.useEffect(() => {
     fetchConversations();
     const channel = supabase
@@ -1023,7 +1018,6 @@ export default function InboxPage() {
   const handleSelectConversation = (conversationId: string) => {
     setSelectedId(conversationId);
     
-    // ✅ FIX 1: USE NEW API FOR UNREAD
     fetch('/api/conversations/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1044,7 +1038,6 @@ export default function InboxPage() {
       )
     );
     try {
-        // ✅ FIX 2: USE NEW API FOR STATUS
         const res = await fetch('/api/conversations/update', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1059,10 +1052,8 @@ export default function InboxPage() {
 
   const handleAssignToMe = async () => {
      if (!selectedId || !currentUser) return;
-     // Optimistic
      setConversations(prev => prev.map(c => c.id === selectedId ? { ...c, assignedTo: currentUser.id } : c));
      
-     // ✅ FIX 3: USE NEW API FOR ASSIGNMENT
      const res = await fetch('/api/conversations/update', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1071,7 +1062,7 @@ export default function InboxPage() {
 
      if (!res.ok) {
         toast({ variant: 'destructive', title: 'Error', description: 'Failed to assign chat.' });
-        fetchConversations(); // Revert on fail
+        fetchConversations(); 
      } else {
         toast({ title: 'Assigned', description: 'Conversation assigned to you.' });
      }
@@ -1083,6 +1074,7 @@ export default function InboxPage() {
 
     const optimisticId = `msg_${Date.now()}`;
     
+    // Optimistic Update
     const newMessage: Message = {
         id: optimisticId,
         type: type, 
@@ -1105,7 +1097,6 @@ export default function InboxPage() {
                 lastMessageTimestamp: new Date().getTime(),
                 state: newState,
                  ...(type !== 'internal' && { unread: 0 }),
-                 // Auto-assign in local state
                  assignedTo: c.assignedTo || currentUser.id 
             };
         }
@@ -1113,22 +1104,36 @@ export default function InboxPage() {
       })
     );
     
-    // API call
     try {
-      const isWindowOpen = conversations.find(c => c.id === selectedId)?.isWindowOpen ?? false;
-      const endpoint = '/api/messages/send';
-      const body = isWindowOpen 
-        ? { contactId: selectedId, text } 
-        : { contactId: selectedId, templateName, params: templateVars };
+      // ✅ FIX: Handling Logic
+      if (type === 'internal') {
+         // 1. Internal Note: Save directly to Supabase
+         const { error } = await supabase.from('messages').insert({
+            conversation_id: selectedId,
+            body: text, 
+            type: 'internal',
+            direction: 'internal',
+            agent_id: currentUser.id
+         });
+         if (error) throw error;
+      } else {
+         // 2. Outbound Message: Send via WhatsApp API
+         const isWindowOpen = conversations.find(c => c.id === selectedId)?.isWindowOpen ?? false;
+         const endpoint = '/api/messages/send';
+         const body = isWindowOpen 
+            ? { contactId: selectedId, text } 
+            : { contactId: selectedId, templateName, params: templateVars };
 
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
+         const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+         });
+         
+         if (!response.ok) throw new Error('Failed to send message');
+      }
       
-      if (!response.ok) throw new Error('Failed to send message');
-      
+      // Update Status to Sent on success
        setConversations(prev =>
          prev.map(c => {
            if (c.id === selectedId) {
@@ -1199,7 +1204,7 @@ export default function InboxPage() {
             onSelect={handleSelectConversation}
             activeFilter={activeFilter}
             onSetFilter={setActiveFilter}
-            agents={agents} // ✅ Pass real agents down
+            agents={agents} 
           />
         </div>
         <div className="flex flex-[1_1_0%] min-w-0 flex-col h-full">
@@ -1211,7 +1216,7 @@ export default function InboxPage() {
               onSendMessage={handleSendMessage}
               onRetryMessage={handleRetryMessage}
               onAssignToMe={handleAssignToMe}
-              agents={agents} // ✅ Pass real agents down
+              agents={agents} 
             />
           ) : (
             <div className="flex h-full flex-col items-center justify-center bg-background p-4 text-center">

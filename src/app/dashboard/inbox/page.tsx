@@ -1,6 +1,6 @@
 'use client';
 // 🔒 INBOX FIXED VERSION
-// Fixes: Internal Note Database Errors, Navigation Loops, and Error Visibility
+// Fixes: Navigation Snapping, Internal Note Database Error
 
 import * as React from 'react';
 import {
@@ -677,6 +677,7 @@ function MessageBubble({
           isOutbound ? 'bg-secondary' : 'bg-[#E3F2FD]'
         )}
       >
+        {/* ✅ FIXED: Always show agent name for outbound messages */}
         {isOutbound && agent && (
           <div className="mb-1 text-[10px] font-bold text-primary/80 flex items-center gap-1">
              {agent.name}
@@ -895,6 +896,7 @@ export default function InboxPage() {
     fetchAgents();
   }, []);
 
+  // Normalization 
   const normalizeConversation = React.useCallback((apiData: any): Conversation => {
         const messages: Message[] = Array.isArray(apiData.messages)
             ? apiData.messages.map((m: any) => {

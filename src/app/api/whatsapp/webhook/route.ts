@@ -26,7 +26,6 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    // console.log('[Webhook] Received POST:', JSON.stringify(body, null, 2));
 
     // 1. Check if it's a message
     if (body.object === 'whatsapp_business_account') {
@@ -37,35 +36,42 @@ export async function POST(req: NextRequest) {
 
       if (message) {
         // --- 2. Extract Data ---
-        // Meta sends number WITHOUT + (e.g., 919988776655)
+        // Meta sends number strictly as digits (e.g. 919988776655)
         const rawPhone = message.from; 
-        const senderPhone = `+${rawPhone}`; 
+        
+        // Prepare variations to search for
+        const phoneWithPlus = `+${rawPhone}`;
+        const phoneWithoutPlus = rawPhone;
         
         const textBody = message.text?.body || message.button?.text || '[Media/Other]';
-        const senderName = value.contacts?.[0]?.profile?.name || senderPhone;
+        const senderName = value.contacts?.[0]?.profile?.name || phoneWithPlus;
         const whatsappMsgId = message.id;
 
-        console.log(`[Webhook] Processing message from ${senderPhone}: ${textBody}`);
+        console.log(`[Webhook] Processing message from ${rawPhone}. Searching DB...`);
 
-        // --- 3. Find Conversation (THE FIX IS HERE) ---
-        // We removed .single() and added sorting to pick the most recent one if duplicates exist
-        const { data: existingConvs } = await supabase
+        // --- 3. Find Conversation (FUZZY SEARCH FIX) ---
+        // We search for EITHER "+91..." OR "91..." to be 100% sure we match.
+        const { data: existingConvs, error: findError } = await supabase
           .from('conversations')
           .select('id, unread')
-          .eq('phone', senderPhone)
-          .order('created_at', { ascending: false }) // Pick the latest one
+          .or(`phone.eq.${phoneWithPlus},phone.eq.${phoneWithoutPlus}`) 
+          .order('created_at', { ascending: false })
           .limit(1);
+
+        if (findError) {
+            console.error('[Webhook] DB Search Error:', findError);
+        }
 
         let conversationId = existingConvs?.[0]?.id;
         let currentUnread = existingConvs?.[0]?.unread || 0;
 
         if (!conversationId) {
           // CREATE NEW CONVERSATION
-          console.log('[Webhook] Creating NEW conversation...');
+          console.log('[Webhook] No conversation found. Creating NEW one for:', phoneWithPlus);
           const { data: newConv, error: createError } = await supabase
             .from('conversations')
             .insert({
-              phone: senderPhone,
+              phone: phoneWithPlus, // Always save WITH plus for consistency
               name: senderName,
               unread: 1,
               last_message: textBody,
@@ -83,7 +89,7 @@ export async function POST(req: NextRequest) {
 
         } else {
           // UPDATE EXISTING CONVERSATION
-          console.log('[Webhook] Updating EXISTING conversation...');
+          console.log(`[Webhook] Found existing conversation ID: ${conversationId}`);
           
           const newUnread = currentUnread + 1;
 

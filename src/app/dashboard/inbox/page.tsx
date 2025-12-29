@@ -1,6 +1,6 @@
 'use client';
-// 🔒 INBOX & CHAT FREEZE - FULL PRODUCTION VERSION
-// Features: Realtime, Internal Notes, Template Button, Role Access.
+// 🔒 INBOX & CHAT FREEZE - FINAL PRODUCTION VERSION
+// Features: Realtime, Internal Notes, Template Button, Role Access, Auto-Assign.
 
 import * as React from 'react';
 import {
@@ -16,6 +16,9 @@ import {
   Lock,
   Undo2,
   Loader,
+  UserPlus,
+  CheckCircle2,
+  Users, // <--- Added this one
 } from 'lucide-react';
 import { format, isToday, isYesterday, differenceInHours, isSameDay } from 'date-fns';
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
@@ -28,7 +31,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { type Template as TemplateType } from '@/lib/data';
 import { User, getCurrentUser } from '@/lib/auth';
-import { createClient } from '@supabase/supabase-js'; // ✅ Import Supabase Client
+import { createClient } from '@supabase/supabase-js'; 
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,7 +60,6 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 
 // --- SUPABASE CLIENT ---
-// ✅ FIX 1: Initialize Realtime Client
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -72,7 +74,7 @@ type Message = {
   time: string; // ISO 8601 string
   status?: 'sent' | 'delivered' | 'read' | 'failed';
   agentId?: string;
-  type: 'inbound' | 'outbound' | 'internal'; // Strict union
+  type: 'inbound' | 'outbound' | 'internal'; 
 };
 
 type Agent = {
@@ -120,39 +122,32 @@ const mockAgents: Agent[] = [
 
 // --- NORMALIZATION HELPER ---
 const normalizeConversation = (apiData: any): Conversation => {
-  // 1. Normalize Messages with Strict Types
   const messages: Message[] = Array.isArray(apiData.messages)
     ? apiData.messages.map((m: any) => {
-        // Determine Type strictly
         let msgType: 'inbound' | 'outbound' | 'internal' = 'internal'; 
         if (m.type === 'internal') msgType = 'internal';
         else if (m.direction === 'inbound') msgType = 'inbound';
         else if (m.direction === 'outbound') msgType = 'outbound';
         
-        // Determine Sender
         const sender = m.direction === 'inbound' ? 'them' : 'me';
 
         return {
           id: m.id,
           sender: sender,
-          // ✅ FIX 2: Check BOTH 'content' (new DB) and 'body' (old DB)
           text: m.content || m.body || '', 
           time: m.created_at || new Date().toISOString(),
-          status: m.status ?? 'sent', // Safe default
+          status: m.status ?? 'sent', 
           agentId: m.agentId,
           type: msgType, 
         };
       })
     : [];
 
-  // 2. Derive computed fields safely
   const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
   const lastTimestamp = lastMsg ? new Date(lastMsg.time).getTime() : Date.now();
   
-  // Find last CUSTOMER message for window logic
   const lastCustomerMessage = [...messages].reverse().find(m => m.sender === 'them' && m.type !== 'internal');
   
-  // Hardened Date Check (Prevents crash on garbage date)
   let isWindowOpen = false;
   if (lastCustomerMessage) {
       const msgDate = new Date(lastCustomerMessage.time);
@@ -161,12 +156,10 @@ const normalizeConversation = (apiData: any): Conversation => {
       }
   }
 
-  // 3. Map State/Status
   let uiState: Conversation['state'] = 'Open';
   if (apiData.status === 'closed') uiState = 'Resolved';
   else if (apiData.status === 'pending') uiState = 'Pending';
 
-  // 4. Handle assignedTo variants
   let assignedToId = null;
   if (typeof apiData.assignedTo === 'string') assignedToId = apiData.assignedTo;
   else if (apiData.assignedTo && typeof apiData.assignedTo === 'object') assignedToId = apiData.assignedTo.id;
@@ -264,12 +257,7 @@ function TemplateDialog({
   
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        {/* ✅ FIX: Added 'max-h-[85vh]', 'flex-col', and 'overflow-hidden'
-           This ensures the dialog never exceeds 85% of screen height.
-        */}
         <DialogContent className="sm:max-w-xl max-h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
-          
-          {/* Header (Fixed at Top) */}
           <DialogHeader className="p-6 pb-2 shrink-0">
             <DialogTitle>Send Template Message</DialogTitle>
             <DialogDescription>
@@ -278,9 +266,6 @@ function TemplateDialog({
             </DialogDescription>
           </DialogHeader>
   
-          {/* ✅ FIX: Added 'overflow-y-auto' and 'flex-1'
-             This makes the middle section scrollable if content is too long.
-          */}
           <div className="flex-1 overflow-y-auto p-6 pt-2">
             <div className="grid gap-6">
               <div className="space-y-2">
@@ -343,7 +328,6 @@ function TemplateDialog({
             </div>
           </div>
   
-          {/* Footer (Fixed at Bottom) */}
           <DialogFooter className="p-6 pt-2 border-t bg-background shrink-0">
             <Button
               onClick={handleSend}
@@ -362,6 +346,7 @@ function TemplateDialog({
       </Dialog>
     );
   }
+
 const formatFuzzyDate = (timestamp: string | number | null | undefined) => {
   if (!timestamp) return '';
   const d = new Date(timestamp);
@@ -533,16 +518,17 @@ function MessagePanel({
   onSetConversationState,
   onSendMessage,
   onRetryMessage,
+  onAssignToMe
 }: {
   conversation: Conversation;
   currentUser: User | null;
   onSetConversationState: (id: string, state: Conversation['state']) => void;
   onSendMessage: (text: string, type: 'outbound' | 'internal', templateName?: string, templateVars?: string[]) => void;
   onRetryMessage: (messageId: string) => void;
+  onAssignToMe: () => void;
 }) {
   const scrollAreaRef = React.useRef<HTMLDivElement>(null);
   const [isTemplateDialogOpen, setTemplateDialogOpen] = React.useState(false);
-
 
   React.useEffect(() => {
     if (scrollAreaRef.current) {
@@ -616,6 +602,15 @@ function MessagePanel({
              </p>
           </div>
         </div>
+        
+        {/* ASSIGN TO ME BUTTON */}
+        {!conversation.assignedTo && (
+            <Button size="sm" variant="outline" className="hidden sm:flex h-8 gap-2 border-dashed" onClick={onAssignToMe}>
+                <UserPlus className="h-4 w-4" />
+                Claim Chat
+            </Button>
+        )}
+
         <div className="flex items-center gap-1">
           {isResolved ? <ReopenButton /> : <ResolveButton />}
           <DropdownMenu>
@@ -628,6 +623,12 @@ function MessagePanel({
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
               <DropdownMenuItem>Contact info</DropdownMenuItem>
               <DropdownMenuItem>Search</DropdownMenuItem>
+              {!conversation.assignedTo && (
+                  <DropdownMenuItem onClick={onAssignToMe}>
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    <span>Claim Chat</span>
+                  </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
                {isResolved ? (
                 <TooltipProvider>
@@ -706,6 +707,7 @@ function MessagePanel({
            isResolved={isResolved}
            assignedAgent={assignedAgent}
            currentUser={currentUser}
+           onAssignToMe={onAssignToMe}
         />
        )}
        <TemplateDialog
@@ -787,7 +789,6 @@ function InternalNote({ message, agent }: { message: Message; agent: Agent | nul
   );
 }
 
-// ✅ FIX 3: REPLY BOX WITH BUTTON
 function ReplyBox({
   onSend,
   onSendInternalNote,
@@ -796,6 +797,7 @@ function ReplyBox({
   isResolved,
   assignedAgent,
   currentUser,
+  onAssignToMe
 }: {
   onSend: (text: string) => void;
   onSendInternalNote: (text: string) => void;
@@ -804,6 +806,7 @@ function ReplyBox({
   isResolved: boolean;
   assignedAgent: Agent | null | undefined;
   currentUser: User | null;
+  onAssignToMe: () => void;
 }) {
   const [text, setText] = React.useState('');
   const [isInternal, setInternal] = React.useState(false);
@@ -813,6 +816,10 @@ function ReplyBox({
     if (isInternal) {
       onSendInternalNote(text);
     } else {
+      // ✅ AUTO ASSIGN FEATURE
+      if (!assignedAgent) {
+          onAssignToMe();
+      }
       onSend(text);
     }
     setText('');
@@ -843,8 +850,11 @@ function ReplyBox({
     <div className="border-t bg-secondary/70 p-3">
        {footerLabel && (
            <div className="text-xs px-2 pb-1.5 flex items-center gap-2">
-             {isResolved && <AlertTriangle className="h-3 w-3 text-yellow-600" />}
+             {isResolved ? <AlertTriangle className="h-3 w-3 text-yellow-600" /> : <Users className="h-3 w-3 text-gray-500"/>}
              {footerLabel}
+             {!assignedAgent && !isResolved && (
+                 <Button variant="link" size="sm" className="h-auto p-0 text-xs text-primary" onClick={onAssignToMe}>Claim Chat</Button>
+             )}
            </div>
        )}
       <div className="flex items-center gap-3">
@@ -852,7 +862,6 @@ function ReplyBox({
           <Paperclip className="h-5 w-5 text-muted-foreground" />
         </Button>
 
-        {/* ✅ THE FIX: Button Logic */}
         {(!isWindowOpen && !isInternal) ? (
             <Button 
                 variant="outline" 
@@ -942,7 +951,7 @@ export default function InboxPage() {
         const raw = await res.json();
         const rawList = Array.isArray(raw?.conversations) ? raw.conversations : [];
 
-        // ✅ Normalization
+        // Normalization
         const normalizedList = rawList.map(normalizeConversation);
         setConversations(normalizedList);
 
@@ -956,17 +965,17 @@ export default function InboxPage() {
     }
   }, [toast, selectedId]); 
 
-  // ✅ FIX 2: SUPABASE REALTIME SUBSCRIPTION
+  // ✅ FIX: Stable Realtime Subscription
   React.useEffect(() => {
     fetchConversations();
     const channel = supabase
       .channel('inbox-realtime')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
-           console.log('[Realtime] New message detected. Refreshing...');
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
+           console.log('[Realtime] Message Event. Refreshing...');
            fetchConversations();
       })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations' }, () => {
-           console.log('[Realtime] Conversation updated. Refreshing...');
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, () => {
+           console.log('[Realtime] Conversation Event. Refreshing...');
            fetchConversations();
       })
       .subscribe();
@@ -974,7 +983,7 @@ export default function InboxPage() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [fetchConversations]);
+  }, []); // Empty dependency array = Stable Connection
 
   const filteredConversations = React.useMemo(() => {
     const sorted = [...conversations].sort(
@@ -995,6 +1004,13 @@ export default function InboxPage() {
   
   const handleSelectConversation = (conversationId: string) => {
     setSelectedId(conversationId);
+    
+    // ✅ FIX 1: INSTANT DB UPDATE FOR UNREAD
+    // We fire this to the DB so next Realtime fetch gets unread=0
+    supabase.from('conversations').update({ unread: 0 }).eq('id', conversationId).then(({ error }) => {
+        if(error) console.error("Failed to clear unread", error);
+    });
+
     setConversations(prev =>
         prev.map(c => 
             c.id === conversationId ? { ...c, unread: 0 } : c
@@ -1003,13 +1019,11 @@ export default function InboxPage() {
   };
 
   const handleSetConversationState = async (conversationId: string, state: Conversation['state']) => {
-    // Optimistic Update
     setConversations(prev =>
       prev.map(c =>
         c.id === conversationId ? { ...c, state: state } : c
       )
     );
-    // Sync with Backend
     try {
         const apiStatus = state === 'Resolved' ? 'closed' : 'open';
         const res = await fetch(`/api/conversations/${conversationId}/status`, {
@@ -1023,6 +1037,21 @@ export default function InboxPage() {
         toast({ variant: 'destructive', title: 'Sync Error', description: 'Could not update conversation status on server.' });
     }
   };
+
+  const handleAssignToMe = async () => {
+     if (!selectedId || !currentUser) return;
+     // Optimistic
+     setConversations(prev => prev.map(c => c.id === selectedId ? { ...c, assignedTo: currentUser.id } : c));
+     
+     // DB Update
+     const { error } = await supabase.from('conversations').update({ assigned_to: currentUser.id }).eq('id', selectedId);
+     if (error) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to assign chat.' });
+        fetchConversations(); // Revert on fail
+     } else {
+        toast({ title: 'Assigned', description: 'Conversation assigned to you.' });
+     }
+  };
   
   const handleSendMessage = async (text: string, type: 'outbound' | 'internal', templateName?: string, templateVars?: string[]) => {
     if (!selectedId || !currentUser || !text.trim()) return;
@@ -1030,7 +1059,6 @@ export default function InboxPage() {
 
     const optimisticId = `msg_${Date.now()}`;
     
-    // STRICT TYPE for optimistic message
     const newMessage: Message = {
         id: optimisticId,
         type: type, 
@@ -1053,6 +1081,8 @@ export default function InboxPage() {
                 lastMessageTimestamp: new Date().getTime(),
                 state: newState,
                  ...(type !== 'internal' && { unread: 0 }),
+                 // Auto-assign in local state
+                 assignedTo: c.assignedTo || currentUser.id 
             };
         }
         return c;
@@ -1075,7 +1105,6 @@ export default function InboxPage() {
       
       if (!response.ok) throw new Error('Failed to send message');
       
-      // Update message status on success
        setConversations(prev =>
          prev.map(c => {
            if (c.id === selectedId) {
@@ -1090,7 +1119,6 @@ export default function InboxPage() {
        fetchConversations(); 
 
     } catch (error) {
-       // Revert optimistic update
        setConversations(prev =>
          prev.map(c => {
            if (c.id === selectedId) {
@@ -1157,6 +1185,7 @@ export default function InboxPage() {
               onSetConversationState={handleSetConversationState}
               onSendMessage={handleSendMessage}
               onRetryMessage={handleRetryMessage}
+              onAssignToMe={handleAssignToMe}
             />
           ) : (
             <div className="flex h-full flex-col items-center justify-center bg-background p-4 text-center">

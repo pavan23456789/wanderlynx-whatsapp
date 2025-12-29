@@ -18,7 +18,7 @@ import {
   Loader,
   UserPlus,
   CheckCircle2,
-  Users, // <--- Added this one
+  Users, // ✅ Icon Added
 } from 'lucide-react';
 import { format, isToday, isYesterday, differenceInHours, isSameDay } from 'date-fns';
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
@@ -59,7 +59,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 
-// --- SUPABASE CLIENT ---
+// --- SUPABASE CLIENT (READ ONLY / REALTIME) ---
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -983,7 +983,7 @@ export default function InboxPage() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []); // Empty dependency array = Stable Connection
+  }, []); 
 
   const filteredConversations = React.useMemo(() => {
     const sorted = [...conversations].sort(
@@ -1005,10 +1005,11 @@ export default function InboxPage() {
   const handleSelectConversation = (conversationId: string) => {
     setSelectedId(conversationId);
     
-    // ✅ FIX 1: INSTANT DB UPDATE FOR UNREAD
-    // We fire this to the DB so next Realtime fetch gets unread=0
-    supabase.from('conversations').update({ unread: 0 }).eq('id', conversationId).then(({ error }) => {
-        if(error) console.error("Failed to clear unread", error);
+    // ✅ FIX 1: USE NEW API FOR UNREAD
+    fetch('/api/conversations/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'unread', conversationId })
     });
 
     setConversations(prev =>
@@ -1025,11 +1026,11 @@ export default function InboxPage() {
       )
     );
     try {
-        const apiStatus = state === 'Resolved' ? 'closed' : 'open';
-        const res = await fetch(`/api/conversations/${conversationId}/status`, {
-            method: 'PATCH',
+        // ✅ FIX 2: USE NEW API FOR STATUS
+        const res = await fetch('/api/conversations/update', {
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: apiStatus })
+            body: JSON.stringify({ action: 'status', conversationId, value: state })
         });
         if (!res.ok) throw new Error("Failed to sync state");
     } catch(e) {
@@ -1043,9 +1044,14 @@ export default function InboxPage() {
      // Optimistic
      setConversations(prev => prev.map(c => c.id === selectedId ? { ...c, assignedTo: currentUser.id } : c));
      
-     // DB Update
-     const { error } = await supabase.from('conversations').update({ assigned_to: currentUser.id }).eq('id', selectedId);
-     if (error) {
+     // ✅ FIX 3: USE NEW API FOR ASSIGNMENT
+     const res = await fetch('/api/conversations/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'assign', conversationId: selectedId, value: currentUser.id })
+     });
+
+     if (!res.ok) {
         toast({ variant: 'destructive', title: 'Error', description: 'Failed to assign chat.' });
         fetchConversations(); // Revert on fail
      } else {

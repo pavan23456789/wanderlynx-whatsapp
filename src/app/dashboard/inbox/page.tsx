@@ -1,6 +1,6 @@
 'use client';
 // 🔒 INBOX & CHAT FREEZE - FINAL PRODUCTION VERSION
-// Features: Realtime, Internal Notes, Template Button, Role Access, Auto-Assign, UI Polish.
+// Features: Realtime, Internal Notes, Template Button, Role Access, Auto-Assign, UI Polish, Real Agent Names.
 
 import * as React from 'react';
 import {
@@ -97,87 +97,6 @@ type Conversation = {
   pinned: boolean; 
   unread: number;  
   state: 'Open' | 'Pending' | 'Resolved';
-};
-
-const mockAgents: Agent[] = [
-  {
-    id: '1',
-    name: 'Super Admin',
-    avatar: 'https://picsum.photos/seed/8/80/80',
-    role: 'Super Admin',
-  },
-  {
-    id: '2',
-    name: 'John Doe',
-    avatar: 'https://picsum.photos/seed/9/40/40',
-    role: 'Internal Staff',
-  },
-  {
-    id: '3',
-    name: 'Jane Appleseed',
-    avatar: 'https://picsum.photos/seed/10/40/40',
-    role: 'Internal Staff',
-  },
-];
-
-// --- NORMALIZATION HELPER ---
-const normalizeConversation = (apiData: any): Conversation => {
-  const messages: Message[] = Array.isArray(apiData.messages)
-    ? apiData.messages.map((m: any) => {
-        let msgType: 'inbound' | 'outbound' | 'internal' = 'internal'; 
-        if (m.type === 'internal') msgType = 'internal';
-        else if (m.direction === 'inbound') msgType = 'inbound';
-        else if (m.direction === 'outbound') msgType = 'outbound';
-        
-        const sender = m.direction === 'inbound' ? 'them' : 'me';
-
-        return {
-          id: m.id,
-          sender: sender,
-          text: m.content || m.body || '', 
-          time: m.created_at || new Date().toISOString(),
-          status: m.status ?? 'sent', 
-          agentId: m.agentId,
-          type: msgType, 
-        };
-      })
-    : [];
-
-  const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
-  const lastTimestamp = lastMsg ? new Date(lastMsg.time).getTime() : Date.now();
-  
-  const lastCustomerMessage = [...messages].reverse().find(m => m.sender === 'them' && m.type !== 'internal');
-  
-  let isWindowOpen = false;
-  if (lastCustomerMessage) {
-      const msgDate = new Date(lastCustomerMessage.time);
-      if (!isNaN(msgDate.getTime())) {
-          isWindowOpen = differenceInHours(new Date(), msgDate) < 24;
-      }
-  }
-
-  let uiState: Conversation['state'] = 'Open';
-  if (apiData.status === 'closed') uiState = 'Resolved';
-  else if (apiData.status === 'pending') uiState = 'Pending';
-
-  let assignedToId = null;
-  if (typeof apiData.assignedTo === 'string') assignedToId = apiData.assignedTo;
-  else if (apiData.assignedTo && typeof apiData.assignedTo === 'object') assignedToId = apiData.assignedTo.id;
-
-  return {
-    id: apiData.id,
-    name: apiData.name || apiData.phone || 'Unknown Contact',
-    phone: apiData.phone || '',
-    avatar: apiData.avatar || `https://ui-avatars.com/api/?name=${apiData.name || 'U'}&background=random`,
-    messages: messages,
-    lastMessage: lastMsg?.text || '',
-    lastMessageTimestamp: lastTimestamp,
-    isWindowOpen: isWindowOpen,
-    assignedTo: assignedToId,
-    pinned: !!apiData.pinned,
-    unread: typeof apiData.unread === 'number' ? apiData.unread : 0,
-    state: uiState,
-  };
 };
 
 // --- COMPONENTS ---
@@ -370,12 +289,14 @@ function ConversationList({
   onSelect,
   activeFilter,
   onSetFilter,
+  agents, // ✅ Received agents
 }: {
   conversations: Conversation[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   activeFilter: FilterState;
   onSetFilter: (filter: FilterState) => void;
+  agents: Agent[];
 }) {
   const filters: FilterState[] = ['All', 'Open', 'Pending', 'Resolved'];
 
@@ -412,6 +333,7 @@ function ConversationList({
                 conversation={c}
                 isActive={selectedId === c.id}
                 onSelect={onSelect}
+                agents={agents}
               />
             ))
           ) : (
@@ -425,26 +347,25 @@ function ConversationList({
   );
 }
 
-// ✅ FIXED: Better UI logic to show who sent the message
 function ConversationRow({
   conversation,
   isActive,
   onSelect,
+  agents,
 }: {
   conversation: Conversation;
   isActive: boolean;
   onSelect: (id: string) => void;
+  agents: Agent[];
 }) {
   const c = conversation;
   const isUnread = c.unread && c.unread > 0;
-  const assignedAgent = mockAgents.find((a) => a.id === c.assignedTo);
+  const assignedAgent = agents.find((a) => a.id === c.assignedTo);
   
-  // Logic to find the last message and who sent it
   const lastVisibleMessage = [...c.messages].reverse().find(m => m.type !== 'internal');
   const lastMsgText = lastVisibleMessage?.text || c.lastMessage || '';
   const isMe = lastVisibleMessage?.sender === 'me';
   
-  // Create the preview text (e.g., "You: Hello")
   const previewText = isMe ? `You: ${lastMsgText}` : lastMsgText;
   const truncatedPreview = previewText.length > 60 ? `${previewText.slice(0, 60)}…` : previewText;
 
@@ -506,7 +427,6 @@ function ConversationRow({
             </div>
           </div>
           
-          {/* Status Label (Optional) */}
           {c.state !== 'Open' && (
               <div className="mt-1">
                  <Badge variant="outline" className="text-[10px] h-5 py-0 px-2 text-muted-foreground border-gray-200">
@@ -526,7 +446,8 @@ function MessagePanel({
   onSetConversationState,
   onSendMessage,
   onRetryMessage,
-  onAssignToMe
+  onAssignToMe,
+  agents,
 }: {
   conversation: Conversation;
   currentUser: User | null;
@@ -534,6 +455,7 @@ function MessagePanel({
   onSendMessage: (text: string, type: 'outbound' | 'internal', templateName?: string, templateVars?: string[]) => void;
   onRetryMessage: (messageId: string) => void;
   onAssignToMe: () => void;
+  agents: Agent[];
 }) {
   const scrollAreaRef = React.useRef<HTMLDivElement>(null);
   const [isTemplateDialogOpen, setTemplateDialogOpen] = React.useState(false);
@@ -547,7 +469,7 @@ function MessagePanel({
     }
   }, [conversation.messages]);
 
-  const assignedAgent = mockAgents.find(a => a.id === conversation.assignedTo);
+  const assignedAgent = agents.find(a => a.id === conversation.assignedTo);
   const isResolved = conversation.state === 'Resolved';
   const canReopen = currentUser?.role === 'Super Admin';
   const isWindowOpen = conversation.isWindowOpen;
@@ -682,8 +604,9 @@ function MessagePanel({
                 const prevMessage = conversation.messages[index - 1];
                 const isNewDay = !prevMessage || !isSameDay(new Date(m.time), new Date(prevMessage.time));
 
+                // ✅ REAL AGENT LOOKUP
                 const agent = m.agentId
-                  ? mockAgents.find((a) => a.id === m.agentId)
+                  ? agents.find((a) => a.id === m.agentId)
                   : null;
 
                 return (
@@ -739,7 +662,6 @@ function MessageBubble({
   onRetry: () => void;
 }) {
   const isOutbound = message.sender === 'me';
-  const isUnassignedReply = isOutbound && agent && agent.id !== assignedToId;
 
   return (
     <div
@@ -754,11 +676,13 @@ function MessageBubble({
           isOutbound ? 'bg-secondary' : 'bg-[#E3F2FD]'
         )}
       >
-        {isOutbound && agent && isUnassignedReply && (
-          <div className="mb-1 flex items-center gap-2 text-xs font-semibold text-gray-600">
-            Sent by {agent.name}
+        {/* ✅ FIXED: Always show agent name for outbound messages */}
+        {isOutbound && agent && (
+          <div className="mb-1 text-[10px] font-bold text-primary/80 flex items-center gap-1">
+             {agent.name}
           </div>
         )}
+        
         <p className="min-w-0 whitespace-pre-wrap break-all">
           {message.text}
         </p>
@@ -824,7 +748,6 @@ function ReplyBox({
     if (isInternal) {
       onSendInternalNote(text);
     } else {
-      // ✅ AUTO ASSIGN FEATURE
       if (!assignedAgent) {
           onAssignToMe();
       }
@@ -945,15 +868,92 @@ export default function InboxPage() {
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [activeFilter, setActiveFilter] = React.useState<FilterState>('All');
   const [isLoading, setIsLoading] = React.useState(true);
+  const [agents, setAgents] = React.useState<Agent[]>([]); // ✅ State for real agents
   const { toast } = useToast();
   
   React.useEffect(() => {
     async function loadUser() {
-        // We must await because fetching from Supabase takes time
-        const user = await getCurrentUser(); 
+        const user = await getCurrentUser();
         setCurrentUser(user);
     }
     loadUser();
+  }, []);
+
+  // ✅ NEW: Fetch Real Agents from Supabase on Load
+  React.useEffect(() => {
+    async function fetchAgents() {
+        const { data: profiles } = await supabase.from('profiles').select('*');
+        if (profiles) {
+            const mappedAgents = profiles.map(p => ({
+                id: p.id,
+                name: p.full_name || p.email,
+                avatar: p.avatar_url || `https://ui-avatars.com/api/?name=${p.full_name || 'U'}&background=random`,
+                role: p.role
+            }));
+            setAgents(mappedAgents);
+        }
+    }
+    fetchAgents();
+  }, []);
+
+  // Normalization needs the real agents too, but we can rely on ID matching in render
+  const normalizeConversation = React.useCallback((apiData: any): Conversation => {
+        const messages: Message[] = Array.isArray(apiData.messages)
+            ? apiData.messages.map((m: any) => {
+                let msgType: 'inbound' | 'outbound' | 'internal' = 'internal'; 
+                if (m.type === 'internal') msgType = 'internal';
+                else if (m.direction === 'inbound') msgType = 'inbound';
+                else if (m.direction === 'outbound') msgType = 'outbound';
+                
+                const sender = m.direction === 'inbound' ? 'them' : 'me';
+
+                return {
+                id: m.id,
+                sender: sender,
+                text: m.content || m.body || '', 
+                time: m.created_at || new Date().toISOString(),
+                status: m.status ?? 'sent', 
+                agentId: m.agentId, // This is the real UUID now
+                type: msgType, 
+                };
+            })
+            : [];
+
+        const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
+        const lastTimestamp = lastMsg ? new Date(lastMsg.time).getTime() : Date.now();
+        
+        const lastCustomerMessage = [...messages].reverse().find(m => m.sender === 'them' && m.type !== 'internal');
+        
+        let isWindowOpen = false;
+        if (lastCustomerMessage) {
+            const msgDate = new Date(lastCustomerMessage.time);
+            if (!isNaN(msgDate.getTime())) {
+                isWindowOpen = differenceInHours(new Date(), msgDate) < 24;
+            }
+        }
+
+        let uiState: Conversation['state'] = 'Open';
+        if (apiData.status === 'closed') uiState = 'Resolved';
+        else if (apiData.status === 'pending') uiState = 'Pending';
+
+        let assignedToId = null;
+        if (typeof apiData.assignedTo === 'string') assignedToId = apiData.assignedTo;
+        else if (apiData.assignedTo && typeof apiData.assignedTo === 'object') assignedToId = apiData.assignedTo.id;
+
+        return {
+            id: apiData.id,
+            name: apiData.name || apiData.phone || 'Unknown Contact',
+            phone: apiData.phone || '',
+            avatar: apiData.avatar || `https://ui-avatars.com/api/?name=${apiData.name || 'U'}&background=random`,
+            messages: messages,
+            lastMessage: lastMsg?.text || '',
+            lastMessageTimestamp: lastTimestamp,
+            isWindowOpen: isWindowOpen,
+            assignedTo: assignedToId,
+            pinned: !!apiData.pinned,
+            unread: typeof apiData.unread === 'number' ? apiData.unread : 0,
+            state: uiState,
+        };
   }, []);
 
   const fetchConversations = React.useCallback(async () => {
@@ -976,7 +976,7 @@ export default function InboxPage() {
     } finally {
         setIsLoading(false);
     }
-  }, [toast, selectedId]); 
+  }, [toast, selectedId, normalizeConversation]); 
 
   // ✅ FIX: Stable Realtime Subscription
   React.useEffect(() => {
@@ -1194,6 +1194,7 @@ export default function InboxPage() {
             onSelect={handleSelectConversation}
             activeFilter={activeFilter}
             onSetFilter={setActiveFilter}
+            agents={agents} // ✅ Pass real agents down
           />
         </div>
         <div className="flex flex-[1_1_0%] min-w-0 flex-col h-full">
@@ -1205,6 +1206,7 @@ export default function InboxPage() {
               onSendMessage={handleSendMessage}
               onRetryMessage={handleRetryMessage}
               onAssignToMe={handleAssignToMe}
+              agents={agents} // ✅ Pass real agents down
             />
           ) : (
             <div className="flex h-full flex-col items-center justify-center bg-background p-4 text-center">

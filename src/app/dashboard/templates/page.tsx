@@ -11,6 +11,7 @@ import {
   XCircle,
   PlusCircle,
   Loader,
+  RefreshCw, // Added for Sync UI
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -37,6 +38,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { useToast } from '@/hooks/use-toast'; // Added for feedback
 
 // ✅ Define Type locally to match the API response exactly
 type Template = {
@@ -107,24 +109,53 @@ export default function TemplatesPage() {
   const [filteredTemplates, setFilteredTemplates] = React.useState<Template[]>([]);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [isLoading, setIsLoading] = React.useState(true);
+  const [isSyncing, setIsSyncing] = React.useState(false); // Added for Sync State
   const [selectedTemplate, setSelectedTemplate] = React.useState<Template | null>(null);
+  const { toast } = useToast(); // Added for notifications
+
+  // Function defined separately so it can be called after sync
+  async function fetchTemplates() {
+      setIsLoading(true);
+      try {
+          const response = await fetch('/api/templates');
+          if (!response.ok) {
+              throw new Error('Failed to fetch templates');
+          }
+          const data = await response.json();
+          setTemplates(data);
+      } catch (error) {
+          console.error(error);
+      } finally {
+          setIsLoading(false);
+      }
+  }
+
+  // ✅ NEW: Sync Function logic
+  const handleSyncWithMeta = async () => {
+    setIsSyncing(true);
+    try {
+      const res = await fetch('/api/templates/sync', { method: 'POST' });
+      if (!res.ok) throw new Error('Sync failed');
+      const result = await res.json();
+      
+      toast({
+        title: "Sync Successful",
+        description: `Updated ${result.count} templates from WhatsApp Manager.`,
+      });
+      
+      await fetchTemplates(); // Refresh the list automatically
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Sync Error",
+        description: error.message || "Could not connect to Meta API.",
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   React.useEffect(() => {
-    async function fetchTemplates() {
-        setIsLoading(true);
-        try {
-            const response = await fetch('/api/templates');
-            if (!response.ok) {
-                throw new Error('Failed to fetch templates');
-            }
-            const data = await response.json();
-            setTemplates(data);
-        } catch (error) {
-            console.error(error);
-        } finally {
-            setIsLoading(false);
-        }
-    }
     fetchTemplates();
   }, []);
 
@@ -144,10 +175,22 @@ export default function TemplatesPage() {
           <div>
             <h1 className="text-3xl font-bold">Message Templates</h1>
             <p className="text-muted-foreground">
-              A read-only view of templates synced from WhatsApp Business Manager.
+              Manage and sync templates from WhatsApp Business Manager.
             </p>
           </div>
           <div className="flex items-center gap-4">
+            {/* ✅ NEW: Sync Button added next to Create Template */}
+            <Button 
+                variant="outline" 
+                size="lg" 
+                className="rounded-full gap-2"
+                onClick={handleSyncWithMeta}
+                disabled={isSyncing}
+            >
+              {isSyncing ? <RefreshCw className="h-5 w-5 animate-spin" /> : <RefreshCw className="h-5 w-5" />}
+              Sync with Meta
+            </Button>
+
             <Tooltip>
               <TooltipTrigger asChild>
                 <div className="relative">

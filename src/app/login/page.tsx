@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@supabase/supabase-js'; // ✅ Import Supabase
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -15,7 +16,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { TravonexLogo } from '@/components/icons';
 import { useToast } from '@/hooks/use-toast';
-import { login } from '@/lib/auth';
+import { Loader2 } from 'lucide-react'; // ✅ Import Loader Icon
+
+// Initialize Supabase
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export default function LoginPage() {
   const router = useRouter();
@@ -29,21 +36,29 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const user = await login(email, password);
-      if (user) {
-        router.push('/dashboard');
-      } else {
-        toast({
-          variant: 'destructive',
-          title: 'Login Failed',
-          description: 'Invalid email or password.',
-        });
+      // ✅ REAL LOGIN CALL
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        throw error;
       }
-    } catch (error) {
+
+      // Success
+      toast({
+        title: 'Welcome back!',
+        description: 'Logging you in...',
+      });
+      router.push('/dashboard/inbox'); 
+      router.refresh(); 
+
+    } catch (error: any) {
       toast({
         variant: 'destructive',
-        title: 'An error occurred',
-        description: (error as Error).message,
+        title: 'Login Failed',
+        description: error.message || 'Invalid email or password.',
       });
     } finally {
       setIsLoading(false);
@@ -105,7 +120,14 @@ export default function LoginPage() {
               disabled={isLoading}
               suppressHydrationWarning={true}
             >
-              {isLoading ? 'Signing In...' : 'Sign In'}
+              {isLoading ? (
+                 <>
+                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                   Signing In...
+                 </>
+              ) : (
+                'Sign In'
+              )}
             </Button>
           </form>
         </CardContent>

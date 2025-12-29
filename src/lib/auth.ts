@@ -1,81 +1,47 @@
-// This is a mock authentication service.
-// In a real application, you would replace this with calls to your authentication provider (e.g., Firebase Auth).
+import { createClient } from '@supabase/supabase-js';
+
+// Initialize Supabase Client
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export type User = {
   id: string;
   name: string;
   email: string;
-  role: 'Super Admin' | 'Marketing' | 'Customer Support';
+  role: 'Super Admin' | 'Marketing' | 'Customer Support' | 'Internal Staff';
   avatar: string;
 };
 
-// Mock user data
-const mockUsers: User[] = [
-  {
-    id: '1',
-    name: 'Super Admin',
-    email: 'admin@travonex.com',
-    role: 'Super Admin',
-    avatar: 'https://picsum.photos/seed/8/80/80',
-  },
-  {
-    id: '2',
-    name: 'John Doe',
-    email: 'support@travonex.com',
-    role: 'Customer Support',
-    avatar: 'https://picsum.photos/seed/9/40/40',
-  },
-    {
-    id: '3',
-    name: 'Jane Appleseed',
-    email: 'marketing@travonex.com',
-    role: 'Marketing',
-    avatar: 'https://picsum.photos/seed/10/40/40',
-  }
-];
+// ✅ REAL AUTH: Fetches the logged-in user from Supabase
+export async function getCurrentUser(): Promise<User | null> {
+  // 1. Get the session (Is the browser logged in?)
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return null;
 
-export function getTeamMembers(): User[] {
-    return mockUsers;
+  // 2. Get their profile details (Name, Role) from the database
+  const { data: profile, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', session.user.id)
+    .single();
+
+  if (error) {
+      console.warn("Profile fetch error:", error.message);
+  }
+
+  // 3. Return the user object
+  return {
+    id: session.user.id,
+    name: profile?.full_name || session.user.email || 'User',
+    email: session.user.email || '',
+    avatar: profile?.avatar_url || `https://ui-avatars.com/api/?name=${profile?.full_name || 'U'}&background=random`,
+    role: profile?.role || 'Internal Staff',
+  };
 }
 
-export function login(email: string, password: string): Promise<User | null> {
-  return new Promise((resolve) => {
-    // Mock API delay
-    setTimeout(() => {
-      const user = mockUsers.find((u) => u.email === email);
-      // In a real app, you'd also check the password hash. Here we just check if user exists.
-      if (user) {
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('user', JSON.stringify(user));
-        }
-        resolve(user);
-      } else {
-        resolve(null);
-      }
-    }, 500);
-  });
-}
-
-export function logout(): Promise<void> {
-  return new Promise((resolve) => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('user');
-    }
-    resolve();
-  });
-}
-
-export function getCurrentUser(): User | null {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-  const userJson = localStorage.getItem('user');
-  if (userJson) {
-    try {
-      return JSON.parse(userJson);
-    } catch (e) {
-      return null;
-    }
-  }
-  return null;
+export async function logout() {
+  await supabase.auth.signOut();
+  window.location.href = '/login';
 }

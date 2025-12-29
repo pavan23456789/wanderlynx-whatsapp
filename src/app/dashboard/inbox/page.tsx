@@ -948,7 +948,12 @@ export default function InboxPage() {
   const { toast } = useToast();
   
   React.useEffect(() => {
-    setCurrentUser(getCurrentUser());
+    async function loadUser() {
+        // We must await because fetching from Supabase takes time
+        const user = await getCurrentUser(); 
+        setCurrentUser(user);
+    }
+    loadUser();
   }, []);
 
   const fetchConversations = React.useCallback(async () => {

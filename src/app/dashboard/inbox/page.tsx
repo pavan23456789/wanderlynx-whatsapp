@@ -1,6 +1,6 @@
 'use client';
 // 🔒 INBOX FIXED VERSION
-// Fixes: Navigation Snapping, Internal Note Database Error
+// Fixes: Internal Note Visibility (Saves to 'content' instead of 'body')
 
 import * as React from 'react';
 import {
@@ -59,7 +59,6 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 
-// Initialize Supabase Client
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -365,13 +364,9 @@ function ConversationRow({
   const isMe = lastVisibleMessage?.sender === 'me';
   
   const rawPreview = isMe ? `You: ${lastMsgText}` : lastMsgText;
-  
-  // ✅ FIXED: Strictly truncated to 12 chars
   const previewText = rawPreview.length > 12 
     ? `${rawPreview.slice(0, 12)}...` 
     : rawPreview;
-
-  const StateBadge = stateConfig[c.state];
 
   return (
     <div
@@ -677,7 +672,6 @@ function MessageBubble({
           isOutbound ? 'bg-secondary' : 'bg-[#E3F2FD]'
         )}
       >
-        {/* ✅ FIXED: Always show agent name for outbound messages */}
         {isOutbound && agent && (
           <div className="mb-1 text-[10px] font-bold text-primary/80 flex items-center gap-1">
              {agent.name}
@@ -910,6 +904,7 @@ export default function InboxPage() {
                 return {
                 id: m.id,
                 sender: sender,
+                // ✅ UPDATED: prioritize 'content' over 'body' for compatibility
                 text: m.content || m.body || '', 
                 time: m.created_at || new Date().toISOString(),
                 status: m.status ?? 'sent', 
@@ -956,7 +951,6 @@ export default function InboxPage() {
         };
   }, []);
 
-  // ✅ FIXED: Removed 'selectedId' from dependency array to prevent loops
   const fetchConversations = React.useCallback(async () => {
     if (conversations.length === 0) setIsLoading(true);
     try {
@@ -1006,7 +1000,6 @@ export default function InboxPage() {
     return sorted.filter((c) => c.state === activeFilter);
   }, [conversations, activeFilter]);
 
-  // ✅ FIXED: Only auto-select on very first load
   React.useEffect(() => {
     if (!selectedId && filteredConversations.length > 0) {
         setSelectedId(filteredConversations[0].id);
@@ -1066,7 +1059,6 @@ export default function InboxPage() {
      }
   };
   
-  // ✅ FIXED: Enhanced HandleSendMessage to double-save ID and catch errors explicitly
   const handleSendMessage = async (text: string, type: 'outbound' | 'internal', templateName?: string, templateVars?: string[]) => {
     if (!selectedId || !currentUser || !text.trim()) return;
     if (currentUser.role === 'Marketing') return;
@@ -1105,20 +1097,20 @@ export default function InboxPage() {
     
     try {
       if (type === 'internal') {
-         // ✅ FIXED: Double-save ID to ensure compatibility + add Status
+         // ✅ FIXED: Saving to 'content' ensures it is visible when fetched
          const { error } = await supabase.from('messages').insert({
             conversation_id: selectedId,
-            contact_id: selectedId, // Fallback safe
-            body: text, 
+            contact_id: selectedId, 
+            content: text, // Changed from 'body' to 'content'
+            body: text,    // Keeping 'body' as backup just in case
             type: 'internal',
             direction: 'internal',
             agent_id: currentUser.id,
-            status: 'sent' // ✅ Added required status
+            status: 'sent' 
          });
          
          if (error) {
              console.error("Internal Note Insert Error:", error);
-             // 🚨 THIS IS THE FIX: Show the REAL error in the toast
              throw new Error(error.message || "Database insert failed");
          }
       } else {
@@ -1164,7 +1156,6 @@ export default function InboxPage() {
            return c;
          })
        );
-      // ✅ UPDATED: Shows specific error message to help debug
       toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to send message.' });
     }
   };

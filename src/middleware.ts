@@ -4,20 +4,22 @@ import { createClient } from "@supabase/supabase-js";
 export async function middleware(req: any) {
   const url = req.nextUrl.pathname;
 
-  // 1. EXEMPTION: Allow the Partner API to bypass user authentication
-  // The route itself will check for the 'x-api-key' header later.
-  if (url.startsWith("/api/v1/messages/send")) {
+  // 1. ALWAYS ALLOW Partner API & Webhooks
+  if (url.startsWith("/api/v1/") || url.includes("webhook")) {
     return NextResponse.next();
   }
 
-  // 2. PROTECTION: Define which routes need a logged-in user
-  const protectedDashboardRoutes = ["/api/conversations", "/api/messages", "/api/contacts"];
-  
-  if (protectedDashboardRoutes.some((p) => url.startsWith(p))) {
-    const token = req.headers.get("authorization")?.replace("Bearer ", "");
+  // 2. ONLY PROTECT specific dashboard data APIs
+  const protectedPaths = ["/api/conversations", "/api/messages", "/api/contacts"];
+  if (protectedPaths.some(path => url.startsWith(path))) {
+    
+    // Get the token from headers
+    const authHeader = req.headers.get("authorization");
+    const token = authHeader?.replace("Bearer ", "");
 
     if (!token) {
-      return NextResponse.json({ error: "Unauthorized: No token" }, { status: 401 });
+      // If no token, return 401 but with a clear message for debugging
+      return NextResponse.json({ error: "No token found in request headers" }, { status: 401 });
     }
 
     const supabase = createClient(
@@ -25,11 +27,11 @@ export async function middleware(req: any) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    // Verify the user session token
-    const { data, error } = await supabase.auth.getUser(token);
+    // VITAL: Revalidate the user with Supabase
+    const { data: { user }, error } = await supabase.auth.getUser(token);
 
-    if (error || !data?.user) {
-      return NextResponse.json({ error: "Unauthorized: Invalid session" }, { status: 401 });
+    if (error || !user) {
+      return NextResponse.json({ error: "Session invalid or expired" }, { status: 401 });
     }
   }
 

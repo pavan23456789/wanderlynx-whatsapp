@@ -1,11 +1,12 @@
-// A simple file-based logger for persisting event and message data.
-// In a production environment, this should be replaced with a robust
-// logging service and a scalable database (e.g., Firestore, Cloud Logging).
+// 🔒 SECURE DATABASE LOGGER (A-Z FIX)
+// Replaced file-based system with Supabase to resolve Vercel ENOENT errors.
+import { createClient } from '@supabase/supabase-js';
 
-import * as fs from 'fs/promises';
-import * as path from 'path';
-
-const LOG_FILE_PATH = path.join(process.cwd(), 'logs', 'events.json');
+// Initialize Supabase with Service Role to bypass RLS for background logging
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export type LogEntry = {
   timestamp: string;
@@ -18,100 +19,84 @@ export type LogEntry = {
   error?: string;
 };
 
-type LogData = {
-  processedBookingIds: string[];
-  processedInvoiceIds: string[];
-  messageLog: LogEntry[];
-};
-
 /**
- * Ensures the log directory and file exist, and returns the log data.
- */
-async function getLogData(): Promise<LogData> {
-  try {
-    await fs.mkdir(path.dirname(LOG_FILE_PATH), { recursive: true });
-    const data = await fs.readFile(LOG_FILE_PATH, 'utf-8');
-    return JSON.parse(data);
-  } catch (error: any) {
-    if (error.code === 'ENOENT') {
-      // File doesn't exist, create it with default structure
-      const defaultData: LogData = {
-        processedBookingIds: [],
-        processedInvoiceIds: [],
-        messageLog: [],
-      };
-      await fs.writeFile(LOG_FILE_PATH, JSON.stringify(defaultData, null, 2));
-      return defaultData;
-    }
-    console.error('[Logger] Failed to read log file:', error);
-    // Return default structure in case of other errors
-    return {
-      processedBookingIds: [],
-      processedInvoiceIds: [],
-      messageLog: [],
-    };
-  }
-}
-
-/**
- * Writes the provided data to the log file.
- */
-async function writeLogData(data: LogData): Promise<void> {
-  try {
-    await fs.writeFile(LOG_FILE_PATH, JSON.stringify(data, null, 2));
-  } catch (error) {
-    console.error('[Logger] Failed to write to log file:', error);
-  }
-}
-
-/**
- * Checks if a bookingId has already been processed.
+ * Checks if a bookingId has already been processed in the database.
  */
 export async function hasProcessedBookingId(bookingId: string): Promise<boolean> {
-  const logs = await getLogData();
-  return logs.processedBookingIds.includes(bookingId);
+  const { data } = await supabase
+    .from('event_logs')
+    .select('id')
+    .eq('idempotencyKey', bookingId)
+    .eq('type', 'booking')
+    .eq('status', 'SUCCESS')
+    .maybeSingle();
+  
+  return !!data;
 }
 
 /**
- * Checks if an invoiceId has already been processed.
+ * Checks if an invoiceId has already been processed in the database.
  */
 export async function hasProcessedInvoiceId(invoiceId: string): Promise<boolean> {
-  const logs = await getLogData();
-  return logs.processedInvoiceIds.includes(invoiceId);
+  const { data } = await supabase
+    .from('event_logs')
+    .select('id')
+    .eq('idempotencyKey', invoiceId)
+    .eq('type', 'invoice')
+    .eq('status', 'SUCCESS')
+    .maybeSingle();
+
+  return !!data;
 }
 
 /**
- * Logs a message event and marks the corresponding ID as processed.
+ * Logs a message event to Supabase. 
+ * Replaces the old local file writing logic.
  */
 export async function logMessageEvent(logEntry: Omit<LogEntry, 'timestamp'>) {
-  const logs = await getLogData();
-  const newLog: LogEntry = {
-    timestamp: new Date().toISOString(),
-    ...logEntry,
-  };
-  logs.messageLog.unshift(newLog); // Add to the beginning of the array
+  try {
+    const newLog = {
+      timestamp: new Date().toISOString(),
+      ...logEntry,
+    };
 
-  // Only add the key if the message was sent successfully
-  if (logEntry.status === 'SUCCESS') {
-    if (logEntry.type === 'booking' && !logs.processedBookingIds.includes(logEntry.idempotencyKey)) {
-      logs.processedBookingIds.push(logEntry.idempotencyKey);
-    } else if (logEntry.type === 'invoice' && !logs.processedInvoiceIds.includes(logEntry.idempotencyKey)) {
-      logs.processedInvoiceIds.push(logEntry.idempotencyKey);
+    // 1. Insert the new log entry into the database
+    const { error } = await supabase.from('event_logs').insert(newLog);
+    if (error) throw error;
+
+    // 2. Housekeeping: Limit log size to 1000 entries (A-Z consistency)
+    // We only keep the most recent 1000 logs to keep queries fast.
+    const { data: oldestLogs } = await supabase
+      .from('event_logs')
+      .select('id')
+      .order('timestamp', { ascending: false })
+      .range(1000, 1010);
+
+    if (oldestLogs && oldestLogs.length > 0) {
+      const idsToDelete = oldestLogs.map(l => l.id);
+      await supabase.from('event_logs').delete().in('id', idsToDelete);
     }
-  }
 
-  // Limit log size to prevent the file from growing indefinitely
-  if (logs.messageLog.length > 1000) {
-    logs.messageLog = logs.messageLog.slice(0, 1000);
+  } catch (error: any) {
+    console.error('[Logger] Failed to save log to Supabase:', error.message);
   }
-
-  await writeLogData(logs);
 }
 
 /**
- * Retrieves the message logs.
+ * Retrieves the message logs for the Event Logs UI.
  */
 export async function getEventLogs(): Promise<LogEntry[]> {
-    const data = await getLogData();
-    return data.messageLog;
+  try {
+    const { data, error } = await supabase
+      .from('event_logs')
+      .select('*')
+      .order('timestamp', { ascending: false })
+      .limit(1000);
+
+    if (error) throw error;
+    return data || [];
+  } catch (error: any) {
+    console.error('[Logger] Failed to fetch logs:', error.message);
+    return [];
+  }
 }

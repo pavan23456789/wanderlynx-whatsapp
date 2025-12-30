@@ -2,6 +2,7 @@
 // 🔒 INBOX FIXED VERSION
 // Fixes: Internal Note Visibility (Saves to 'content' instead of 'body')
 // FIX: Applied authFetch to all API calls to resolve 401 Middleware errors
+// FIX: Added Notification Sound and Blue/White Bubble Colors
 
 import * as React from 'react';
 import {
@@ -33,7 +34,7 @@ import { cn } from '@/lib/utils';
 import { type Template as TemplateType } from '@/lib/data';
 import { User, getCurrentUser } from '@/lib/auth';
 import { createClient } from '@supabase/supabase-js'; 
-import { authFetch } from '@/utils/api-client'; // GEMINI FIX: Import authFetch
+import { authFetch } from '@/utils/api-client'; 
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -138,7 +139,6 @@ function TemplateDialog({
       async function fetchTemplates() {
         if(open) {
           try {
-              // GEMINI FIX: Replaced fetch with authFetch
               const res = await authFetch('/api/templates');
               if(res.ok) {
                   const data = await res.json();
@@ -661,6 +661,7 @@ function MessageBubble({
   onRetry: () => void;
 }) {
   const isOutbound = message.sender === 'me';
+  const isApiTool = message.text.startsWith('API Template:'); 
 
   return (
     <div
@@ -671,27 +672,30 @@ function MessageBubble({
     >
       <div
         className={cn(
-          'relative w-fit min-w-0 max-w-[75%] rounded-2xl px-3 py-2 shadow-sm',
-          isOutbound ? 'bg-secondary' : 'bg-[#E3F2FD]'
+          'relative w-fit min-w-0 max-w-[75%] rounded-2xl px-4 py-2 shadow-sm text-sm',
+          // FIX: Explicit colors for Blue (Me) and White (Them)
+          isOutbound 
+            ? 'bg-blue-600 text-white' 
+            : 'bg-white text-slate-800 border border-gray-200' 
         )}
       >
         {isOutbound && agent && (
-          <div className="mb-1 text-[10px] font-bold text-primary/80 flex items-center gap-1">
+          <div className="mb-1 text-[10px] font-bold opacity-80 flex items-center gap-1">
              {agent.name}
           </div>
         )}
         
-        <p className="min-w-0 whitespace-pre-wrap break-all">
+        <p className="min-w-0 whitespace-pre-wrap break-all leading-relaxed">
           {message.text}
         </p>
       </div>
-       <div className="mt-1 flex items-center justify-end gap-1.5 whitespace-nowrap px-1 text-[11px] text-muted-foreground/80">
+      
+       <div className="mt-1 flex items-center justify-end gap-1.5 whitespace-nowrap px-1 text-[10px] text-muted-foreground">
         {message.status === 'failed' && (
-            <>
-              <span className="font-semibold text-red-500">Failed</span>
-              <Button variant="link" size="sm" className="h-auto p-0 text-[11px] text-blue-500" onClick={onRetry}>Retry</Button>
-              <span className="mx-1">•</span>
-            </>
+           <>
+             <span className="font-semibold text-red-500">Failed</span>
+             <Button variant="link" size="sm" className="h-auto p-0 text-[10px] text-blue-500" onClick={onRetry}>Retry</Button>
+           </>
         )}
         <span suppressHydrationWarning>
         {isNaN(new Date(message.time).getTime()) ? '' : format(new Date(message.time), 'p')}
@@ -976,13 +980,34 @@ export default function InboxPage() {
     }
   }, [toast, normalizeConversation]); 
 
-  // Realtime Subscription
+  // --- NEW: NOTIFICATION SOUND FUNCTION ---
+  const playNotificationSound = () => {
+    try {
+      const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2343/2343-preview.mp3');
+      audio.volume = 0.5;
+      audio.play().catch(e => console.log("Audio play blocked (user interaction needed first)"));
+    } catch (e) {
+      console.error("Audio error", e);
+    }
+  };
+
+  // Realtime Subscription with Sound
   React.useEffect(() => {
     fetchConversations();
     const channel = supabase
       .channel('inbox-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
-           console.log('[Realtime] Message Event. Refreshing...');
+      // ✅ UPDATED: Listen for INSERT to trigger sound
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload: any) => {
+           console.log('[Realtime] New Message:', payload);
+           
+           // Play sound if message is Inbound OR API Tool
+           if (payload.new.direction === 'inbound' || payload.new.type === 'api_tool') {
+               playNotificationSound();
+           }
+           
+           fetchConversations();
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, () => {
            fetchConversations();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, () => {

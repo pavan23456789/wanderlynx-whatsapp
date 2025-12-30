@@ -1,38 +1,59 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { NextResponse, type NextRequest } from 'next/server'
 
-const PROTECTED_API = [
-  "/api/conversations",
-  "/api/messages",
-  "/api/send-message",
-  "/api/contacts",
-];
+export async function middleware(request: NextRequest) {
+  let response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  })
 
-export async function middleware(req: any) {
-  const url = req.nextUrl.pathname;
-
-  // Only protect these backend APIs
-  if (!PROTECTED_API.some((p) => url.startsWith(p))) {
-    return NextResponse.next();
-  }
-
-  // get auth token sent from frontend
-  const token = req.headers.get("authorization")?.replace("Bearer ", "");
-
-  if (!token) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const supabase = createClient(
+  const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, // Use ANON_KEY for auth verification
+    {
+      cookies: {
+        get(name: string) {
+          return request.cookies.get(name)?.value
+        },
+        set(name: string, value: string, options: CookieOptions) {
+          request.cookies.set({ name, value, ...options })
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          })
+          response.cookies.set({ name, value, ...options })
+        },
+        remove(name: string, options: CookieOptions) {
+          request.cookies.set({ name, value: '', ...options })
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          })
+          response.cookies.set({ name, value: '', ...options })
+        },
+      },
+    }
+  )
 
-  const { data } = await supabase.auth.getUser(token);
+  // This will refresh the session if it's expired
+  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!data?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Protect specific API routes
+  const protectedRoutes = ["/api/conversations", "/api/messages", "/api/contacts"]
+  const isProtected = protectedRoutes.some(p => request.nextUrl.pathname.startsWith(p))
+
+  if (isProtected && !user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  return NextResponse.next();
+  return response
+}
+
+export const config = {
+  matcher: [
+    '/api/:path*', // Only run middleware on API routes to save performance
+  ],
 }

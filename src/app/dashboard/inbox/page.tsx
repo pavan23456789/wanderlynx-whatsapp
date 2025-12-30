@@ -2,7 +2,7 @@
 // 🔒 INBOX FIXED VERSION
 // Fixes: Internal Note Visibility (Saves to 'content' instead of 'body')
 // FIX: Applied authFetch to all API calls to resolve 401 Middleware errors
-// FIX: Added Notification Sound and Blue/White Bubble Colors
+// FIX: Added Notification Sound and Sender Names (Bot vs Human) in Bubbles
 
 import * as React from 'react';
 import {
@@ -649,6 +649,7 @@ function MessagePanel({
   );
 }
 
+// ✅ FIXED MESSAGE BUBBLE WITH SENDER NAMES
 function MessageBubble({
   message,
   agent,
@@ -661,7 +662,22 @@ function MessageBubble({
   onRetry: () => void;
 }) {
   const isOutbound = message.sender === 'me';
-  const isApiTool = message.text.startsWith('API Template:'); 
+  
+  // 1. Detect if this is an automated API message
+  // We check the text content since the 'type' might be normalized to just 'outbound'
+  const isApiMessage = message.text.startsWith('API Template:');
+  
+  // 2. Determine the Name to Display
+  let senderName = null;
+  if (isOutbound) {
+      if (isApiMessage) {
+        senderName = "Travonex Bot 🤖"; // Custom name for the tool
+      } else if (agent) {
+        senderName = agent.name;        // Name of the logged-in user
+      } else {
+        senderName = "System";          // Fallback if no agent found
+      }
+  }
 
   return (
     <div
@@ -673,15 +689,16 @@ function MessageBubble({
       <div
         className={cn(
           'relative w-fit min-w-0 max-w-[75%] rounded-2xl px-4 py-2 shadow-sm text-sm',
-          // FIX: Explicit colors for Blue (Me) and White (Them)
+          // Blue for You/Bot, White for Customer
           isOutbound 
             ? 'bg-blue-600 text-white' 
             : 'bg-white text-slate-800 border border-gray-200' 
         )}
       >
-        {isOutbound && agent && (
-          <div className="mb-1 text-[10px] font-bold opacity-80 flex items-center gap-1">
-             {agent.name}
+        {/* 3. NAME LABEL - Renders the name right inside the bubble */}
+        {senderName && (
+          <div className="mb-1 text-[10px] font-bold opacity-90 flex items-center gap-1 uppercase tracking-wider text-blue-100">
+             {senderName}
           </div>
         )}
         
@@ -985,7 +1002,7 @@ export default function InboxPage() {
   const playNotificationSound = () => {
     // Standard "Pop" sound from Google's CDN (Fast & Reliable)
     const audio = new Audio('https://codeskulptor-demos.commondatastorage.googleapis.com/pang/pop.mp3');
-    audio.volume = 2.0; // Max volume
+    audio.volume = 1.0; // Max volume
     
     const playPromise = audio.play();
 

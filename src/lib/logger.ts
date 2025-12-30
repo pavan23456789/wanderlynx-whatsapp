@@ -21,12 +21,13 @@ export type LogEntry = {
 
 /**
  * Checks if a bookingId has already been processed in the database.
+ * Matches lowercase 'idempotency_key' from SQL schema.
  */
 export async function hasProcessedBookingId(bookingId: string): Promise<boolean> {
   const { data } = await supabase
     .from('event_logs')
     .select('id')
-    .eq('idempotency_key', bookingId) // Match SQL lowercase name
+    .eq('idempotency_key', bookingId) 
     .eq('type', 'booking')
     .eq('status', 'SUCCESS')
     .maybeSingle();
@@ -41,7 +42,7 @@ export async function hasProcessedInvoiceId(invoiceId: string): Promise<boolean>
   const { data } = await supabase
     .from('event_logs')
     .select('id')
-    .eq('idempotency_key', invoiceId) // Match SQL lowercase name
+    .eq('idempotency_key', invoiceId)
     .eq('type', 'invoice')
     .eq('status', 'SUCCESS')
     .maybeSingle();
@@ -51,19 +52,19 @@ export async function hasProcessedInvoiceId(invoiceId: string): Promise<boolean>
 
 /**
  * Logs a message event to Supabase. 
+ * Maps camelCase code variables to snake_case database columns.
  */
 export async function logMessageEvent(logEntry: Omit<LogEntry, 'timestamp'>) {
   try {
-    // We map the camelCase code variable to the snake_case database column
     const { error } = await supabase.from('event_logs').insert({
-      idempotency_key: logEntry.idempotencyKey,
+      idempotency_key: logEntry.idempotencyKey, // Map code variable to SQL column
       type: logEntry.type,
       status: logEntry.status,
       event: logEntry.event,
       recipient: logEntry.recipient,
       details: logEntry.details,
       error: logEntry.error,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     });
 
     if (error) throw error;
@@ -86,7 +87,7 @@ export async function logMessageEvent(logEntry: Omit<LogEntry, 'timestamp'>) {
 }
 
 /**
- * Retrieves the message logs for the Event Logs UI.
+ * Retrieves message logs for the Event Logs UI.
  */
 export async function getEventLogs(): Promise<LogEntry[]> {
   try {
@@ -98,7 +99,7 @@ export async function getEventLogs(): Promise<LogEntry[]> {
 
     if (error) throw error;
 
-    // Map back to camelCase for frontend compatibility if necessary
+    // Map database snake_case back to camelCase for the Frontend UI
     return (data || []).map(row => ({
       ...row,
       idempotencyKey: row.idempotency_key

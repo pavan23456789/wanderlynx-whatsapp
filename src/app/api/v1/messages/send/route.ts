@@ -1,21 +1,21 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { logMessageEvent } from '@/lib/logger'; // ✅ Ensure this import exists
 
-// Initialize Supabase with Service Role to bypass RLS for administrative logging
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
 const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN;
-const PHONE_ID = process.env.WHATSAPP_PHONE_NUMBER_ID; // Must be 935339339662475
+const PHONE_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const apiKey = req.headers.get('x-api-key');
 
-    // 1. VERIFY PARTNER API KEY
+    // 1. Verify Partner API Key
     const { data: keyData, error: keyError } = await supabase
       .from('api_keys')
       .select('business_id')
@@ -24,11 +24,10 @@ export async function POST(req: Request) {
       .single();
 
     if (keyError || !keyData) {
-      console.error("[Middleware] Blocked unauthorized API access attempt");
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // 2. BUILD META PAYLOAD (Template Message)
+    // 2. Build and Send Meta Payload
     const metaPayload = {
       messaging_product: "whatsapp",
       to: body.to,
@@ -39,7 +38,7 @@ export async function POST(req: Request) {
         components: [
           {
             type: "body",
-            parameters: body.variables.map((val: string) => ({
+            parameters: (body.variables || []).map((val: string) => ({
               type: "text",
               text: val
             }))
@@ -48,7 +47,6 @@ export async function POST(req: Request) {
       }
     };
 
-    // 3. SEND VIA META API
     const response = await fetch(
       `https://graph.facebook.com/v21.0/${PHONE_ID}/messages`,
       {
@@ -64,9 +62,19 @@ export async function POST(req: Request) {
     const result = await response.json();
     if (!response.ok) throw new Error(result.error?.message || "Meta API Error");
 
-    // --- TRACKER & DASHBOARD SYNC (A-Z FIX) ---
+    // --- NEW: SYNC TO DASHBOARD & TRACKER ---
     
-    // A. Find or Create Conversation so it appears in the Dashboard Inbox
+    // A. Technical Log (For 'Event Logs' page)
+    await logMessageEvent({
+      idempotencyKey: body.idempotencyKey || result.messages?.[0]?.id,
+      type: 'booking',
+      status: 'SUCCESS',
+      event: 'API Template Sent',
+      recipient: body.to,
+      details: { templateName: body.templateName, variables: body.variables }
+    });
+
+    // B. Find or Create Conversation (For 'Inbox' visibility)
     const { data: conv } = await supabase
       .from('conversations')
       .select('id')
@@ -76,8 +84,7 @@ export async function POST(req: Request) {
     let conversationId = conv?.id;
 
     if (!conversationId) {
-      // Create a new conversation if this is a first-time contact
-      const { data: newConv, error: convError } = await supabase
+      const { data: newConv } = await supabase
         .from('conversations')
         .insert({ 
             phone: body.to, 
@@ -87,33 +94,27 @@ export async function POST(req: Request) {
         })
         .select()
         .single();
-      
-      if (convError) throw new Error("Failed to create conversation entry");
       conversationId = newConv?.id;
     }
 
-    // B. Log to Database (The Tracker)
-    // Tagged with 'api_tool' to differentiate from manual dashboard messages
+    // C. Insert Message Bubble (For 'Inbox' and 'Usage Tracker')
+    // type: 'api_tool' allows the Tracker Card to count this message
     await supabase.from('messages').insert({
       conversation_id: conversationId,
-      content: `Template Sent: ${body.templateName}`, 
+      content: `API Template: ${body.templateName}`, 
       direction: 'outbound',
-      type: 'api_tool', // This is what the Usage Tracker UI filters for
+      type: 'api_tool', 
       status: 'sent',
       metadata: { 
         template: body.templateName, 
-        variables: body.variables,
         meta_id: result.messages?.[0]?.id 
       }
     });
 
-    // C. Update Conversation Timestamp
-    // This forces the chat to the top of the Inbox list for immediate visibility
+    // D. Update the Conversation list to show the new message at the top
     await supabase.from('conversations')
       .update({ last_message_at: new Date().toISOString() })
       .eq('id', conversationId);
-
-    // --- END TRACKER LOGIC ---
 
     return NextResponse.json({ 
         success: true, 

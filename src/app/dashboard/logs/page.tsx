@@ -29,6 +29,8 @@ import {
 import { formatDistanceToNow } from 'date-fns';
 import { getCurrentUser, User } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
+// GEMINI FIX: Added authFetch to pass Middleware 401 checks
+import { authFetch } from '@/utils/api-client';
 
 const statusConfig = {
   SUCCESS: {
@@ -57,37 +59,43 @@ export default function LogsPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [currentUser, setCurrentUser] = React.useState<User | null>(null);
 
+  // GEMINI FIX: Correctly handling the Async nature of getCurrentUser to solve "Access Restricted"
   React.useEffect(() => {
-    setCurrentUser(getCurrentUser());
-
-    const fetchLogs = async () => {
+    async function loadPageData() {
       setIsLoading(true);
       try {
-        const response = await fetch('/api/logs');
-        if (!response.ok) {
-          throw new Error('Failed to fetch logs');
+        // 1. Await the user data properly (Fixes image_c06076.png)
+        const user = await getCurrentUser();
+        setCurrentUser(user);
+
+        // 2. Only fetch logs if the user is verified as Super Admin
+        if (user?.role === 'Super Admin') {
+          const response = await authFetch('/api/logs'); // Use authFetch to fix 401
+          if (!response.ok) {
+            throw new Error('Failed to fetch logs from server');
+          }
+          const data = await response.json();
+          setLogs(data);
         }
-        const data = await response.json();
-        setLogs(data);
       } catch (err: any) {
         setError(err.message);
       } finally {
         setIsLoading(false);
       }
-    };
-
-    if (getCurrentUser()?.role === 'Super Admin') {
-        fetchLogs();
-    } else {
-        setIsLoading(false);
     }
+    
+    loadPageData();
   }, []);
 
   if (isLoading) {
-      return <div className="p-10 text-center">Loading...</div>
+      return <div className="p-10 text-center flex items-center justify-center gap-2">
+        <Lock className="animate-pulse h-5 w-5" />
+        Loading Event Logs...
+      </div>
   }
 
-  if (currentUser?.role !== 'Super Admin') {
+  // Final Guard: If data is loaded but user is still not Admin
+  if (!currentUser || currentUser.role !== 'Super Admin') {
       return (
         <main className="flex flex-1 flex-col items-center justify-center gap-6 p-6 md:gap-8 md:p-10 text-center">
             <Lock className="h-16 w-16 text-muted-foreground" />
@@ -101,7 +109,6 @@ export default function LogsPage() {
         </main>
       )
   }
-
 
   return (
     <main className="flex flex-1 flex-col gap-6 p-6 md:gap-8 md:p-10">
@@ -138,7 +145,7 @@ export default function LogsPage() {
                 </TableHeader>
                 <TableBody>
                     {logs.length > 0 ? logs.map((log, index) => {
-                        const config = statusConfig[log.status];
+                        const config = statusConfig[log.status as keyof typeof statusConfig];
                         const Icon = config.icon;
                         return (
                             <TableRow key={index}>

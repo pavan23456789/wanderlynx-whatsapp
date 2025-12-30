@@ -26,7 +26,7 @@ export async function hasProcessedBookingId(bookingId: string): Promise<boolean>
   const { data } = await supabase
     .from('event_logs')
     .select('id')
-    .eq('idempotencyKey', bookingId)
+    .eq('idempotency_key', bookingId) // Match SQL lowercase name
     .eq('type', 'booking')
     .eq('status', 'SUCCESS')
     .maybeSingle();
@@ -41,7 +41,7 @@ export async function hasProcessedInvoiceId(invoiceId: string): Promise<boolean>
   const { data } = await supabase
     .from('event_logs')
     .select('id')
-    .eq('idempotencyKey', invoiceId)
+    .eq('idempotency_key', invoiceId) // Match SQL lowercase name
     .eq('type', 'invoice')
     .eq('status', 'SUCCESS')
     .maybeSingle();
@@ -51,21 +51,24 @@ export async function hasProcessedInvoiceId(invoiceId: string): Promise<boolean>
 
 /**
  * Logs a message event to Supabase. 
- * Replaces the old local file writing logic.
  */
 export async function logMessageEvent(logEntry: Omit<LogEntry, 'timestamp'>) {
   try {
-    const newLog = {
+    // We map the camelCase code variable to the snake_case database column
+    const { error } = await supabase.from('event_logs').insert({
+      idempotency_key: logEntry.idempotencyKey,
+      type: logEntry.type,
+      status: logEntry.status,
+      event: logEntry.event,
+      recipient: logEntry.recipient,
+      details: logEntry.details,
+      error: logEntry.error,
       timestamp: new Date().toISOString(),
-      ...logEntry,
-    };
+    });
 
-    // 1. Insert the new log entry into the database
-    const { error } = await supabase.from('event_logs').insert(newLog);
     if (error) throw error;
 
-    // 2. Housekeeping: Limit log size to 1000 entries (A-Z consistency)
-    // We only keep the most recent 1000 logs to keep queries fast.
+    // Housekeeping: Limit log size to 1000 entries
     const { data: oldestLogs } = await supabase
       .from('event_logs')
       .select('id')
@@ -94,7 +97,12 @@ export async function getEventLogs(): Promise<LogEntry[]> {
       .limit(1000);
 
     if (error) throw error;
-    return data || [];
+
+    // Map back to camelCase for frontend compatibility if necessary
+    return (data || []).map(row => ({
+      ...row,
+      idempotencyKey: row.idempotency_key
+    }));
   } catch (error: any) {
     console.error('[Logger] Failed to fetch logs:', error.message);
     return [];

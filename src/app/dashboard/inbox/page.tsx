@@ -1,6 +1,7 @@
 'use client';
 // 🔒 INBOX FIXED VERSION
 // Fixes: Internal Note Visibility (Saves to 'content' instead of 'body')
+// FIX: Applied authFetch to all API calls to resolve 401 Middleware errors
 
 import * as React from 'react';
 import {
@@ -32,7 +33,7 @@ import { cn } from '@/lib/utils';
 import { type Template as TemplateType } from '@/lib/data';
 import { User, getCurrentUser } from '@/lib/auth';
 import { createClient } from '@supabase/supabase-js'; 
-import { authFetch } from '@/utils/api-client';
+import { authFetch } from '@/utils/api-client'; // GEMINI FIX: Import authFetch
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -137,7 +138,8 @@ function TemplateDialog({
       async function fetchTemplates() {
         if(open) {
           try {
-              const res = await fetch('/api/templates');
+              // GEMINI FIX: Replaced fetch with authFetch
+              const res = await authFetch('/api/templates');
               if(res.ok) {
                   const data = await res.json();
                   setTemplates(data);
@@ -955,6 +957,7 @@ export default function InboxPage() {
   const fetchConversations = React.useCallback(async () => {
     if (conversations.length === 0) setIsLoading(true);
     try {
+        // GEMINI FIX: Replaced fetch with authFetch
         const res = await authFetch('/api/conversations');
         if (!res.ok) throw new Error('Failed to fetch conversations');
         const raw = await res.json();
@@ -1010,9 +1013,9 @@ export default function InboxPage() {
   const handleSelectConversation = (conversationId: string) => {
     setSelectedId(conversationId);
     
-    fetch('/api/conversations/update', {
+    // GEMINI FIX: Applied authFetch for status updates
+    authFetch('/api/conversations/update', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'unread', conversationId })
     });
 
@@ -1030,9 +1033,9 @@ export default function InboxPage() {
       )
     );
     try {
-        const res = await fetch('/api/conversations/update', {
+        // GEMINI FIX: Applied authFetch for state updates
+        const res = await authFetch('/api/conversations/update', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'status', conversationId, value: state })
         });
         if (!res.ok) throw new Error("Failed to sync state");
@@ -1046,9 +1049,9 @@ export default function InboxPage() {
      if (!selectedId || !currentUser) return;
      setConversations(prev => prev.map(c => c.id === selectedId ? { ...c, assignedTo: currentUser.id } : c));
      
-     const res = await fetch('/api/conversations/update', {
+     // GEMINI FIX: Applied authFetch for assignment
+     const res = await authFetch('/api/conversations/update', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'assign', conversationId: selectedId, value: currentUser.id })
      });
 
@@ -1098,8 +1101,8 @@ export default function InboxPage() {
     
     try {
       if (type === 'internal') {
-         // ✅ FIXED: Saving to 'content' ensures it is visible when fetched
-         const { error } = await supabase.from('messages').insert({
+          // ✅ FIXED: Saving to 'content' ensures it is visible when fetched
+          const { error } = await supabase.from('messages').insert({
             conversation_id: selectedId,
             contact_id: selectedId, 
             content: text, // Changed from 'body' to 'content'
@@ -1108,26 +1111,26 @@ export default function InboxPage() {
             direction: 'internal',
             agent_id: currentUser.id,
             status: 'sent' 
-         });
-         
-         if (error) {
-             console.error("Internal Note Insert Error:", error);
-             throw new Error(error.message || "Database insert failed");
-         }
+          });
+          
+          if (error) {
+              console.error("Internal Note Insert Error:", error);
+              throw new Error(error.message || "Database insert failed");
+          }
       } else {
-         const isWindowOpen = conversations.find(c => c.id === selectedId)?.isWindowOpen ?? false;
-         const endpoint = '/api/messages/send';
-         const body = isWindowOpen 
+          const isWindowOpen = conversations.find(c => c.id === selectedId)?.isWindowOpen ?? false;
+          const endpoint = '/api/messages/send';
+          const body = isWindowOpen 
             ? { contactId: selectedId, text } 
             : { contactId: selectedId, templateName, params: templateVars };
 
-         const response = await fetch(endpoint, {
+          // GEMINI FIX: Applied authFetch for sending logic
+          const response = await authFetch(endpoint, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body)
-         });
-         
-         if (!response.ok) throw new Error('Failed to send message via API');
+          });
+          
+          if (!response.ok) throw new Error('Failed to send message via API');
       }
       
       // Update Status to Sent on success

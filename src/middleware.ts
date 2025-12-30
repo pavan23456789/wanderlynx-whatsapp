@@ -1,59 +1,49 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
-import { NextResponse, type NextRequest } from 'next/server'
+import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
-export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  })
+// 1. Routes that need a LOGGED-IN USER (Dashboard)
+const PROTECTED_DASHBOARD_API = [
+  "/api/conversations",
+  "/api/messages",
+  "/api/contacts",
+];
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, // Use ANON_KEY for auth verification
-    {
-      cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          request.cookies.set({ name, value, ...options })
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          })
-          response.cookies.set({ name, value, ...options })
-        },
-        remove(name: string, options: CookieOptions) {
-          request.cookies.set({ name, value: '', ...options })
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          })
-          response.cookies.set({ name, value: '', ...options })
-        },
-      },
-    }
-  )
+// 2. Routes that are PUBLIC or use API KEYS (Partner API)
+const PUBLIC_OR_KEY_API = [
+  "/api/v1/messages/send",
+];
 
-  // This will refresh the session if it's expired
-  const { data: { user } } = await supabase.auth.getUser()
+export async function middleware(req: any) {
+  const url = req.nextUrl.pathname;
 
-  // Protect specific API routes
-  const protectedRoutes = ["/api/conversations", "/api/messages", "/api/contacts"]
-  const isProtected = protectedRoutes.some(p => request.nextUrl.pathname.startsWith(p))
-
-  if (isProtected && !user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  // STEP A: Allow Partner API to bypass User Auth
+  if (PUBLIC_OR_KEY_API.some((p) => url.startsWith(p))) {
+    return NextResponse.next(); 
+    // We don't check for a User here because the API route 
+    // itself will check the 'x-api-key' header later.
   }
 
-  return response
-}
+  // STEP B: Only run User Auth for Dashboard APIs
+  if (!PROTECTED_DASHBOARD_API.some((p) => url.startsWith(p))) {
+    return NextResponse.next();
+  }
 
-export const config = {
-  matcher: [
-    '/api/:path*', // Only run middleware on API routes to save performance
-  ],
+  // STEP C: Check for User Token (Dashboard only)
+  const token = req.headers.get("authorization")?.replace("Bearer ", "");
+  if (!token) {
+    return NextResponse.json({ error: "Unauthorized: No token" }, { status: 401 });
+  }
+
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  const { data, error } = await supabase.auth.getUser(token);
+
+  if (error || !data?.user) {
+    return NextResponse.json({ error: "Unauthorized: Invalid User" }, { status: 401 });
+  }
+
+  return NextResponse.next();
 }

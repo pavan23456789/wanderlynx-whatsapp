@@ -32,6 +32,7 @@ import { cn } from '@/lib/utils';
 import { type Template as TemplateType } from '@/lib/data';
 import { User, getCurrentUser } from '@/lib/auth';
 import { createClient } from '@supabase/supabase-js'; 
+import { authFetch } from '@/utils/api-client';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -954,7 +955,7 @@ export default function InboxPage() {
   const fetchConversations = React.useCallback(async () => {
     if (conversations.length === 0) setIsLoading(true);
     try {
-        const res = await fetch('/api/conversations');
+        const res = await authFetch('/api/conversations');
         if (!res.ok) throw new Error('Failed to fetch conversations');
         const raw = await res.json();
         const rawList = Array.isArray(raw?.conversations) ? raw.conversations : [];

@@ -1,6 +1,6 @@
 'use client';
 // ⚠️ GLOBAL LAYOUT CONTRACT
-// Fixed: Handles Async Auth correctly to prevent "charAt" crashes.
+// Fixed: Handles Async Auth correctly and resolves TypeScript "badge" errors.
 
 import * as React from 'react';
 import Link from 'next/link';
@@ -15,7 +15,7 @@ import {
   LogOut,
   History,
   Menu,
-  Loader2 // Added Loader icon
+  Loader2 
 } from 'lucide-react';
 
 import {
@@ -40,15 +40,24 @@ import { Button } from '@/components/ui/button';
 import { logout, getCurrentUser, User } from '@/lib/auth';
 import { Separator } from '@/components/ui/separator';
 
-const menuItems = [
+// ✅ FIX: Define the type to allow 'badge' to be optional
+type MenuItem = {
+  href: string;
+  label: string;
+  icon: any;
+  roles: string[];
+  badge?: string | number; // This line fixes the TS error
+};
+
+const menuItems: MenuItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['Super Admin', 'Marketing', 'Customer Support'] },
-  { href: '/dashboard/inbox', label: 'Inbox', icon: MessageSquare, roles: ['Super Admin', 'Marketing', 'Customer Support'], badge: '12' },
+  { href: '/dashboard/inbox', label: 'Inbox', icon: MessageSquare, roles: ['Super Admin', 'Marketing', 'Customer Support'] },
   { href: '/dashboard/contacts', label: 'Contacts', icon: Users, roles: ['Super Admin', 'Marketing', 'Customer Support'] },
   { href: '/dashboard/campaigns', label: 'Campaigns', icon: Send, roles: ['Super Admin', 'Marketing'] },
   { href: '/dashboard/templates', label: 'Templates', icon: ScrollText, roles: ['Super Admin', 'Marketing', 'Customer Support'] },
 ];
 
-const adminMenuItems = [
+const adminMenuItems: MenuItem[] = [
   { href: '/dashboard/logs', label: 'Event Logs', icon: History, roles: ['Super Admin'] },
   { href: '/dashboard/settings', label: 'Settings', icon: Settings, roles: ['Super Admin'] },
 ];
@@ -63,11 +72,10 @@ export default function DashboardLayout({
   const [user, setUser] = React.useState<User | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
 
-  // ✅ FIX: Use async/await to handle the real database response
   React.useEffect(() => {
     async function checkAuth() {
         try {
-            const currentUser = await getCurrentUser(); // Wait for Supabase
+            const currentUser = await getCurrentUser(); 
             if (!currentUser) {
                 router.push('/login');
             } else {
@@ -112,7 +120,6 @@ export default function DashboardLayout({
 
   return (
     <SidebarProvider>
-      {/* 🔑 THIS WRAPPER FIXES ALL SHRINKING ISSUES */}
       <div className="flex h-screen w-full min-w-0 overflow-hidden">
 
         {/* SIDEBAR (fixed width, never shrinks) */}
@@ -135,6 +142,7 @@ export default function DashboardLayout({
                     >
                       <item.icon />
                       <span>{item.label}</span>
+                      {/* Now safe because we defined the optional type above */}
                       {item.badge && (
                         <SidebarMenuBadge>{item.badge}</SidebarMenuBadge>
                       )}
@@ -171,7 +179,6 @@ export default function DashboardLayout({
             <div className="flex items-center gap-3 rounded-2xl p-2 bg-secondary/50">
               <Avatar className="h-11 w-11 border">
                 <AvatarImage src={user.avatar} alt={user.name} />
-                {/* ✅ SAFE FALLBACK: Prevents crash if name is loading/empty */}
                 <AvatarFallback>{user.name?.[0] || 'U'}</AvatarFallback>
               </Avatar>
               <div className="flex-1 overflow-hidden">
@@ -192,7 +199,7 @@ export default function DashboardLayout({
           </SidebarFooter>
         </Sidebar>
 
-        {/* MAIN CONTENT (can shrink safely now) */}
+        {/* MAIN CONTENT */}
         <SidebarInset className="flex min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-10 flex h-14 items-center justify-between gap-4 border-b bg-background/80 px-4 backdrop-blur-sm md:hidden">
             <div className="flex items-center gap-2">

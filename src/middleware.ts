@@ -1,38 +1,33 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 
-export async function middleware(req: any) {
-  const url = req.nextUrl.pathname;
+export function middleware(req: any) {
+  const pathname = req.nextUrl.pathname;
 
-  // 1. ALWAYS ALLOW Partner API & Webhooks
-  if (url.startsWith("/api/v1/") || url.includes("webhook")) {
+  // 1. ALWAYS allow the Partner API (v1) to pass the middleware
+  // The code inside the route will check the 'x-api-key' later.
+  if (pathname.startsWith("/api/v1/")) {
     return NextResponse.next();
   }
 
-  // 2. ONLY PROTECT specific dashboard data APIs
-  const protectedPaths = ["/api/conversations", "/api/messages", "/api/contacts"];
-  if (protectedPaths.some(path => url.startsWith(path))) {
+  // 2. Protect all other internal dashboard APIs
+  if (pathname.startsWith("/api/")) {
     
-    // Get the token from headers
-    const authHeader = req.headers.get("authorization");
-    const token = authHeader?.replace("Bearer ", "");
-
-    if (!token) {
-      // If no token, return 401 but with a clear message for debugging
-      return NextResponse.json({ error: "No token found in request headers" }, { status: 401 });
-    }
-
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    // Check for a Supabase auth cookie (Used by your browser/dashboard)
+    const hasSessionCookie = req.cookies.getAll().some((cookie: any) => 
+      cookie.name.includes("auth-token") || cookie.name.startsWith("sb-")
     );
 
-    // VITAL: Revalidate the user with Supabase
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+    // Check for an Authorization header (Used by Postman/authFetch)
+    const hasAuthHeader = req.headers.get("authorization");
 
-    if (error || !user) {
-      return NextResponse.json({ error: "Session invalid or expired" }, { status: 401 });
+    // If we have either one, let the request through
+    if (hasSessionCookie || hasAuthHeader) {
+      return NextResponse.next();
     }
+
+    // Otherwise, block the request
+    console.log(`[Middleware] Blocked unauthorized access to: ${pathname}`);
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   return NextResponse.next();

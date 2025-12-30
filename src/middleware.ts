@@ -3,13 +3,19 @@ import { NextResponse } from "next/server";
 export function middleware(req: any) {
   const pathname = req.nextUrl.pathname;
 
-  // 1. ALWAYS allow the Partner API (v1) to pass the middleware
+  // 1. ALLOW WhatsApp Webhook (Exempt from all checks to allow incoming messages)
+  // Incoming messages from Meta/WhatsApp do not have cookies or your auth tokens.
+  if (pathname.startsWith("/api/whatsapp/webhook")) {
+    return NextResponse.next();
+  }
+
+  // 2. ALWAYS allow the Partner API (v1) to pass the middleware
   // The code inside the route will check the 'x-api-key' later.
   if (pathname.startsWith("/api/v1/")) {
     return NextResponse.next();
   }
 
-  // 2. Protect all other internal dashboard APIs
+  // 3. Protect all other internal dashboard APIs
   if (pathname.startsWith("/api/")) {
     
     // Check for a Supabase auth cookie (Used by your browser/dashboard)

@@ -46,8 +46,7 @@ export async function POST(req: Request) {
       }
     };
 
-    // 3. Send via Phone ID Endpoint
-    // ERROR FIX: We use PHONE_ID here, not Business ID
+    // 3. Send via Meta API
     const response = await fetch(
       `https://graph.facebook.com/v21.0/${PHONE_ID}/messages`,
       {
@@ -63,7 +62,58 @@ export async function POST(req: Request) {
     const result = await response.json();
     if (!response.ok) throw new Error(result.error?.message || "Meta API Error");
 
-    return NextResponse.json({ success: true, meta_id: result.messages?.[0]?.id });
+    // --- NEW: TRACKER & DASHBOARD SYNC ---
+    
+    // A. Find or Create Conversation so it appears in the Inbox
+    const { data: conv } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('phone', body.to)
+      .single();
+
+    let conversationId = conv?.id;
+
+    if (!conversationId) {
+      const { data: newConv } = await supabase
+        .from('conversations')
+        .insert({ 
+            phone: body.to, 
+            name: body.to, 
+            status: 'open',
+            last_message_at: new Date().toISOString() 
+        })
+        .select()
+        .single();
+      conversationId = newConv?.id;
+    }
+
+    // B. Log the outbound message to the database (The Tracker)
+    // type: 'api_tool' allows you to filter these in your Usage Tracker UI
+    await supabase.from('messages').insert({
+      conversation_id: conversationId,
+      content: `Template: ${body.templateName}`, 
+      direction: 'outbound',
+      type: 'api_tool', 
+      status: 'sent',
+      metadata: { 
+        template: body.templateName, 
+        variables: body.variables,
+        meta_id: result.messages?.[0]?.id 
+      }
+    });
+
+    // C. Update the conversation timestamp to bump it to the top of the Inbox
+    await supabase.from('conversations')
+      .update({ last_message_at: new Date().toISOString() })
+      .eq('id', conversationId);
+
+    // --- END TRACKER LOGIC ---
+
+    return NextResponse.json({ 
+        success: true, 
+        meta_id: result.messages?.[0]?.id,
+        tracked: true 
+    });
 
   } catch (error: any) {
     console.error("[API Error]:", error.message);

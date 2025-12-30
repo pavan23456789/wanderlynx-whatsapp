@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+// Initialize Supabase with Service Role to bypass RLS for administrative logging
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -14,7 +15,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     const apiKey = req.headers.get('x-api-key');
 
-    // 1. Verify Partner API Key
+    // 1. VERIFY PARTNER API KEY
     const { data: keyData, error: keyError } = await supabase
       .from('api_keys')
       .select('business_id')
@@ -23,10 +24,11 @@ export async function POST(req: Request) {
       .single();
 
     if (keyError || !keyData) {
+      console.error("[Middleware] Blocked unauthorized API access attempt");
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // 2. Build Meta Payload
+    // 2. BUILD META PAYLOAD (Template Message)
     const metaPayload = {
       messaging_product: "whatsapp",
       to: body.to,
@@ -46,7 +48,7 @@ export async function POST(req: Request) {
       }
     };
 
-    // 3. Send via Meta API
+    // 3. SEND VIA META API
     const response = await fetch(
       `https://graph.facebook.com/v21.0/${PHONE_ID}/messages`,
       {
@@ -62,19 +64,20 @@ export async function POST(req: Request) {
     const result = await response.json();
     if (!response.ok) throw new Error(result.error?.message || "Meta API Error");
 
-    // --- NEW: TRACKER & DASHBOARD SYNC ---
+    // --- TRACKER & DASHBOARD SYNC (A-Z FIX) ---
     
-    // A. Find or Create Conversation so it appears in the Inbox
+    // A. Find or Create Conversation so it appears in the Dashboard Inbox
     const { data: conv } = await supabase
       .from('conversations')
       .select('id')
       .eq('phone', body.to)
-      .single();
+      .maybeSingle();
 
     let conversationId = conv?.id;
 
     if (!conversationId) {
-      const { data: newConv } = await supabase
+      // Create a new conversation if this is a first-time contact
+      const { data: newConv, error: convError } = await supabase
         .from('conversations')
         .insert({ 
             phone: body.to, 
@@ -84,16 +87,18 @@ export async function POST(req: Request) {
         })
         .select()
         .single();
+      
+      if (convError) throw new Error("Failed to create conversation entry");
       conversationId = newConv?.id;
     }
 
-    // B. Log the outbound message to the database (The Tracker)
-    // type: 'api_tool' allows you to filter these in your Usage Tracker UI
+    // B. Log to Database (The Tracker)
+    // Tagged with 'api_tool' to differentiate from manual dashboard messages
     await supabase.from('messages').insert({
       conversation_id: conversationId,
-      content: `Template: ${body.templateName}`, 
+      content: `Template Sent: ${body.templateName}`, 
       direction: 'outbound',
-      type: 'api_tool', 
+      type: 'api_tool', // This is what the Usage Tracker UI filters for
       status: 'sent',
       metadata: { 
         template: body.templateName, 
@@ -102,7 +107,8 @@ export async function POST(req: Request) {
       }
     });
 
-    // C. Update the conversation timestamp to bump it to the top of the Inbox
+    // C. Update Conversation Timestamp
+    // This forces the chat to the top of the Inbox list for immediate visibility
     await supabase.from('conversations')
       .update({ last_message_at: new Date().toISOString() })
       .eq('id', conversationId);

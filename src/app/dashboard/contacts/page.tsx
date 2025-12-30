@@ -53,6 +53,8 @@ import {
   TooltipContent,
 } from '@/components/ui/tooltip';
 import { getCurrentUser, User } from '@/lib/auth';
+// --- GEMINI CUSTOM COMMENT: Added authFetch to fix 401 Middleware errors ---
+import { authFetch } from '@/utils/api-client';
 
 // --- COMPONENTS ---
 
@@ -254,14 +256,20 @@ export default function ContactsPage() {
   const { toast } = useToast();
   const [currentUser, setCurrentUser] = React.useState<User | null>(null);
 
+  // --- GEMINI CUSTOM COMMENT: Fixed ts(2345) by awaiting getCurrentUser() correctly ---
   React.useEffect(() => {
-    setCurrentUser(getCurrentUser());
+    async function loadUser() {
+        const user = await getCurrentUser();
+        setCurrentUser(user);
+    }
+    loadUser();
   }, []);
 
   const fetchContacts = React.useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('/api/contacts');
+      // --- GEMINI CUSTOM COMMENT: Swapped fetch for authFetch to fix 401 error ---
+      const response = await authFetch('/api/contacts');
       if (!response.ok) throw new Error('Failed to fetch contacts');
       const data = await response.json();
       setContacts(data);
@@ -288,9 +296,9 @@ export default function ContactsPage() {
 
   const handleSaveContact = async (contactData: Partial<Contact>, isUpdate: boolean) => {
     try {
-      const response = await fetch('/api/contacts', {
+      // --- GEMINI CUSTOM COMMENT: Swapped fetch for authFetch here as well ---
+      const response = await authFetch('/api/contacts', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contact: contactData, isUpdate }),
       });
       if (!response.ok) {

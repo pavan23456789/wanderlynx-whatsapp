@@ -981,13 +981,22 @@ export default function InboxPage() {
   }, [toast, normalizeConversation]); 
 
   // --- NEW: NOTIFICATION SOUND FUNCTION ---
+  // --- UPDATED SOUND FUNCTION ---
   const playNotificationSound = () => {
-    try {
-      const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2343/2343-preview.mp3');
-      audio.volume = 0.5;
-      audio.play().catch(e => console.log("Audio play blocked (user interaction needed first)"));
-    } catch (e) {
-      console.error("Audio error", e);
+    // Standard "Pop" sound from Google's CDN (Fast & Reliable)
+    const audio = new Audio('https://codeskulptor-demos.commondatastorage.googleapis.com/pang/pop.mp3');
+    audio.volume = 2.0; // Max volume
+    
+    const playPromise = audio.play();
+
+    if (playPromise !== undefined) {
+      playPromise
+        .then(() => {
+          console.log("Audio played successfully!");
+        })
+        .catch((error) => {
+          console.warn("Audio blocked. User must click on the page first.", error);
+        });
     }
   };
 

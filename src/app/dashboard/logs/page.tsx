@@ -25,11 +25,17 @@ import {
   SkipForward,
   AlertTriangle,
   Lock,
+  Zap,
+  BarChart3,
+  RefreshCcw,
+  Search
 } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, format } from 'date-fns';
 import { getCurrentUser, User } from '@/lib/auth';
+import { cn } from "@/lib/utils";
 import { Button } from '@/components/ui/button';
-// GEMINI FIX: Added authFetch to pass Middleware 401 checks
+import { Input } from '@/components/ui/input';
+// GEMINI FIX: Import authFetch to pass Middleware 401 checks
 import { authFetch } from '@/utils/api-client';
 
 const statusConfig = {
@@ -58,52 +64,68 @@ export default function LogsPage() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [currentUser, setCurrentUser] = React.useState<User | null>(null);
+  const [searchTerm, setSearchTerm] = React.useState('');
+  
+  // USAGE TRACKER STATE (NEW A-Z FIX)
+  const [apiStats, setApiStats] = React.useState({ total: 0, last24h: 0 });
 
-  // GEMINI FIX: Correctly handling the Async nature of getCurrentUser to solve "Access Restricted"
-  React.useEffect(() => {
-    async function loadPageData() {
-      setIsLoading(true);
-      try {
-        // 1. Await the user data properly (Fixes image_c06076.png)
-        const user = await getCurrentUser();
-        setCurrentUser(user);
+  const loadPageData = React.useCallback(async () => {
+    setIsLoading(true);
+    try {
+      // 1. Await the user data properly (Fixes image_c06076.png)
+      const user = await getCurrentUser();
+      setCurrentUser(user);
 
-        // 2. Only fetch logs if the user is verified as Super Admin
-        if (user?.role === 'Super Admin') {
-          const response = await authFetch('/api/logs'); // Use authFetch to fix 401
-          if (!response.ok) {
-            throw new Error('Failed to fetch logs from server');
-          }
-          const data = await response.json();
-          setLogs(data);
+      // 2. Only fetch data if the user is verified as Super Admin
+      if (user?.role === 'Super Admin') {
+        // Fetch standard logs
+        const response = await authFetch('/api/logs'); 
+        if (!response.ok) throw new Error('Failed to fetch logs');
+        const data = await response.json();
+        setLogs(data);
+
+        // Fetch Usage Tracker stats for the cards
+        const statsRes = await authFetch('/api/stats/usage');
+        if (statsRes.ok) {
+          const stats = await statsRes.json();
+          setApiStats(stats);
         }
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setIsLoading(false);
       }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
     }
-    
-    loadPageData();
   }, []);
 
+  React.useEffect(() => {
+    loadPageData();
+  }, [loadPageData]);
+
+  // Filtering Logic for large datasets
+  const filteredLogs = logs.filter(log => 
+    log.recipient?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    log.event?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   if (isLoading) {
-      return <div className="p-10 text-center flex items-center justify-center gap-2">
-        <Lock className="animate-pulse h-5 w-5" />
-        Loading Event Logs...
-      </div>
+      return (
+        <div className="flex h-screen items-center justify-center flex-col gap-4">
+          <RefreshCcw className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground animate-pulse">Synchronizing Logs & Usage Tracker...</p>
+        </div>
+      );
   }
 
-  // Final Guard: If data is loaded but user is still not Admin
   if (!currentUser || currentUser.role !== 'Super Admin') {
       return (
         <main className="flex flex-1 flex-col items-center justify-center gap-6 p-6 md:gap-8 md:p-10 text-center">
             <Lock className="h-16 w-16 text-muted-foreground" />
-            <h1 className="text-3xl font-bold">Access Restricted</h1>
-            <p className="text-muted-foreground">
-                Only Admins can view event logs.
+            <h1 className="text-3xl font-bold tracking-tight">Access Restricted</h1>
+            <p className="max-w-[400px] text-muted-foreground">
+                Administrative privileges are required to view technical event logs and API usage metrics.
             </p>
-            <Button asChild>
+            <Button asChild className="rounded-full">
                 <Link href="/dashboard">Return to Dashboard</Link>
             </Button>
         </main>
@@ -111,63 +133,116 @@ export default function LogsPage() {
   }
 
   return (
-    <main className="flex flex-1 flex-col gap-6 p-6 md:gap-8 md:p-10">
-      <div className="flex items-center justify-between">
+    <main className="flex flex-1 flex-col gap-6 p-6 md:gap-8 md:p-10 max-w-7xl mx-auto w-full">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Event Logs</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Event Logs & API Tracker</h1>
           <p className="text-muted-foreground">
-            A real-time stream of incoming events and message delivery status.
+            Monitoring message delivery status and partner tool activity.
           </p>
         </div>
+        <Button onClick={() => loadPageData()} variant="outline" size="sm" className="rounded-full gap-2">
+          <RefreshCcw className="h-4 w-4" /> Refresh Data
+        </Button>
       </div>
 
-      <Card>
+      {/* USAGE TRACKER CARDS (A-Z FIX) */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
+        <Card className="border-blue-200 bg-blue-50/30 shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Total API Requests</CardTitle>
+            <Zap className="h-4 w-4 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{apiStats.total.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground mt-1">Lifetime messages from external tool</p>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Last 24 Hours</CardTitle>
+            <BarChart3 className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-green-600">+{apiStats.last24h.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground mt-1">Successfully synced messages today</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="shadow-sm">
         <CardHeader>
-          <CardTitle>Recent Messages</CardTitle>
-          <CardDescription>
-            Showing the last 1000 processed events.
-          </CardDescription>
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <CardTitle>Recent Messages</CardTitle>
+              <CardDescription>
+                Detailed technical stream of the last 1000 events.
+              </CardDescription>
+            </div>
+            <div className="relative w-full md:w-72">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Filter by recipient or event..."
+                className="pl-8 rounded-full bg-secondary/50"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {error ? (
-            <div className="text-center text-destructive">{error}</div>
+            <div className="text-center p-10 bg-destructive/10 rounded-2xl text-destructive border border-destructive/20">
+              <AlertTriangle className="mx-auto h-8 w-8 mb-2" />
+              <p className="font-semibold">{error}</p>
+              <Button onClick={() => loadPageData()} variant="link" className="mt-2">Try again</Button>
+            </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="rounded-xl border overflow-hidden">
                 <Table>
-                <TableHeader>
+                <TableHeader className="bg-muted/50">
                     <TableRow>
-                    <TableHead className="w-[100px]">Status</TableHead>
-                    <TableHead>Event</TableHead>
+                    <TableHead className="w-[140px]">Status</TableHead>
+                    <TableHead>Event Type</TableHead>
                     <TableHead>Recipient</TableHead>
-                    <TableHead>Details</TableHead>
+                    <TableHead className="hidden md:table-cell">Details</TableHead>
                     <TableHead className="text-right">Timestamp</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {logs.length > 0 ? logs.map((log, index) => {
-                        const config = statusConfig[log.status as keyof typeof statusConfig];
+                    {filteredLogs.length > 0 ? filteredLogs.map((log, index) => {
+                        const config = statusConfig[log.status as keyof typeof statusConfig] || statusConfig.FAILURE;
                         const Icon = config.icon;
                         return (
-                            <TableRow key={index}>
+                            <TableRow key={index} className="hover:bg-muted/30 transition-colors">
                                 <TableCell>
-                                    <Badge variant={config.variant as any} className={config.className}>
-                                        <Icon className="h-4 w-4 mr-2" />
+                                    <Badge variant={config.variant as any} className={cn("rounded-full font-medium px-2.5 py-0.5", config.className)}>
+                                        <Icon className="h-3.5 w-3.5 mr-1.5" />
                                         {config.label}
                                     </Badge>
                                 </TableCell>
-                                <TableCell className="font-medium">{log.event}</TableCell>
-                                <TableCell>{log.recipient}</TableCell>
-                                <TableCell className="text-muted-foreground text-xs max-w-sm truncate">
-                                    {log.error ? log.error : log.details?.message || `Template: ${log.details?.template}`}
+                                <TableCell className="font-medium text-sm">{log.event}</TableCell>
+                                <TableCell className="text-sm font-mono">{log.recipient}</TableCell>
+                                <TableCell className="hidden md:table-cell text-muted-foreground text-xs max-w-md">
+                                    <span className="truncate block">
+                                      {log.error ? log.error : log.details?.message || `Template ID: ${log.details?.template || 'N/A'}`}
+                                    </span>
                                 </TableCell>
-                                <TableCell className="text-right text-muted-foreground text-xs">
-                                     {formatDistanceToNow(new Date(log.timestamp), { addSuffix: true })}
+                                <TableCell className="text-right text-muted-foreground text-xs whitespace-nowrap">
+                                     <div className="font-medium text-foreground">
+                                       {format(new Date(log.timestamp), 'HH:mm:ss')}
+                                     </div>
+                                     <div className="text-[10px]">
+                                       {formatDistanceToNow(new Date(log.timestamp), { addSuffix: true })}
+                                     </div>
                                 </TableCell>
                             </TableRow>
                         )
                     }) : (
                         <TableRow>
-                            <TableCell colSpan={5} className="text-center">No logs found.</TableCell>
+                            <TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic">
+                              No log entries found matching your search.
+                            </TableCell>
                         </TableRow>
                     )}
                 </TableBody>

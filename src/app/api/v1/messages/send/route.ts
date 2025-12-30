@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { logMessageEvent } from '@/lib/logger'; // ✅ Ensure this import exists
+import { logMessageEvent } from '@/lib/logger'; // ✅ Correctly imported
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -62,9 +62,9 @@ export async function POST(req: Request) {
     const result = await response.json();
     if (!response.ok) throw new Error(result.error?.message || "Meta API Error");
 
-    // --- NEW: SYNC TO DASHBOARD & TRACKER ---
+    // --- TRACKER & DASHBOARD SYNC (The "Senior Dev" Fix) ---
     
-    // A. Technical Log (For 'Event Logs' page)
+    // A. Technical Log: This populates the "Recent Messages" list (image_c3174d.png)
     await logMessageEvent({
       idempotencyKey: body.idempotencyKey || result.messages?.[0]?.id,
       type: 'booking',
@@ -74,7 +74,7 @@ export async function POST(req: Request) {
       details: { templateName: body.templateName, variables: body.variables }
     });
 
-    // B. Find or Create Conversation (For 'Inbox' visibility)
+    // B. Conversation Management: Ensures contact appears in Inbox (image_c3176b.png)
     const { data: conv } = await supabase
       .from('conversations')
       .select('id')
@@ -97,8 +97,8 @@ export async function POST(req: Request) {
       conversationId = newConv?.id;
     }
 
-    // C. Insert Message Bubble (For 'Inbox' and 'Usage Tracker')
-    // type: 'api_tool' allows the Tracker Card to count this message
+    // C. Inbox & Usage Sync: This triggers the tracker count (image_c1c517.png)
+    // IMPORTANT: 'type: api_tool' is the filter for your tracker cards.
     await supabase.from('messages').insert({
       conversation_id: conversationId,
       content: `API Template: ${body.templateName}`, 
@@ -107,11 +107,12 @@ export async function POST(req: Request) {
       status: 'sent',
       metadata: { 
         template: body.templateName, 
+        variables: body.variables,
         meta_id: result.messages?.[0]?.id 
       }
     });
 
-    // D. Update the Conversation list to show the new message at the top
+    // D. Immediate UI Refresh: Pushes conversation to the top
     await supabase.from('conversations')
       .update({ last_message_at: new Date().toISOString() })
       .eq('id', conversationId);
